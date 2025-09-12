@@ -372,6 +372,21 @@ export const insertCompanyObjectiveSchema = createInsertSchema(companyObjectives
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  startDate: z.string()
+    .min(1, "Start date is required")
+    .refine((str) => {
+      const date = new Date(str);
+      return !isNaN(date.getTime());
+    }, "Invalid date format")
+    .transform((str) => new Date(str)),
+  endDate: z.string()
+    .min(1, "End date is required")
+    .refine((str) => {
+      const date = new Date(str);
+      return !isNaN(date.getTime());
+    }, "Invalid date format")
+    .transform((str) => new Date(str)),
 });
 
 export const insertKeyResultSchema = createInsertSchema(keyResults).omit({
@@ -384,6 +399,21 @@ export const insertTeamObjectiveSchema = createInsertSchema(teamObjectives).omit
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  startDate: z.string()
+    .min(1, "Start date is required")
+    .refine((str) => {
+      const date = new Date(str);
+      return !isNaN(date.getTime());
+    }, "Invalid date format")
+    .transform((str) => new Date(str)),
+  endDate: z.string()
+    .min(1, "End date is required")
+    .refine((str) => {
+      const date = new Date(str);
+      return !isNaN(date.getTime());
+    }, "Invalid date format")
+    .transform((str) => new Date(str)),
 });
 
 export const insertTeamKeyResultSchema = createInsertSchema(teamKeyResults).omit({
