@@ -343,6 +343,12 @@ export const insertWeeklyCheckInSchema = createInsertSchema(weeklyCheckIns).omit
     .max(100, "Progress cannot exceed 100"),
 });
 
+export const insertUserCompetencySchema = createInsertSchema(userCompetencies).omit({
+  id: true,
+  lastAssessedAt: true,
+  updatedAt: true,
+});
+
 export const insertDevelopmentPlanSchema = createInsertSchema(developmentPlans).omit({
   id: true,
   createdAt: true,
@@ -378,6 +384,7 @@ export type InsertCompanyObjective = z.infer<typeof insertCompanyObjectiveSchema
 export type InsertKeyResult = z.infer<typeof insertKeyResultSchema>;
 export type InsertGoal = z.infer<typeof insertGoalSchema>;
 export type InsertWeeklyCheckIn = z.infer<typeof insertWeeklyCheckInSchema>;
+export type InsertUserCompetency = z.infer<typeof insertUserCompetencySchema>;
 export type InsertDevelopmentPlan = z.infer<typeof insertDevelopmentPlanSchema>;
 export type InsertMeeting = z.infer<typeof insertMeetingSchema>;
 export type InsertRecognition = z.infer<typeof insertRecognitionSchema>;

@@ -24,6 +24,7 @@ import {
   type InsertCompanyObjective,
   type InsertGoal,
   type InsertWeeklyCheckIn,
+  type InsertUserCompetency,
   type InsertDevelopmentPlan,
   type InsertMeeting,
   type InsertRecognition,
@@ -55,7 +56,8 @@ export interface IStorage {
   
   // Competencies
   getCompetencies(): Promise<Competency[]>;
-  getUserCompetencies(userId: string): Promise<UserCompetency[]>;
+  getUserCompetencies(userId: string): Promise<any[]>;
+  createUserCompetency(userCompetency: InsertUserCompetency): Promise<UserCompetency>;
   
   // Development plans
   getUserDevelopmentPlans(userId: string): Promise<DevelopmentPlan[]>;
@@ -206,12 +208,38 @@ export class DatabaseStorage implements IStorage {
       .orderBy(competencies.name);
   }
 
-  async getUserCompetencies(userId: string): Promise<UserCompetency[]> {
+  async getUserCompetencies(userId: string): Promise<any[]> {
     return await db
-      .select()
+      .select({
+        id: userCompetencies.id,
+        userId: userCompetencies.userId,
+        competencyId: userCompetencies.competencyId,
+        currentLevel: userCompetencies.currentLevel,
+        targetLevel: userCompetencies.targetLevel,
+        lastAssessedAt: userCompetencies.lastAssessedAt,
+        updatedAt: userCompetencies.updatedAt,
+        competency: {
+          id: competencies.id,
+          name: competencies.name,
+          description: competencies.description,
+          category: competencies.category,
+        }
+      })
       .from(userCompetencies)
+      .leftJoin(competencies, eq(userCompetencies.competencyId, competencies.id))
       .where(eq(userCompetencies.userId, userId))
-      .orderBy(userCompetencies.updatedAt);
+      .orderBy(desc(userCompetencies.updatedAt));
+  }
+
+  async createUserCompetency(userCompetencyData: InsertUserCompetency): Promise<UserCompetency> {
+    const [userCompetency] = await db
+      .insert(userCompetencies)
+      .values({
+        ...userCompetencyData,
+        lastAssessedAt: new Date(),
+      })
+      .returning();
+    return userCompetency;
   }
 
   // Development plans

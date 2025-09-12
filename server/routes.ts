@@ -5,6 +5,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import {
   insertGoalSchema,
   insertWeeklyCheckInSchema,
+  insertUserCompetencySchema,
   insertDevelopmentPlanSchema,
   insertMeetingSchema,
   insertRecognitionSchema,
@@ -170,6 +171,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user competencies:", error);
       res.status(500).json({ message: "Failed to fetch user competencies" });
+    }
+  });
+
+  app.post('/api/user-competencies', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const competencyData = insertUserCompetencySchema.parse({ ...req.body, userId });
+      const userCompetency = await storage.createUserCompetency(competencyData);
+      res.json(userCompetency);
+    } catch (error: any) {
+      console.error("Error creating user competency:", error);
+      
+      // Handle validation errors specifically
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid data provided", 
+          errors: error.errors 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to create competency assessment" });
     }
   });
 
