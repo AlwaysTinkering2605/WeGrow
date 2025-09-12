@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Mail, Phone, User } from "lucide-react";
-import ProgressRing from "./ProgressRing";
+// import ProgressRing from "./ProgressRing"; // TODO: Create or fix ProgressRing component
 
 export default function Profile() {
   const { user } = useAuth();
@@ -85,19 +85,25 @@ export default function Profile() {
           
           <div className="grid md:grid-cols-3 gap-6">
             <div className="text-center">
-              <ProgressRing value={87} size={64} strokeWidth={4} className="mx-auto mb-2" />
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <span className="text-2xl font-bold text-green-600">87%</span>
+              </div>
               <p className="font-medium" data-testid="text-goal-completion">Goal Completion</p>
               <p className="text-xs text-muted-foreground">This Quarter</p>
             </div>
 
             <div className="text-center">
-              <ProgressRing value={80} size={64} strokeWidth={4} className="mx-auto mb-2" color="blue" />
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <span className="text-2xl font-bold text-blue-600">80%</span>
+              </div>
               <p className="font-medium" data-testid="text-training-progress">Training Progress</p>
               <p className="text-xs text-muted-foreground">Current Year</p>
             </div>
 
             <div className="text-center">
-              <ProgressRing value={92} size={64} strokeWidth={4} className="mx-auto mb-2" color="purple" />
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <span className="text-2xl font-bold text-purple-600">92%</span>
+              </div>
               <p className="font-medium" data-testid="text-quality-score">Quality Score</p>
               <p className="text-xs text-muted-foreground">Last 30 Days</p>
             </div>

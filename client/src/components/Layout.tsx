@@ -11,6 +11,9 @@ import {
   User,
   Bell,
   ChevronDown,
+  BarChart3,
+  Settings,
+  UsersRound,
 } from "lucide-react";
 import Dashboard from "./Dashboard";
 import Goals from "./Goals";
@@ -19,14 +22,20 @@ import Recognition from "./Recognition";
 import Meetings from "./Meetings";
 import Profile from "./Profile";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "profile";
+// Role-based components
+import TeamManagement from "./TeamManagement";
+import Reports from "./Reports";
+import CompanySettings from "./CompanySettings";
+
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "profile" | "team" | "reports" | "settings";
 
 export default function Layout() {
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
   const { user } = useAuth();
   const isMobile = useIsMobile();
 
-  const tabs = [
+  // Base tabs available to all users
+  const baseTabs = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, component: Dashboard },
     { id: "goals", label: "My Goals", icon: Target, component: Goals },
     { id: "development", label: "Development", icon: BookOpen, component: Development },
@@ -34,6 +43,29 @@ export default function Layout() {
     { id: "meetings", label: "1-on-1s", icon: Users, component: Meetings },
     { id: "profile", label: "Profile", icon: User, component: Profile },
   ];
+
+  // Additional tabs for supervisors and leadership
+  const supervisorTabs = [
+    { id: "team", label: "Team Management", icon: UsersRound, component: TeamManagement },
+  ];
+
+  const leadershipTabs = [
+    { id: "team", label: "Team Management", icon: UsersRound, component: TeamManagement },
+    { id: "reports", label: "Reports", icon: BarChart3, component: Reports },
+    { id: "settings", label: "Company Settings", icon: Settings, component: CompanySettings },
+  ];
+
+  // Determine tabs based on user role
+  const getRoleTabs = () => {
+    if (user?.role === 'leadership') {
+      return [...baseTabs, ...leadershipTabs];
+    } else if (user?.role === 'supervisor') {
+      return [...baseTabs, ...supervisorTabs];
+    }
+    return baseTabs; // operative or default
+  };
+
+  const tabs = getRoleTabs();
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component || Dashboard;
 
