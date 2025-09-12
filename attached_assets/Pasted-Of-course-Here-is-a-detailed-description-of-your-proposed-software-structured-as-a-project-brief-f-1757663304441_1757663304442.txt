@@ -1,0 +1,105 @@
+Of course. Here is a detailed description of your proposed software, structured as a project brief for a software developer. This document outlines the vision, target users, core features, and technical considerations to ensure the final product is "best in class" for your commercial cleaning business.
+
+---
+
+### **Project Brief: "Apex" - Performance & Development Platform**
+
+**1. Executive Summary**
+
+**Project Vision:** To create a simple, engaging, and mobile-first software platform named "Apex" that seamlessly integrates Personal Development Plans (PDPs) with an Objectives and Key Results (OKR) framework. Apex will empower our 150 cleaning operatives, supervisors, and management team by directly connecting their individual goals and skills development to the strategic objectives of the company. The ultimate aim is to improve employee engagement, service quality, client retention, and operational efficiency.
+
+**Problem Statement:** Our current methods for managing employee performance and development are fragmented, relying on paper forms, spreadsheets, and informal conversations. This makes it difficult to track progress, ensure consistency, and clearly demonstrate to each employee how their crucial work contributes to the company's success. For a distributed workforce like ours, a centralised, digital solution is essential.
+
+**Core Philosophy:**
+* **Simplicity First:** The interface must be incredibly intuitive, especially for our frontline staff who may not be tech-savvy. Minimal clicks, clear language, and visual cues are paramount.
+* **Mobile-First:** The majority of our staff are on-site, not at a desk. The mobile experience must be flawless and the primary way most users interact with the platform.
+* **Transparency & Alignment:** Every user should be able to see the company's top-level goals and how their team and individual objectives link to them.
+* **Action-Oriented:** The platform should drive behaviour through timely reminders, notifications, and clear calls to action.
+
+---
+
+**2. User Personas**
+
+1.  **Cleaning Operative (e.g., "Maria")**:
+    * **Primary Device:** Smartphone.
+    * **Needs:** To see her goals clearly (e.g., "Achieve 95%+ on client quality audits," "Complete Biohazard Cleaning Certification"). To know what training she needs to complete. To receive feedback and recognition for her hard work.
+    * **Pain Points:** Doesn't feel connected to the main office. Unsure of career progression opportunities. Paperwork is cumbersome.
+
+2.  **Area Supervisor (e.g., "David")**:
+    * **Primary Devices:** Smartphone (on-site) and Tablet/Laptop (for admin).
+    * **Needs:** To manage the goals and development of his team (10-15 operatives). To conduct and log 1-on-1 meetings. To track team-level objectives (e.g., "Reduce chemical wastage by 10%," "Achieve 100% team attendance for Q3"). To quickly see who is on track and who needs support.
+    * **Pain Points:** Spends too much time chasing paperwork and compiling reports. Lacks a single view of his team's performance.
+
+3.  **Senior Leadership (e.g., "Sarah, Operations Director")**:
+    * **Primary Device:** Laptop/Desktop.
+    * **Needs:** To set and communicate company-wide strategic objectives (e.g., "Increase client retention to 98%," "Reduce safety incidents to zero"). To have a high-level dashboard showing the health of the entire organisation. To identify high-performing teams and areas needing strategic intervention.
+    * **Pain Points:** Lack of real-time data on goal progress. Difficulty ensuring that company strategy is being executed effectively on the ground.
+
+---
+
+**3. Core Modules & Functionality**
+
+**Module 1: OKR & Goal Management**
+
+* **Company Objectives Hub:** An area for leadership to define 3-5 high-level, inspirational company objectives for each cycle (e.g., quarterly or annually). Each Objective should have 3-5 measurable Key Results.
+* **Goal Cascading & Alignment:**
+    * Allow Area Supervisors to create Team OKRs that directly link to and support a Company Objective.
+    * Allow individuals (or their supervisors on their behalf) to create Individual OKRs that link to Team or Company Objectives.
+    * **Visual Alignment Tree:** A graphical representation showing the hierarchy of goals, from the company level down to the individual. This is the core of the alignment feature.
+* **Goal Creation Wizard:** A simple, step-by-step process to help users create S.M.A.R.T. (Specific, Measurable, Achievable, Relevant, Time-bound) goals and Key Results. Suggest relevant KRs based on job role (e.g., for an operative, suggest "Client Quality Audit Score").
+* **Weekly Check-ins:**
+    * A simple, prompted process for users to update the progress of their Key Results (e.g., using a slider from 0-100%).
+    * Users must also set a confidence level: **Green** (On Track), **Amber** (At Risk), or **Red** (Off Track).
+    * A field for a brief text update: "What have you achieved? Any roadblocks?"
+    * Automated push notifications and reminders to complete check-ins.
+
+**Module 2: Personal Development Plan (PDP)**
+
+* **Competency Framework:** An admin-defined library of core competencies relevant to our business (e.g., "Health & Safety Protocol," "COSHH Knowledge," "Client Communication," "Equipment Operation").
+* **Development Goals:** A space for employees and their managers to set specific development goals (e.g., "Get certified on the new ride-on scrubber," "Complete leadership training"). These can be linked to competencies.
+* **Learning Hub:** A simple library of resources. This could include:
+    * Internal documents (PDFs, training manuals).
+    * Internal videos (e.g., a "how-to" on a cleaning technique).
+    * Links to approved external courses.
+* **Training Log:** A simple record of all completed training, including dates and the ability to upload certificates or digital badges.
+
+**Module 3: Feedback & Communication**
+
+* **1-on-1 Meeting Tool:**
+    * A shared space for a manager and their direct report.
+    * Ability to schedule meetings and set a shared agenda.
+    * The agenda can automatically pull in the employee's current OKRs and PDP goals for discussion.
+    * Space to record private notes and shared action items.
+* **Recognition Wall ("Shout-Outs"):**
+    * A public feed where any employee can give positive recognition to a colleague.
+    * Shout-outs can be linked to specific company values (e.g., "Teamwork," "Excellence").
+    * This fosters morale and reinforces desired behaviours.
+
+**Module 4: Dashboards & Reporting**
+
+* **Individual Dashboard:** A personalised view showing the user's current OKRs, progress, upcoming PDP tasks, and recent feedback.
+* **Manager Dashboard:** A "mission control" view of the manager's team. Shows overall team progress, flags at-risk goals, and highlights employees who haven't checked in.
+* **Leadership Dashboard:** A high-level, company-wide view. Heatmaps showing progress by department, overall OKR attainment percentage, and key engagement metrics (e.g., check-in rate).
+
+---
+
+**4. Non-Functional Requirements**
+
+* **User Interface (UI) & Experience (UX):** Must be clean, uncluttered, and highly visual (using progress bars, colour codes, icons). Requires minimal training to use. Multi-language support (e.g., English, Polish, Spanish) should be considered.
+* **Performance:** The application must be fast and responsive, even on low-cost smartphones and with poor mobile data connections.
+* **Security:** Role-based access control is essential. Managers can only see their team's data. All data must be encrypted in transit and at rest.
+* **Notifications:** A robust notification system (push, email) for reminders, new feedback, meeting invites, and goal updates. Users should be able to manage their notification preferences.
+* **Scalability:** The architecture should be able to support growth from our current 150 employees to 500+ without a significant performance degradation.
+
+---
+
+**5. Technical Considerations & Suggestions**
+
+* **Platform:** This should be built as a **Progressive Web App (PWA)**. This provides a native app-like experience on mobile (can be "installed" on the home screen) without the complexities and costs of managing separate iOS and Android app store builds. It also works seamlessly on desktop browsers.
+* **Backend:** A modern, scalable framework like Node.js, Python (Django/FastAPI), or Ruby on Rails.
+* **Frontend:** A modern JavaScript framework like React or Vue.js for a dynamic and responsive user experience.
+* **Database:** A relational database like PostgreSQL is suitable for the structured data involved.
+* **Hosting:** A cloud platform like AWS, Google Cloud, or Azure will provide the necessary scalability and reliability.
+* **Integrations (Future-proofing):** Design the system with an API-first approach to allow for future integrations with our HR/Payroll system (for user provisioning) or a potential scheduling system.
+
+By focusing on these specific requirements, we will create a platform that is not just a tool, but a central part of our company culture, driving performance and investing in our most valuable asset: our people.
