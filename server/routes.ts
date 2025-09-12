@@ -175,6 +175,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/team-objectives/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is supervisor or leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const { id } = req.params;
+      await storage.deleteTeamObjective(id);
+      res.json({ message: "Team objective deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting team objective:", error);
+      res.status(500).json({ message: "Failed to delete team objective" });
+    }
+  });
+
   // Company Reports (Leadership only)
   app.get('/api/company/metrics', isAuthenticated, async (req: any, res) => {
     try {

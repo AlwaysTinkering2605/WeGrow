@@ -24,10 +24,11 @@ import Profile from "./Profile";
 
 // Role-based components
 import TeamManagement from "./TeamManagement";
+import TeamObjectives from "./TeamObjectives";
 import Reports from "./Reports";
 import CompanySettings from "./CompanySettings";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "profile" | "team" | "reports" | "settings";
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "profile" | "team" | "team-objectives" | "reports" | "settings";
 
 export default function Layout() {
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
@@ -47,10 +48,12 @@ export default function Layout() {
   // Additional tabs for supervisors and leadership
   const supervisorTabs = [
     { id: "team", label: "Team Management", icon: UsersRound, component: TeamManagement },
+    { id: "team-objectives", label: "Team Objectives", icon: Target, component: TeamObjectives },
   ];
 
   const leadershipTabs = [
     { id: "team", label: "Team Management", icon: UsersRound, component: TeamManagement },
+    { id: "team-objectives", label: "Team Objectives", icon: Target, component: TeamObjectives },
     { id: "reports", label: "Reports", icon: BarChart3, component: Reports },
     { id: "settings", label: "Company Settings", icon: Settings, component: CompanySettings },
   ];
