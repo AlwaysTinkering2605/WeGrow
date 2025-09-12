@@ -1,6 +1,8 @@
 import {
   users,
   companyObjectives,
+  teamObjectives,
+  teamKeyResults,
   keyResults,
   goals,
   weeklyCheckIns,
@@ -13,6 +15,8 @@ import {
   type User,
   type UpsertUser,
   type CompanyObjective,
+  type TeamObjective,
+  type TeamKeyResult,
   type Goal,
   type WeeklyCheckIn,
   type Competency,
@@ -22,6 +26,8 @@ import {
   type Meeting,
   type Recognition,
   type InsertCompanyObjective,
+  type InsertTeamObjective,
+  type InsertTeamKeyResult,
   type InsertGoal,
   type InsertWeeklyCheckIn,
   type InsertUserCompetency,
@@ -41,6 +47,18 @@ export interface IStorage {
   // Company objectives
   getActiveCompanyObjectives(): Promise<CompanyObjective[]>;
   createCompanyObjective(objective: InsertCompanyObjective): Promise<CompanyObjective>;
+  updateCompanyObjective(id: string, objective: Partial<InsertCompanyObjective>): Promise<CompanyObjective>;
+  deleteCompanyObjective(id: string): Promise<void>;
+  
+  // Team objectives
+  getTeamObjectives(teamName?: string, supervisorId?: string): Promise<TeamObjective[]>;
+  createTeamObjective(objective: InsertTeamObjective): Promise<TeamObjective>;
+  updateTeamObjective(id: string, objective: Partial<InsertTeamObjective>): Promise<TeamObjective>;
+  deleteTeamObjective(id: string): Promise<void>;
+  
+  // Team key results
+  getTeamKeyResults(teamObjectiveId: string): Promise<TeamKeyResult[]>;
+  createTeamKeyResult(keyResult: InsertTeamKeyResult): Promise<TeamKeyResult>;
   
   // Goals
   getUserGoals(userId: string): Promise<Goal[]>;
@@ -151,6 +169,76 @@ export class DatabaseStorage implements IStorage {
     const [created] = await db
       .insert(companyObjectives)
       .values(objective)
+      .returning();
+    return created;
+  }
+
+  async updateCompanyObjective(id: string, objective: Partial<InsertCompanyObjective>): Promise<CompanyObjective> {
+    const [updated] = await db
+      .update(companyObjectives)
+      .set({ ...objective, updatedAt: new Date() })
+      .where(eq(companyObjectives.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCompanyObjective(id: string): Promise<void> {
+    await db
+      .update(companyObjectives)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(companyObjectives.id, id));
+  }
+
+  // Team objectives
+  async getTeamObjectives(teamName?: string, supervisorId?: string): Promise<TeamObjective[]> {
+    const conditions = [];
+    if (teamName) conditions.push(eq(teamObjectives.teamName, teamName));
+    if (supervisorId) conditions.push(eq(teamObjectives.supervisorId, supervisorId));
+    
+    return await db
+      .select()
+      .from(teamObjectives)
+      .where(and(eq(teamObjectives.isActive, true), ...conditions))
+      .orderBy(desc(teamObjectives.startDate));
+  }
+
+  async createTeamObjective(objective: InsertTeamObjective): Promise<TeamObjective> {
+    const [created] = await db
+      .insert(teamObjectives)
+      .values(objective)
+      .returning();
+    return created;
+  }
+
+  async updateTeamObjective(id: string, objective: Partial<InsertTeamObjective>): Promise<TeamObjective> {
+    const [updated] = await db
+      .update(teamObjectives)
+      .set({ ...objective, updatedAt: new Date() })
+      .where(eq(teamObjectives.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTeamObjective(id: string): Promise<void> {
+    await db
+      .update(teamObjectives)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(teamObjectives.id, id));
+  }
+
+  // Team key results
+  async getTeamKeyResults(teamObjectiveId: string): Promise<TeamKeyResult[]> {
+    return await db
+      .select()
+      .from(teamKeyResults)
+      .where(eq(teamKeyResults.teamObjectiveId, teamObjectiveId))
+      .orderBy(teamKeyResults.createdAt);
+  }
+
+  async createTeamKeyResult(keyResult: InsertTeamKeyResult): Promise<TeamKeyResult> {
+    const [created] = await db
+      .insert(teamKeyResults)
+      .values(keyResult)
       .returning();
     return created;
   }

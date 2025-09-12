@@ -4,6 +4,9 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import {
   insertGoalSchema,
+  insertCompanyObjectiveSchema,
+  insertTeamObjectiveSchema,
+  insertTeamKeyResultSchema,
   insertWeeklyCheckInSchema,
   insertUserCompetencySchema,
   insertDevelopmentPlanSchema,
@@ -69,6 +72,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching objectives:", error);
       res.status(500).json({ message: "Failed to fetch objectives" });
+    }
+  });
+
+  app.post('/api/objectives', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const objectiveData = insertCompanyObjectiveSchema.parse({ 
+        ...req.body, 
+        createdBy: req.user.claims.sub 
+      });
+      const objective = await storage.createCompanyObjective(objectiveData);
+      res.json(objective);
+    } catch (error) {
+      console.error("Error creating company objective:", error);
+      res.status(500).json({ message: "Failed to create company objective" });
+    }
+  });
+
+  app.put('/api/objectives/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const updateData = req.body;
+      const objective = await storage.updateCompanyObjective(id, updateData);
+      res.json(objective);
+    } catch (error) {
+      console.error("Error updating company objective:", error);
+      res.status(500).json({ message: "Failed to update company objective" });
+    }
+  });
+
+  app.delete('/api/objectives/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      await storage.deleteCompanyObjective(id);
+      res.json({ message: "Company objective deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting company objective:", error);
+      res.status(500).json({ message: "Failed to delete company objective" });
+    }
+  });
+
+  // Team objectives
+  app.get('/api/team-objectives', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      
+      // Different access patterns based on role
+      let teamObjectives;
+      if (user?.role === 'leadership') {
+        // Leadership can see all team objectives
+        teamObjectives = await storage.getTeamObjectives();
+      } else if (user?.role === 'supervisor') {
+        // Supervisors can see objectives for their teams
+        teamObjectives = await storage.getTeamObjectives(undefined, req.user.claims.sub);
+      } else {
+        // Operatives can see objectives for their team
+        teamObjectives = await storage.getTeamObjectives(user?.teamName || undefined);
+      }
+      
+      res.json(teamObjectives);
+    } catch (error) {
+      console.error("Error fetching team objectives:", error);
+      res.status(500).json({ message: "Failed to fetch team objectives" });
+    }
+  });
+
+  app.post('/api/team-objectives', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is supervisor or leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const objectiveData = insertTeamObjectiveSchema.parse({ 
+        ...req.body, 
+        supervisorId: req.user.claims.sub 
+      });
+      const objective = await storage.createTeamObjective(objectiveData);
+      res.json(objective);
+    } catch (error) {
+      console.error("Error creating team objective:", error);
+      res.status(500).json({ message: "Failed to create team objective" });
     }
   });
 
