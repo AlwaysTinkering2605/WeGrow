@@ -32,6 +32,11 @@ export default function Dashboard() {
     retry: false,
   });
 
+  const { data: checkIns } = useQuery({
+    queryKey: ["/api/check-ins"],
+    retry: false,
+  });
+
   if (goalsLoading) {
     return (
       <div className="space-y-6">
@@ -55,6 +60,36 @@ export default function Dashboard() {
     : 0;
 
   const pendingDevelopmentPlans = (developmentPlans as any[])?.filter((plan: any) => plan.status === 'in_progress') || [];
+
+  // Calculate days until next check-in is due
+  const calculateDaysToCheckIn = () => {
+    const userCheckIns = (checkIns as any[]) || [];
+    if (userCheckIns.length === 0) {
+      // If no check-ins exist, assume check-in is due now
+      return 0;
+    }
+
+    // Find the most recent check-in
+    const latestCheckIn = userCheckIns.sort((a: any, b: any) => 
+      new Date(b.weekStarting).getTime() - new Date(a.weekStarting).getTime()
+    )[0];
+
+    if (!latestCheckIn) return 0;
+
+    // Calculate next check-in date (7 days after the last one)
+    const lastCheckInDate = new Date(latestCheckIn.weekStarting);
+    const nextCheckInDate = new Date(lastCheckInDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const today = new Date();
+    
+    // Calculate days difference
+    const diffTime = nextCheckInDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Return 0 if overdue, otherwise return days remaining
+    return Math.max(0, diffDays);
+  };
+
+  const daysToCheckIn = calculateDaysToCheckIn();
 
   return (
     <div className="space-y-6">
@@ -96,9 +131,11 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="text-2xl font-bold text-yellow-600" data-testid="text-check-in-due">
-              2
+              {daysToCheckIn}
             </div>
-            <div className="text-sm text-muted-foreground">Days to Check-in</div>
+            <div className="text-sm text-muted-foreground">
+              {daysToCheckIn === 0 ? "Check-in Due" : `Days to Check-in`}
+            </div>
           </CardContent>
         </Card>
 
