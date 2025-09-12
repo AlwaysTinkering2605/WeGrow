@@ -14,8 +14,8 @@ import { Plus, Target } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertGoalSchema } from "@shared/schema";
-import GoalAlignment from "./GoalAlignment";
-import WeeklyCheckIn from "./WeeklyCheckIn";
+// import GoalAlignment from "./GoalAlignment";
+// import WeeklyCheckIn from "./WeeklyCheckIn";
 
 // Enhanced form schema with date validation
 const goalSchema = insertGoalSchema.omit({ userId: true }).extend({
@@ -42,6 +42,11 @@ export default function Goals() {
 
   const { data: objectives } = useQuery({
     queryKey: ["/api/objectives"],
+    retry: false,
+  });
+
+  const { data: teamObjectives } = useQuery({
+    queryKey: ["/api/team-objectives"],
     retry: false,
   });
 
@@ -232,28 +237,58 @@ export default function Goals() {
                     )}
                   />
                 </div>
-                {(objectives as any[])?.length > 0 && (
+                {/* Objective Selection - 3-tier hierarchy support */}
+                {((objectives as any[])?.length > 0 || (teamObjectives as any[])?.length > 0) && (
                   <FormField
                     control={goalForm.control}
                     name="parentObjectiveId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Link to Company Objective (Optional)</FormLabel>
+                        <FormLabel>Link to Objective (Optional)</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
                             <SelectTrigger data-testid="select-goal-objective">
-                              <SelectValue placeholder="Select company objective" />
+                              <SelectValue placeholder="Select team or company objective" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {(objectives as any[])?.map((objective: any) => (
-                              <SelectItem key={objective.id} value={objective.id}>
-                                {objective.title}
-                              </SelectItem>
-                            ))}
+                            {/* Team Objectives - Preferred for individual goals */}
+                            {(teamObjectives as any[])?.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Team Objectives</div>
+                                {(teamObjectives as any[]).map((objective: any) => (
+                                  <SelectItem key={`team-${objective.id}`} value={objective.id}>
+                                    <div className="flex items-center space-x-2">
+                                      <span className="text-blue-600 text-xs">TEAM</span>
+                                      <span>{objective.title}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
+                            {/* Company Objectives */}
+                            {(objectives as any[])?.length > 0 && (
+                              <>
+                                {(teamObjectives as any[])?.length > 0 && <div className="border-t my-1" />}
+                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Company Objectives</div>
+                                {(objectives as any[]).map((objective: any) => (
+                                  <SelectItem key={`company-${objective.id}`} value={objective.id}>
+                                    <div className="flex items-center space-x-2">
+                                      <span className="text-green-600 text-xs">COMPANY</span>
+                                      <span>{objective.title}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
                           </SelectContent>
                         </Select>
                         <FormMessage />
+                        {(teamObjectives as any[])?.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            💡 Tip: Link to team objectives for better goal alignment
+                          </p>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -275,8 +310,52 @@ export default function Goals() {
         </Dialog>
       </div>
 
-      <GoalAlignment goals={activeGoals} objectives={objectives || []} />
-      <WeeklyCheckIn goals={activeGoals} />
+      {/* Goal Lists and Weekly Check-ins will be rendered here when components are available */}
+      <div className="grid md:grid-cols-1 gap-6">
+        {activeGoals.length > 0 ? (
+          <div className="space-y-4">
+            {activeGoals.map((goal: any) => (
+              <Card key={goal.id} data-testid={`goal-${goal.id}`}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-lg" data-testid={`text-goal-title-${goal.id}`}>
+                        {goal.title}
+                      </h4>
+                      {goal.description && (
+                        <p className="text-muted-foreground text-sm mt-1" data-testid={`text-goal-description-${goal.id}`}>
+                          {goal.description}
+                        </p>
+                      )}
+                      <div className="flex items-center space-x-4 mt-3 text-sm">
+                        <span className="flex items-center space-x-1">
+                          <Target className="w-4 h-4" />
+                          <span data-testid={`text-goal-progress-${goal.id}`}>
+                            {goal.currentValue} / {goal.targetValue} {goal.unit}
+                          </span>
+                        </span>
+                        <span className="text-muted-foreground">
+                          Ends: {new Date(goal.endDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <Target className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold">No Goals Yet</h3>
+            <p className="text-muted-foreground mb-4">Create your first goal to start tracking your progress.</p>
+            <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create-first-goal">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Your First Goal
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
