@@ -82,6 +82,16 @@ export interface IStorage {
   // Team Management
   getTeamMembers(userId: string): Promise<User[]>;
   getTeamGoals(userId: string): Promise<Goal[]>;
+
+  // Company Reports
+  getCompanyMetrics(): Promise<{
+    totalEmployees: number;
+    avgGoalCompletion: number;
+    totalGoalsCompleted: number;
+    totalGoalsActive: number;
+    avgDevelopmentProgress: number;
+    recognitionsSent: number;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -443,6 +453,59 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(goals.startDate));
+  }
+
+  // Company Reports
+  async getCompanyMetrics(): Promise<{
+    totalEmployees: number;
+    avgGoalCompletion: number;
+    totalGoalsCompleted: number;
+    totalGoalsActive: number;
+    avgDevelopmentProgress: number;
+    recognitionsSent: number;
+  }> {
+    // Get total employee count
+    const [employeeCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(users);
+
+    // Get all active goals
+    const allGoals = await db
+      .select()
+      .from(goals)
+      .where(eq(goals.isActive, true));
+
+    // Calculate goal completion metrics
+    const totalGoalsActive = allGoals.length;
+    const completedGoals = allGoals.filter(goal => 
+      goal.targetValue !== null && goal.currentValue !== null && goal.currentValue >= goal.targetValue
+    );
+    const totalGoalsCompleted = completedGoals.length;
+    const avgGoalCompletion = totalGoalsActive > 0 ? Math.round((totalGoalsCompleted / totalGoalsActive) * 100) : 0;
+
+    // Get development plans progress
+    const allDevelopmentPlans = await db
+      .select()
+      .from(developmentPlans);
+
+    const completedPlans = allDevelopmentPlans.filter(plan => plan.status === 'completed');
+    const avgDevelopmentProgress = allDevelopmentPlans.length > 0 
+      ? Math.round((completedPlans.length / allDevelopmentPlans.length) * 100) 
+      : 0;
+
+    // Get total recognitions sent
+    const [recognitionCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(recognitions);
+
+    return {
+      totalEmployees: employeeCount?.count || 0,
+      avgGoalCompletion,
+      totalGoalsCompleted,
+      totalGoalsActive,
+      avgDevelopmentProgress,
+      recognitionsSent: recognitionCount?.count || 0,
+    };
   }
 }
 

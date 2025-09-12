@@ -72,6 +72,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Company Reports (Leadership only)
+  app.get('/api/company/metrics', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const metrics = await storage.getCompanyMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching company metrics:", error);
+      res.status(500).json({ message: "Failed to fetch company metrics" });
+    }
+  });
+
   // Goals
   app.get('/api/goals', isAuthenticated, async (req: any, res) => {
     try {
