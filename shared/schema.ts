@@ -74,13 +74,43 @@ export const keyResults = pgTable("key_results", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Team objectives (middle tier in 3-tier OKR hierarchy)
+export const teamObjectives = pgTable("team_objectives", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  parentCompanyObjectiveId: varchar("parent_company_objective_id").notNull(),
+  teamName: varchar("team_name").notNull(),
+  supervisorId: varchar("supervisor_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Key results for team objectives
+export const teamKeyResults = pgTable("team_key_results", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamObjectiveId: varchar("team_objective_id").notNull(),
+  title: text("title").notNull(),
+  targetValue: integer("target_value").notNull(),
+  currentValue: integer("current_value").default(0),
+  unit: varchar("unit").notNull(), // %, count, score, etc.
+  isSharedGoal: boolean("is_shared_goal").default(false), // True if whole team contributes
+  assignedToUserId: varchar("assigned_to_user_id"), // For individually owned KRs
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Individual goals (OKRs)
 export const goals = pgTable("goals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   title: text("title").notNull(),
   description: text("description"),
-  parentObjectiveId: varchar("parent_objective_id"), // Links to company or team objective
+  parentObjectiveId: varchar("parent_objective_id"), // Links to company objective
+  parentTeamObjectiveId: varchar("parent_team_objective_id"), // Links to team objective
   targetValue: integer("target_value").notNull(),
   currentValue: integer("current_value").default(0),
   unit: varchar("unit").notNull(),
@@ -203,6 +233,20 @@ export const companyObjectivesRelations = relations(companyObjectives, ({ one, m
     references: [users.id],
   }),
   keyResults: many(keyResults),
+  teamObjectives: many(teamObjectives),
+  goals: many(goals),
+}));
+
+export const teamObjectivesRelations = relations(teamObjectives, ({ one, many }) => ({
+  parentCompanyObjective: one(companyObjectives, {
+    fields: [teamObjectives.parentCompanyObjectiveId],
+    references: [companyObjectives.id],
+  }),
+  supervisor: one(users, {
+    fields: [teamObjectives.supervisorId],
+    references: [users.id],
+  }),
+  keyResults: many(teamKeyResults),
   goals: many(goals),
 }));
 
@@ -210,6 +254,17 @@ export const keyResultsRelations = relations(keyResults, ({ one }) => ({
   objective: one(companyObjectives, {
     fields: [keyResults.objectiveId],
     references: [companyObjectives.id],
+  }),
+}));
+
+export const teamKeyResultsRelations = relations(teamKeyResults, ({ one }) => ({
+  teamObjective: one(teamObjectives, {
+    fields: [teamKeyResults.teamObjectiveId],
+    references: [teamObjectives.id],
+  }),
+  assignedToUser: one(users, {
+    fields: [teamKeyResults.assignedToUserId],
+    references: [users.id],
   }),
 }));
 
@@ -221,6 +276,10 @@ export const goalsRelations = relations(goals, ({ one, many }) => ({
   parentObjective: one(companyObjectives, {
     fields: [goals.parentObjectiveId],
     references: [companyObjectives.id],
+  }),
+  parentTeamObjective: one(teamObjectives, {
+    fields: [goals.parentTeamObjectiveId],
+    references: [teamObjectives.id],
   }),
   checkIns: many(weeklyCheckIns),
 }));
@@ -321,6 +380,18 @@ export const insertKeyResultSchema = createInsertSchema(keyResults).omit({
   updatedAt: true,
 });
 
+export const insertTeamObjectiveSchema = createInsertSchema(teamObjectives).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTeamKeyResultSchema = createInsertSchema(teamKeyResults).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertGoalSchema = createInsertSchema(goals).omit({
   id: true,
   createdAt: true,
@@ -385,7 +456,9 @@ export const insertRecognitionSchema = createInsertSchema(recognitions).omit({
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type CompanyObjective = typeof companyObjectives.$inferSelect;
+export type TeamObjective = typeof teamObjectives.$inferSelect;
 export type KeyResult = typeof keyResults.$inferSelect;
+export type TeamKeyResult = typeof teamKeyResults.$inferSelect;
 export type Goal = typeof goals.$inferSelect;
 export type WeeklyCheckIn = typeof weeklyCheckIns.$inferSelect;
 export type Competency = typeof competencies.$inferSelect;
@@ -396,7 +469,9 @@ export type Meeting = typeof meetings.$inferSelect;
 export type Recognition = typeof recognitions.$inferSelect;
 
 export type InsertCompanyObjective = z.infer<typeof insertCompanyObjectiveSchema>;
+export type InsertTeamObjective = z.infer<typeof insertTeamObjectiveSchema>;
 export type InsertKeyResult = z.infer<typeof insertKeyResultSchema>;
+export type InsertTeamKeyResult = z.infer<typeof insertTeamKeyResultSchema>;
 export type InsertGoal = z.infer<typeof insertGoalSchema>;
 export type InsertWeeklyCheckIn = z.infer<typeof insertWeeklyCheckInSchema>;
 export type InsertUserCompetency = z.infer<typeof insertUserCompetencySchema>;
