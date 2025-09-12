@@ -89,7 +89,7 @@ export class DatabaseStorage implements IStorage {
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     // First check if user already exists
-    const existingUser = await this.getUser(userData.id);
+    const existingUser = await this.getUser(userData.id!);
     
     if (existingUser) {
       // User exists - only update basic profile info, preserve role and other fields
@@ -102,7 +102,7 @@ export class DatabaseStorage implements IStorage {
           profileImageUrl: userData.profileImageUrl,
           updatedAt: new Date(),
         })
-        .where(eq(users.id, userData.id))
+        .where(eq(users.id, userData.id!))
         .returning();
       return user;
     } else {
