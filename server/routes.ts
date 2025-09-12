@@ -27,6 +27,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Users
+  app.get('/api/users', isAuthenticated, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
   // Company objectives
   app.get('/api/objectives', isAuthenticated, async (req, res) => {
     try {
@@ -253,10 +264,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Recognition
-  app.get('/api/recognitions', isAuthenticated, async (req, res) => {
+  app.patch('/api/meetings/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const recognitions = await storage.getRecentRecognitions();
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      // Verify meeting access
+      const hasAccess = await storage.verifyMeetingAccess(id, userId);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "You don't have permission to update this meeting" });
+      }
+      
+      // Validate allowed fields for update
+      const allowedFields = ['agenda', 'employeeNotes', 'managerNotes', 'actionItems'];
+      const updates: any = {};
+      
+      Object.keys(req.body).forEach(key => {
+        if (allowedFields.includes(key)) {
+          updates[key] = req.body[key];
+        }
+      });
+      
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+      
+      const meeting = await storage.updateMeeting(id, updates);
+      res.json(meeting);
+    } catch (error) {
+      console.error("Error updating meeting:", error);
+      res.status(500).json({ message: "Failed to update meeting" });
+    }
+  });
+
+  // Recognition
+  app.get('/api/recognitions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const recognitions = await storage.getUserRelevantRecognitions(userId);
       res.json(recognitions);
     } catch (error) {
       console.error("Error fetching recognitions:", error);

@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Heart, Star } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Heart, Star, Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -21,22 +23,29 @@ export default function Recognition() {
   const [selectedUser, setSelectedUser] = useState("");
   const [selectedValue, setSelectedValue] = useState("excellence");
   const [message, setMessage] = useState("");
+  const [isPublic, setIsPublic] = useState(true);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: recognitions, isLoading } = useQuery({
+  const { data: recognitions, isLoading: loadingRecognitions } = useQuery({
     queryKey: ["/api/recognitions"],
     retry: false,
   });
 
+  const { data: users, isLoading: loadingUsers } = useQuery({
+    queryKey: ["/api/users"],
+    retry: false,
+  });
+
   const createRecognitionMutation = useMutation({
-    mutationFn: async (data: { toUserId: string; value: string; message: string }) => {
+    mutationFn: async (data: { toUserId: string; value: string; message: string; isPublic: boolean }) => {
       await apiRequest("POST", "/api/recognitions", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/recognitions"] });
       setSelectedUser("");
       setMessage("");
+      setIsPublic(true);
       toast({
         title: "Recognition sent!",
         description: "Your colleague will be notified of your recognition.",
@@ -77,6 +86,7 @@ export default function Recognition() {
       toUserId: selectedUser,
       value: selectedValue,
       message: message.trim(),
+      isPublic,
     });
   };
 
@@ -84,7 +94,7 @@ export default function Recognition() {
     return companyValues.find(v => v.id === value)?.color || "bg-gray-100 text-gray-800";
   };
 
-  if (isLoading) {
+  if (loadingRecognitions || loadingUsers) {
     return (
       <div className="space-y-6">
         {[...Array(2)].map((_, i) => (
@@ -111,13 +121,24 @@ export default function Recognition() {
               <label className="block text-sm font-medium mb-2">Recognize a colleague</label>
               <Select value={selectedUser} onValueChange={setSelectedUser}>
                 <SelectTrigger data-testid="select-colleague">
-                  <SelectValue placeholder="Select a team member..." />
+                  <SelectValue placeholder={loadingUsers ? "Loading users..." : "Select a team member..."} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="user1">John Smith</SelectItem>
-                  <SelectItem value="user2">Sarah Johnson</SelectItem>
-                  <SelectItem value="user3">Mike Wilson</SelectItem>
-                  <SelectItem value="user4">Emma Davis</SelectItem>
+                  {loadingUsers ? (
+                    <SelectItem value="loading" disabled>
+                      <div className="flex items-center space-x-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Loading users...</span>
+                      </div>
+                    </SelectItem>
+                  ) : (
+                    (users as any[])?.map((user: any) => (
+                      <SelectItem key={user.id} value={user.id} data-testid={`user-option-${user.id}`}>
+                        {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email}
+                        {user.jobTitle && ` - ${user.jobTitle}`}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -154,12 +175,35 @@ export default function Recognition() {
               />
             </div>
 
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="is-public"
+                checked={isPublic}
+                onCheckedChange={setIsPublic}
+                data-testid="switch-is-public"
+              />
+              <Label htmlFor="is-public" className="text-sm">
+                Make this recognition public
+                <span className="block text-xs text-muted-foreground">
+                  {isPublic ? "Everyone can see this recognition" : "Only you and the recipient can see this"}
+                </span>
+              </Label>
+            </div>
+
             <Button 
               type="submit" 
-              disabled={createRecognitionMutation.isPending || !selectedUser || !message.trim()}
+              disabled={createRecognitionMutation.isPending || !selectedUser || !message.trim() || loadingUsers}
               data-testid="button-send-recognition"
+              className="w-full sm:w-auto"
             >
-              {createRecognitionMutation.isPending ? "Sending..." : "Send Recognition"}
+              {createRecognitionMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                "Send Recognition"
+              )}
             </Button>
           </form>
         </CardContent>
@@ -187,29 +231,34 @@ export default function Recognition() {
                       </span>
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <span className="font-medium">
+                      <div className="flex items-center space-x-2 mb-1 flex-wrap">
+                        <span className="font-medium" data-testid={`text-from-user-${recognition.id}`}>
                           {recognition.fromUser?.firstName && recognition.fromUser?.lastName 
                             ? `${recognition.fromUser.firstName} ${recognition.fromUser.lastName}`
                             : recognition.fromUser?.email || "Someone"}
                         </span>
                         <span className="text-sm text-muted-foreground">recognized</span>
-                        <span className="font-medium">
+                        <span className="font-medium" data-testid={`text-to-user-${recognition.id}`}>
                           {recognition.toUser?.firstName && recognition.toUser?.lastName 
                             ? `${recognition.toUser.firstName} ${recognition.toUser.lastName}`
                             : recognition.toUser?.email || "Someone"}
                         </span>
-                        <Badge className={getValueColor(recognition.value)}>
+                        <Badge className={getValueColor(recognition.value)} data-testid={`badge-value-${recognition.id}`}>
                           {companyValues.find(v => v.id === recognition.value)?.label || recognition.value}
                         </Badge>
+                        {!recognition.isPublic && (
+                          <Badge variant="secondary" className="text-xs" data-testid={`badge-private-${recognition.id}`}>
+                            Private
+                          </Badge>
+                        )}
                       </div>
-                      <p className="text-sm text-muted-foreground mb-2">"{recognition.message}"</p>
+                      <p className="text-sm text-muted-foreground mb-2" data-testid={`text-message-${recognition.id}`}>
+                        "{recognition.message}"
+                      </p>
                       <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                        <span>{new Date(recognition.createdAt).toLocaleDateString()}</span>
-                        <button className="flex items-center space-x-1 hover:text-foreground" data-testid={`button-like-${recognition.id}`}>
-                          <Heart className="w-4 h-4" />
-                          <span>Like</span>
-                        </button>
+                        <span data-testid={`text-date-${recognition.id}`}>
+                          {new Date(recognition.createdAt).toLocaleDateString()}
+                        </span>
                       </div>
                     </div>
                   </div>

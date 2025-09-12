@@ -1,16 +1,153 @@
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, Users, CheckCircle, AlertCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertMeetingSchema, type Meeting, type User, type InsertMeeting } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Calendar, Clock, Users, CheckCircle, AlertCircle, Plus, Save, Edit, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { z } from "zod";
+
+// Form schema for meeting creation  
+const createMeetingSchema = insertMeetingSchema.extend({
+  scheduledAt: z.string().min(1, "Meeting date/time is required"),
+});
+
+type CreateMeetingData = z.infer<typeof createMeetingSchema>;
+
+interface MeetingWithRelations extends Meeting {
+  manager?: User;
+  employee?: User;
+}
 
 export default function Meetings() {
-  const { data: meetings, isLoading } = useQuery({
+  const { data: meetings, isLoading } = useQuery<MeetingWithRelations[]>({
     queryKey: ["/api/meetings"],
     retry: false,
   });
+  
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+    retry: false,
+  });
+  
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingMeetingId, setEditingMeetingId] = useState<string | null>(null);
+  const [editingAgenda, setEditingAgenda] = useState<{[key: string]: string}>({});
+  const [editingNotes, setEditingNotes] = useState<{[key: string]: string}>({});
+  
+  const form = useForm<CreateMeetingData>({
+    resolver: zodResolver(createMeetingSchema),
+    defaultValues: {
+      managerId: "",
+      employeeId: "",
+      scheduledAt: "",
+      duration: 30,
+      agenda: "",
+      employeeNotes: "",
+    },
+  });
+  
+  // Set employeeId when user data loads
+  useEffect(() => {
+    if (user?.id) {
+      form.setValue("employeeId", user.id);
+    }
+  }, [user, form]);
+  
+  const createMeetingMutation = useMutation({
+    mutationFn: async (data: CreateMeetingData) => {
+      const meetingData = {
+        ...data,
+        scheduledAt: new Date(data.scheduledAt).toISOString(),
+      };
+      const response = await apiRequest("POST", "/api/meetings", meetingData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/meetings"] });
+      setIsDialogOpen(false);
+      form.reset();
+      toast({
+        title: "Meeting scheduled",
+        description: "Your 1-on-1 meeting has been scheduled successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to schedule meeting",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const updateMeetingMutation = useMutation({
+    mutationFn: async ({ meetingId, updates }: { meetingId: string; updates: any }) => {
+      const response = await apiRequest("PATCH", `/api/meetings/${meetingId}`, updates);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/meetings"] });
+      toast({
+        title: "Meeting updated",
+        description: "Meeting details have been saved.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update meeting",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const handleSubmit = (data: CreateMeetingData) => {
+    createMeetingMutation.mutate(data);
+  };
+  
+  const handleSaveAgenda = (meetingId: string) => {
+    const agenda = editingAgenda[meetingId];
+    if (agenda !== undefined) {
+      updateMeetingMutation.mutate({ 
+        meetingId, 
+        updates: { agenda } 
+      });
+      setEditingMeetingId(null);
+      setEditingAgenda({});
+    }
+  };
+  
+  const handleSaveNotes = (meetingId: string) => {
+    const notes = editingNotes[meetingId];
+    if (notes !== undefined) {
+      updateMeetingMutation.mutate({ 
+        meetingId, 
+        updates: { employeeNotes: notes } 
+      });
+      setEditingNotes({});
+    }
+  };
+  
+  const startEditingAgenda = (meetingId: string, currentAgenda: string) => {
+    setEditingMeetingId(meetingId);
+    setEditingAgenda({ [meetingId]: currentAgenda || "" });
+  };
+  
+  const startEditingNotes = (meetingId: string, currentNotes: string) => {
+    setEditingNotes({ [meetingId]: currentNotes || "" });
+  };
 
   if (isLoading) {
     return (
@@ -27,16 +164,162 @@ export default function Meetings() {
     );
   }
 
-  const upcomingMeetings = (meetings as any[])?.filter((meeting: any) => 
+  const upcomingMeetings = meetings?.filter((meeting) => 
     new Date(meeting.scheduledAt) > new Date() && meeting.status === 'scheduled'
   ) || [];
 
-  const pastMeetings = (meetings as any[])?.filter((meeting: any) => 
+  const pastMeetings = meetings?.filter((meeting) => 
     new Date(meeting.scheduledAt) <= new Date() || meeting.status === 'completed'
   ) || [];
 
   return (
     <div className="space-y-6">
+      {/* Header with Schedule Meeting button */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">1-on-1 Meetings</h2>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-schedule-meeting">
+              <Plus className="w-4 h-4 mr-2" />
+              Schedule Meeting
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]" data-testid="dialog-schedule-meeting">
+            <DialogHeader>
+              <DialogTitle>Schedule 1-on-1 Meeting</DialogTitle>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="managerId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Manager</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-manager">
+                            <SelectValue placeholder="Select your manager" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {user?.managerId && (
+                            <SelectItem value={user.managerId} data-testid={`manager-option-${user.managerId}`}>
+                              Manager
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="scheduledAt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date & Time</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="datetime-local"
+                          {...field}
+                          data-testid="input-meeting-datetime"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="duration"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Duration (minutes)</FormLabel>
+                      <Select onValueChange={(value) => field.onChange(parseInt(value))} defaultValue={field.value?.toString()}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-duration">
+                            <SelectValue placeholder="Select duration" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="15">15 minutes</SelectItem>
+                          <SelectItem value="30">30 minutes</SelectItem>
+                          <SelectItem value="45">45 minutes</SelectItem>
+                          <SelectItem value="60">60 minutes</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="agenda"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Agenda</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Meeting topics to discuss..."
+                          rows={3}
+                          {...field}
+                          value={field.value || ""}
+                          data-testid="textarea-meeting-agenda"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="employeeNotes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Your Notes</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Add any topics you'd like to discuss..."
+                          rows={3}
+                          {...field}
+                          value={field.value || ""}
+                          data-testid="textarea-employee-notes"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="flex justify-end space-x-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsDialogOpen(false)}
+                    data-testid="button-cancel-meeting"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={createMeetingMutation.isPending}
+                    data-testid="button-create-meeting"
+                  >
+                    {createMeetingMutation.isPending ? "Scheduling..." : "Schedule Meeting"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </div>
+      
       {/* Upcoming Meeting */}
       {upcomingMeetings.length > 0 && (
         <Card>
@@ -75,31 +358,108 @@ export default function Meetings() {
 
                 <div className="space-y-4">
                   <div>
-                    <h4 className="font-medium mb-2">Agenda</h4>
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="agenda-1" />
-                        <label htmlFor="agenda-1" className="text-sm">Review goal progress</label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="agenda-2" />
-                        <label htmlFor="agenda-2" className="text-sm">Discuss development plans</label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="agenda-3" />
-                        <label htmlFor="agenda-3" className="text-sm">Career development opportunities</label>
-                      </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium">Agenda</h4>
+                      {editingMeetingId === meeting.id ? (
+                        <div className="flex space-x-1">
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleSaveAgenda(meeting.id)}
+                            disabled={updateMeetingMutation.isPending}
+                            data-testid={`button-save-agenda-${meeting.id}`}
+                          >
+                            <Save className="w-3 h-3" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => {
+                              setEditingMeetingId(null);
+                              setEditingAgenda({});
+                            }}
+                            data-testid={`button-cancel-agenda-${meeting.id}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => startEditingAgenda(meeting.id, meeting.agenda)}
+                          data-testid={`button-edit-agenda-${meeting.id}`}
+                        >
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                      )}
                     </div>
+                    {editingMeetingId === meeting.id ? (
+                      <Textarea
+                        value={editingAgenda[meeting.id] || ""}
+                        onChange={(e) => setEditingAgenda({ 
+                          ...editingAgenda, 
+                          [meeting.id]: e.target.value 
+                        })}
+                        rows={3}
+                        placeholder="Meeting topics to discuss..."
+                        data-testid={`textarea-edit-agenda-${meeting.id}`}
+                      />
+                    ) : (
+                      <div className="bg-muted rounded-lg p-3 text-sm" data-testid={`text-agenda-${meeting.id}`}>
+                        {meeting.agenda || "No agenda set"}
+                      </div>
+                    )}
                   </div>
 
                   <div>
-                    <h4 className="font-medium mb-2">Your Notes</h4>
-                    <Textarea
-                      placeholder="Add any topics you'd like to discuss..."
-                      rows={3}
-                      defaultValue={meeting.employeeNotes || ""}
-                      data-testid="textarea-meeting-notes"
-                    />
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium">Your Notes</h4>
+                      {editingNotes[meeting.id] !== undefined ? (
+                        <div className="flex space-x-1">
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleSaveNotes(meeting.id)}
+                            disabled={updateMeetingMutation.isPending}
+                            data-testid={`button-save-notes-${meeting.id}`}
+                          >
+                            <Save className="w-3 h-3" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => setEditingNotes({})}
+                            data-testid={`button-cancel-notes-${meeting.id}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => startEditingNotes(meeting.id, meeting.employeeNotes)}
+                          data-testid={`button-edit-notes-${meeting.id}`}
+                        >
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
+                    {editingNotes[meeting.id] !== undefined ? (
+                      <Textarea
+                        value={editingNotes[meeting.id] || ""}
+                        onChange={(e) => setEditingNotes({ 
+                          ...editingNotes, 
+                          [meeting.id]: e.target.value 
+                        })}
+                        rows={3}
+                        placeholder="Add any topics you'd like to discuss..."
+                        data-testid={`textarea-edit-notes-${meeting.id}`}
+                      />
+                    ) : (
+                      <div className="bg-muted rounded-lg p-3 text-sm" data-testid={`text-notes-${meeting.id}`}>
+                        {meeting.employeeNotes || "No notes added"}
+                      </div>
+                    )}
                   </div>
 
                   <Button data-testid="button-join-meeting">
@@ -141,6 +501,12 @@ export default function Meetings() {
                   {meeting.agenda && (
                     <div className="text-sm text-muted-foreground mb-3">
                       <p><strong>Topics discussed:</strong> {meeting.agenda}</p>
+                    </div>
+                  )}
+                  
+                  {meeting.employeeNotes && (
+                    <div className="text-sm text-muted-foreground mb-3">
+                      <p><strong>Your notes:</strong> {meeting.employeeNotes}</p>
                     </div>
                   )}
 

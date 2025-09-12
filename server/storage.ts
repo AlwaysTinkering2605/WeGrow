@@ -36,6 +36,7 @@ export interface IStorage {
   // User operations - required for Replit Auth
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  getAllUsers(): Promise<User[]>;
   
   // Company objectives
   getActiveCompanyObjectives(): Promise<CompanyObjective[]>;
@@ -69,9 +70,12 @@ export interface IStorage {
   // Meetings
   getUserMeetings(userId: string): Promise<Meeting[]>;
   createMeeting(meeting: InsertMeeting): Promise<Meeting>;
+  updateMeeting(meetingId: string, updates: Partial<Meeting>): Promise<Meeting>;
+  verifyMeetingAccess(meetingId: string, userId: string): Promise<boolean>;
   
   // Recognition
   getRecentRecognitions(limit?: number): Promise<Recognition[]>;
+  getUserRelevantRecognitions(userId: string, limit?: number): Promise<any[]>;
   createRecognition(recognition: InsertRecognition): Promise<Recognition>;
   getUserRecognitionStats(userId: string): Promise<{ sent: number; received: number }>;
 }
@@ -96,6 +100,13 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .orderBy(users.firstName, users.lastName);
   }
 
   // Company objectives
@@ -285,6 +296,23 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async updateMeeting(meetingId: string, updates: Partial<Meeting>): Promise<Meeting> {
+    const [updated] = await db
+      .update(meetings)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(meetings.id, meetingId))
+      .returning();
+    return updated;
+  }
+
+  async verifyMeetingAccess(meetingId: string, userId: string): Promise<boolean> {
+    const [meeting] = await db
+      .select({ employeeId: meetings.employeeId, managerId: meetings.managerId })
+      .from(meetings)
+      .where(eq(meetings.id, meetingId));
+    return meeting ? (meeting.employeeId === userId || meeting.managerId === userId) : false;
+  }
+
   // Recognition
   async getRecentRecognitions(limit: number = 20): Promise<Recognition[]> {
     return await db
@@ -293,6 +321,51 @@ export class DatabaseStorage implements IStorage {
       .where(eq(recognitions.isPublic, true))
       .orderBy(desc(recognitions.createdAt))
       .limit(limit);
+  }
+
+  async getUserRelevantRecognitions(userId: string, limit: number = 20): Promise<any[]> {
+    // Get recognitions that are either public OR involve the current user
+    const recognitionRecords = await db
+      .select()
+      .from(recognitions)
+      .where(
+        sql`(${recognitions.isPublic} = true) OR (${recognitions.fromUserId} = ${userId}) OR (${recognitions.toUserId} = ${userId})`
+      )
+      .orderBy(desc(recognitions.createdAt))
+      .limit(limit);
+
+    // Fetch associated user data for each recognition
+    const enrichedRecognitions = await Promise.all(
+      recognitionRecords.map(async (recognition) => {
+        const [fromUser] = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+          })
+          .from(users)
+          .where(eq(users.id, recognition.fromUserId));
+
+        const [toUser] = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+          })
+          .from(users)
+          .where(eq(users.id, recognition.toUserId));
+
+        return {
+          ...recognition,
+          fromUser,
+          toUser,
+        };
+      })
+    );
+
+    return enrichedRecognitions;
   }
 
   async createRecognition(recognition: InsertRecognition): Promise<Recognition> {
