@@ -55,18 +55,23 @@ export default function TeamManagement() {
     );
   }
 
-  const mockTeamMembers = [
-    { id: '1', name: 'Sarah Johnson', role: 'operative', goalsCompleted: 3, totalGoals: 4, lastCheckIn: '2 days ago' },
-    { id: '2', name: 'Mike Chen', role: 'operative', goalsCompleted: 2, totalGoals: 3, lastCheckIn: '1 day ago' },
-    { id: '3', name: 'Emily Davis', role: 'operative', goalsCompleted: 4, totalGoals: 5, lastCheckIn: '3 hours ago' },
-  ];
+  // Calculate real team statistics from actual data
+  const realTeamMembers = teamMembers || [];
+  const realTeamGoals = teamGoals || [];
 
   const teamStats = {
-    totalMembers: mockTeamMembers.length,
-    avgGoalCompletion: Math.round(mockTeamMembers.reduce((acc, member) => 
-      acc + (member.goalsCompleted / member.totalGoals * 100), 0) / mockTeamMembers.length),
-    overdueCheckIns: mockTeamMembers.filter(member => 
-      member.lastCheckIn.includes('days ago') || member.lastCheckIn.includes('week')).length
+    totalMembers: realTeamMembers.length,
+    avgGoalCompletion: realTeamMembers.length > 0 ? Math.round(
+      realTeamMembers.reduce((acc: number, member: any) => {
+        const memberGoals = realTeamGoals.filter((goal: any) => goal.userId === member.id);
+        const completedGoals = memberGoals.filter((goal: any) => 
+          goal.targetValue && goal.currentValue !== null && goal.currentValue >= goal.targetValue
+        ).length;
+        const completionRate = memberGoals.length > 0 ? (completedGoals / memberGoals.length * 100) : 0;
+        return acc + completionRate;
+      }, 0) / realTeamMembers.length
+    ) : 0,
+    overdueCheckIns: 0 // TODO: Calculate from actual check-in data when available
   };
 
   return (
@@ -133,47 +138,74 @@ export default function TeamManagement() {
           <CardTitle>Team Members</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {mockTeamMembers.map((member) => (
-              <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <Avatar>
-                    <AvatarFallback>
-                      {member.name.split(' ').map(n => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="font-medium">{member.name}</div>
-                    <div className="text-sm text-muted-foreground capitalize">{member.role}</div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-4 text-sm">
-                  <div className="text-center">
-                    <div className="font-medium">{member.goalsCompleted}/{member.totalGoals}</div>
-                    <div className="text-muted-foreground">Goals</div>
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="flex items-center space-x-1">
-                      <Clock className="w-4 h-4" />
-                      <span>{member.lastCheckIn}</span>
+          {realTeamMembers.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Team Members</h3>
+              <p className="text-muted-foreground mb-4">
+                You don't have any team members assigned to you yet.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Team members will appear here when they are assigned to report to you.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {realTeamMembers.map((member: any) => {
+                const memberGoals = realTeamGoals.filter((goal: any) => goal.userId === member.id);
+                const completedGoals = memberGoals.filter((goal: any) => 
+                  goal.targetValue && goal.currentValue !== null && goal.currentValue >= goal.targetValue
+                ).length;
+                const completionPercentage = memberGoals.length > 0 ? Math.round((completedGoals / memberGoals.length) * 100) : 0;
+
+                return (
+                  <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center space-x-4">
+                      <Avatar>
+                        <AvatarFallback>
+                          {member.firstName && member.lastName 
+                            ? `${member.firstName[0]}${member.lastName[0]}` 
+                            : member.email[0].toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="font-medium">
+                          {member.firstName && member.lastName 
+                            ? `${member.firstName} ${member.lastName}` 
+                            : member.email}
+                        </div>
+                        <div className="text-sm text-muted-foreground capitalize">{member.role}</div>
+                      </div>
                     </div>
-                    <div className="text-muted-foreground">Last Check-in</div>
+                    
+                    <div className="flex items-center space-x-4 text-sm">
+                      <div className="text-center">
+                        <div className="font-medium">{completedGoals}/{memberGoals.length}</div>
+                        <div className="text-muted-foreground">Goals</div>
+                      </div>
+                      
+                      <div className="text-center">
+                        <div className="flex items-center space-x-1">
+                          <Clock className="w-4 h-4" />
+                          <span>No check-in data</span>
+                        </div>
+                        <div className="text-muted-foreground">Last Check-in</div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Badge variant={completedGoals === memberGoals.length && memberGoals.length > 0 ? "default" : "secondary"}>
+                          {completionPercentage}%
+                        </Badge>
+                        <Button size="sm" variant="outline" data-testid={`button-view-details-${member.id}`}>
+                          View Details
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Badge variant={member.goalsCompleted === member.totalGoals ? "default" : "secondary"}>
-                      {Math.round(member.goalsCompleted / member.totalGoals * 100)}%
-                    </Badge>
-                    <Button size="sm" variant="outline" data-testid={`button-view-details-${member.id}`}>
-                      View Details
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

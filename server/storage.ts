@@ -78,6 +78,10 @@ export interface IStorage {
   getUserRelevantRecognitions(userId: string, limit?: number): Promise<any[]>;
   createRecognition(recognition: InsertRecognition): Promise<Recognition>;
   getUserRecognitionStats(userId: string): Promise<{ sent: number; received: number }>;
+
+  // Team Management
+  getTeamMembers(userId: string): Promise<User[]>;
+  getTeamGoals(userId: string): Promise<Goal[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -406,6 +410,39 @@ export class DatabaseStorage implements IStorage {
       sent: sentCount?.count || 0,
       received: receivedCount?.count || 0,
     };
+  }
+
+  // Team Management
+  async getTeamMembers(userId: string): Promise<User[]> {
+    // Get users who report to this user (managerId = userId)
+    return await db
+      .select()
+      .from(users)
+      .where(eq(users.managerId, userId))
+      .orderBy(users.firstName, users.lastName);
+  }
+
+  async getTeamGoals(userId: string): Promise<Goal[]> {
+    // Get all goals for team members who report to this user
+    const teamMemberIds = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.managerId, userId));
+
+    if (teamMemberIds.length === 0) {
+      return [];
+    }
+
+    return await db
+      .select()
+      .from(goals)
+      .where(
+        and(
+          sql`${goals.userId} IN (${teamMemberIds.map(m => `'${m.id}'`).join(',')})`,
+          eq(goals.isActive, true)
+        )
+      )
+      .orderBy(desc(goals.startDate));
   }
 }
 

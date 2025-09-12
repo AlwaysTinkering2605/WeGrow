@@ -1,15 +1,53 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Mail, Phone, User } from "lucide-react";
+import type { Goal, DevelopmentPlan } from "@shared/schema";
 // import ProgressRing from "./ProgressRing"; // TODO: Create or fix ProgressRing component
 
 export default function Profile() {
   const { user } = useAuth();
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
+
+  // Fetch real data for performance calculations
+  const { data: goals = [] } = useQuery<Goal[]>({
+    queryKey: ["/api/goals"],
+    retry: false,
+  });
+
+  const { data: developmentPlans = [] } = useQuery<DevelopmentPlan[]>({
+    queryKey: ["/api/development-plans"],
+    retry: false,
+  });
+
+  const { data: recognitionStats } = useQuery({
+    queryKey: ["/api/recognition-stats"],
+    retry: false,
+  });
+
+  // Calculate real performance metrics
+  const calculateGoalCompletion = () => {
+    if (!goals.length) return 0;
+    const completedGoals = goals.filter(goal => 
+      goal.targetValue && goal.currentValue !== null && goal.currentValue >= goal.targetValue
+    ).length;
+    return Math.round((completedGoals / goals.length) * 100);
+  };
+
+  const calculateTrainingProgress = () => {
+    if (!developmentPlans.length) return 0;
+    const completedPlans = developmentPlans.filter(plan => 
+      plan.status === 'completed'
+    ).length;
+    return Math.round((completedPlans / developmentPlans.length) * 100);
+  };
+
+  const goalCompletionPercentage = calculateGoalCompletion();
+  const trainingProgressPercentage = calculateTrainingProgress();
 
   const handleSignOut = () => {
     window.location.href = "/api/logout";
@@ -86,26 +124,44 @@ export default function Profile() {
           <div className="grid md:grid-cols-3 gap-6">
             <div className="text-center">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                <span className="text-2xl font-bold text-green-600">87%</span>
+                {goals.length > 0 ? (
+                  <span className="text-2xl font-bold text-green-600">{goalCompletionPercentage}%</span>
+                ) : (
+                  <span className="text-sm font-medium text-green-600">No Goals</span>
+                )}
               </div>
               <p className="font-medium" data-testid="text-goal-completion">Goal Completion</p>
-              <p className="text-xs text-muted-foreground">This Quarter</p>
+              <p className="text-xs text-muted-foreground">
+                {goals.length > 0 ? `${goals.filter(g => g.targetValue && g.currentValue !== null && g.currentValue >= g.targetValue).length} of ${goals.length} goals` : "Set your first goal"}
+              </p>
             </div>
 
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                <span className="text-2xl font-bold text-blue-600">80%</span>
+                {developmentPlans.length > 0 ? (
+                  <span className="text-2xl font-bold text-blue-600">{trainingProgressPercentage}%</span>
+                ) : (
+                  <span className="text-sm font-medium text-blue-600">No Plans</span>
+                )}
               </div>
               <p className="font-medium" data-testid="text-training-progress">Training Progress</p>
-              <p className="text-xs text-muted-foreground">Current Year</p>
+              <p className="text-xs text-muted-foreground">
+                {developmentPlans.length > 0 ? `${developmentPlans.filter(p => p.status === 'completed').length} of ${developmentPlans.length} plans` : "Create development plan"}
+              </p>
             </div>
 
             <div className="text-center">
               <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                <span className="text-2xl font-bold text-purple-600">92%</span>
+                {recognitionStats && (recognitionStats as any).received !== undefined ? (
+                  <span className="text-2xl font-bold text-purple-600">{(recognitionStats as any).received || 0}</span>
+                ) : (
+                  <span className="text-sm font-medium text-purple-600">0</span>
+                )}
               </div>
-              <p className="font-medium" data-testid="text-quality-score">Quality Score</p>
-              <p className="text-xs text-muted-foreground">Last 30 Days</p>
+              <p className="font-medium" data-testid="text-quality-score">Kudos Received</p>
+              <p className="text-xs text-muted-foreground">
+                {recognitionStats && (recognitionStats as any).sent ? `${(recognitionStats as any).sent} sent` : "No recognition yet"}
+              </p>
             </div>
           </div>
         </CardContent>

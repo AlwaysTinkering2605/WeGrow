@@ -38,6 +38,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Team Management
+  app.get('/api/team/members', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const teamMembers = await storage.getTeamMembers(userId);
+      res.json(teamMembers);
+    } catch (error) {
+      console.error("Error fetching team members:", error);
+      res.status(500).json({ message: "Failed to fetch team members" });
+    }
+  });
+
+  app.get('/api/team/goals', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const teamGoals = await storage.getTeamGoals(userId);
+      res.json(teamGoals);
+    } catch (error) {
+      console.error("Error fetching team goals:", error);
+      res.status(500).json({ message: "Failed to fetch team goals" });
+    }
+  });
+
   // Company objectives
   app.get('/api/objectives', isAuthenticated, async (req, res) => {
     try {
