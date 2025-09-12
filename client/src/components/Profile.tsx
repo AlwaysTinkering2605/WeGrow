@@ -39,7 +39,7 @@ export default function Profile() {
                 {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.email || "User"}
               </h3>
               <p className="text-muted-foreground" data-testid="text-user-role">
-                {user?.jobTitle || "Team Member"}
+                {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "Team Member"}
               </p>
               <p className="text-sm text-muted-foreground" data-testid="text-user-team">
                 {user?.teamName ? `${user.teamName} •` : ""} Started {user?.startDate ? new Date(user.startDate).toLocaleDateString() : "Recently"}

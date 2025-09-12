@@ -110,7 +110,7 @@ export default function Layout() {
                   {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
-                  {user.jobTitle || "Team Member"}
+                  {user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "Team Member"}
                 </p>
               </div>
             </div>
