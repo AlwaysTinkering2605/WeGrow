@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import {
   insertGoalSchema,
   insertCompanyObjectiveSchema,
@@ -408,6 +409,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching team members:", error);
       res.status(500).json({ message: "Failed to fetch team members" });
+    }
+  });
+
+  // Object Storage endpoints for photo upload
+  app.post('/api/objects/upload', isAuthenticated, async (req: any, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ message: "Failed to get upload URL" });
+    }
+  });
+
+  app.put('/api/profile-images', isAuthenticated, async (req: any, res) => {
+    try {
+      if (!req.body.profileImageURL) {
+        return res.status(400).json({ error: "profileImageURL is required" });
+      }
+
+      const userId = req.user.claims.sub;
+
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        req.body.profileImageURL,
+        {
+          owner: userId,
+          visibility: "public", // Profile images are public
+        },
+      );
+
+      // Update user profile with the new image path
+      const updatedUser = await storage.updateUserProfile(userId, {
+        profileImageUrl: objectPath,
+      }, userId);
+
+      res.json({
+        objectPath: objectPath,
+        user: updatedUser,
+      });
+    } catch (error) {
+      console.error("Error setting profile image:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 

@@ -220,7 +220,13 @@ export default function TeamManagement() {
   }
 
   const handleCreateTeam = (data: InsertTeamData) => {
-    createTeamMutation.mutate(data);
+    // Normalize empty strings to undefined for optional fields
+    const normalizedData = {
+      ...data,
+      parentTeamId: data.parentTeamId === "" ? undefined : data.parentTeamId,
+      description: data.description === "" ? undefined : data.description,
+    };
+    createTeamMutation.mutate(normalizedData);
   };
 
   const handleEditTeam = (team: Team) => {
@@ -246,9 +252,16 @@ export default function TeamManagement() {
       return;
     }
 
+    // Normalize empty strings to undefined for optional fields
+    const normalizedData = {
+      ...data,
+      parentTeamId: data.parentTeamId === "" ? undefined : data.parentTeamId,
+      description: data.description === "" ? undefined : data.description,
+    };
+
     updateTeamMutation.mutate({
       id: selectedTeam.id,
-      ...data
+      ...normalizedData,
     });
   };
 
@@ -281,7 +294,7 @@ export default function TeamManagement() {
             </div>
             <div>
               <h3 className="font-semibold" data-testid={`text-team-name-${team.id}`}>{team.name}</h3>
-              <p className="text-sm text-muted-foreground capitalize">{team.departmentType}</p>
+              <p className="text-sm text-muted-foreground capitalize">{team.department}</p>
               {team.description && (
                 <p className="text-sm text-muted-foreground mt-1">{team.description}</p>
               )}
@@ -605,7 +618,7 @@ export default function TeamManagement() {
                           </div>
                           <div>
                             <h3 className="font-semibold" data-testid={`text-team-list-name-${team.id}`}>{team.name}</h3>
-                            <p className="text-sm text-muted-foreground capitalize">{team.departmentType}</p>
+                            <p className="text-sm text-muted-foreground capitalize">{team.department}</p>
                             {team.description && (
                               <p className="text-sm text-muted-foreground mt-1">{team.description}</p>
                             )}
