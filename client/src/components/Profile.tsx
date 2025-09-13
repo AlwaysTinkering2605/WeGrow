@@ -36,7 +36,7 @@ export default function Profile() {
     mobilePhone?: string;
     jobTitle?: string;
     profileImageUrl?: string;
-    role?: string;
+    role?: "operative" | "supervisor" | "leadership";
   }>({
     resolver: zodResolver(updateUserProfileSchema),
     defaultValues: {
@@ -45,7 +45,7 @@ export default function Profile() {
       mobilePhone: "",
       jobTitle: "",
       profileImageUrl: "",
-      role: "",
+      role: undefined,
     },
   });
 
@@ -300,14 +300,16 @@ export default function Profile() {
                                 maxNumberOfFiles={1}
                                 maxFileSize={5 * 1024 * 1024} // 5MB
                                 onGetUploadParameters={async () => {
-                                  const { uploadURL } = await apiRequest('/api/objects/upload', 'POST');
+                                  const response = await apiRequest('POST', '/api/objects/upload');
+                                  const { uploadURL } = await response.json();
                                   return { method: 'PUT' as const, url: uploadURL };
                                 }}
                                 onComplete={async (result) => {
                                   const uploaded = result.successful?.[0];
                                   if (!uploaded) return;
                                   const path = uploaded.uploadURL || uploaded.response?.uploadURL;
-                                  const { objectPath } = await apiRequest('/api/profile-images', 'PUT', { profileImageURL: path });
+                                  const response = await apiRequest('PUT', '/api/profile-images', { profileImageURL: path });
+                                  const { objectPath } = await response.json();
                                   profileForm.setValue('profileImageUrl', objectPath, { shouldValidate: true });
                                   toast({ title: 'Photo uploaded successfully' });
                                 }}
