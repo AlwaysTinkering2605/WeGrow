@@ -33,6 +33,13 @@ export const confidenceLevelEnum = pgEnum("confidence_level", ["green", "amber",
 // Company values enum
 export const companyValueEnum = pgEnum("company_value", ["excellence", "teamwork", "innovation", "reliability"]);
 
+// LMS-specific enums
+export const lessonTypeEnum = pgEnum("lesson_type", ["video", "quiz", "document", "link"]);
+export const enrollmentStatusEnum = pgEnum("enrollment_status", ["enrolled", "in_progress", "completed", "expired"]);
+export const lessonStatusEnum = pgEnum("lesson_status", ["not_started", "in_progress", "completed"]);
+export const questionTypeEnum = pgEnum("question_type", ["multiple_choice", "true_false", "multi_select"]);
+export const trainingStatusEnum = pgEnum("training_status", ["in_progress", "completed", "on_hold"]);
+
 // Teams table - formal team structure
 export const teams = pgTable("teams", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -222,6 +229,207 @@ export const recognitions = pgTable("recognitions", {
   value: companyValueEnum("value").notNull(),
   message: text("message").notNull(),
   isPublic: boolean("is_public").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// LMS Tables
+
+// Courses - main course definitions
+export const courses = pgTable("courses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  category: varchar("category"),
+  level: varchar("level"), // Beginner, Intermediate, Advanced
+  estimatedDuration: integer("estimated_duration"), // minutes
+  tags: text("tags").array(),
+  thumbnailUrl: varchar("thumbnail_url"),
+  currentVersionId: varchar("current_version_id"),
+  isPublished: boolean("is_published").default(false),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Course versions - for ISO compliance
+export const courseVersions = pgTable("course_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  courseId: varchar("course_id").notNull(),
+  version: varchar("version").notNull(), // e.g., "1.0", "1.1", "2.0"
+  changelog: text("changelog"),
+  publishedAt: timestamp("published_at"),
+  publishedBy: varchar("published_by").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Course modules - chapters/sections within a course
+export const courseModules = pgTable("course_modules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  courseVersionId: varchar("course_version_id").notNull(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  orderIndex: integer("order_index").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Lessons - individual learning units
+export const lessons = pgTable("lessons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  moduleId: varchar("module_id").notNull(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  type: lessonTypeEnum("type").notNull(),
+  orderIndex: integer("order_index").notNull(),
+  vimeoVideoId: varchar("vimeo_video_id"), // For video lessons
+  estimatedDuration: integer("estimated_duration"), // seconds
+  resourceUrl: varchar("resource_url"), // For documents/links
+  isRequired: boolean("is_required").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Quizzes for lessons
+export const quizzes = pgTable("quizzes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lessonId: varchar("lesson_id").notNull(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  passingScore: integer("passing_score").default(70), // percentage
+  timeLimit: integer("time_limit"), // minutes
+  maxAttempts: integer("max_attempts").default(3),
+  randomizeQuestions: boolean("randomize_questions").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Quiz questions
+export const quizQuestions = pgTable("quiz_questions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quizId: varchar("quiz_id").notNull(),
+  type: questionTypeEnum("type").notNull(),
+  questionText: text("question_text").notNull(),
+  options: jsonb("options"), // Array of answer options
+  correctAnswers: jsonb("correct_answers"), // Array of correct option indices
+  explanation: text("explanation"),
+  orderIndex: integer("order_index"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// User enrollments in courses
+export const enrollments = pgTable("enrollments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  courseVersionId: varchar("course_version_id").notNull(),
+  status: enrollmentStatusEnum("status").default("enrolled"),
+  enrolledAt: timestamp("enrolled_at").defaultNow(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  dueDate: timestamp("due_date"),
+  progress: integer("progress").default(0), // 0-100 percentage
+  currentModuleId: varchar("current_module_id"),
+  currentLessonId: varchar("current_lesson_id"),
+});
+
+// Lesson progress tracking
+export const lessonProgress = pgTable("lesson_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  enrollmentId: varchar("enrollment_id").notNull(),
+  lessonId: varchar("lesson_id").notNull(),
+  status: lessonStatusEnum("status").default("not_started"),
+  progressPercentage: integer("progress_percentage").default(0),
+  lastPosition: integer("last_position").default(0), // Video position in seconds
+  timeSpent: integer("time_spent").default(0), // Total time in seconds
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Quiz attempts
+export const quizAttempts = pgTable("quiz_attempts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quizId: varchar("quiz_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  enrollmentId: varchar("enrollment_id").notNull(),
+  attemptNumber: integer("attempt_number").notNull(),
+  score: integer("score").default(0), // percentage
+  passed: boolean("passed").default(false),
+  answers: jsonb("answers"), // User's answers
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  timeSpent: integer("time_spent"), // seconds
+});
+
+// Training records - immutable records for ISO compliance
+export const trainingRecords = pgTable("training_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  courseVersionId: varchar("course_version_id").notNull(),
+  enrollmentId: varchar("enrollment_id").notNull(),
+  completedAt: timestamp("completed_at").notNull(),
+  finalScore: integer("final_score"), // percentage
+  certificateId: varchar("certificate_id"),
+  signedOffBy: varchar("signed_off_by"), // Manager who verified
+  effectivenessCheck: text("effectiveness_check"), // Post-training assessment
+  lockedAt: timestamp("locked_at").defaultNow(), // Record lock for immutability
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Certificates
+export const certificates = pgTable("certificates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  courseVersionId: varchar("course_version_id").notNull(),
+  trainingRecordId: varchar("training_record_id").notNull(),
+  certificateNumber: varchar("certificate_number").notNull(),
+  issuedAt: timestamp("issued_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  verificationHash: varchar("verification_hash"),
+  metadata: jsonb("metadata"), // Additional certificate data
+});
+
+// Badges
+export const badges = pgTable("badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  iconUrl: varchar("icon_url"),
+  criteria: text("criteria"), // How to earn this badge
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// User badges
+export const userBadges = pgTable("user_badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  badgeId: varchar("badge_id").notNull(),
+  awardedAt: timestamp("awarded_at").defaultNow(),
+  awardedBy: varchar("awarded_by"), // System or user ID
+  reason: text("reason"),
+  courseVersionId: varchar("course_version_id"), // If earned from course completion
+});
+
+// Training requirements - maps roles to required courses
+export const trainingRequirements = pgTable("training_requirements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(), // Requirement name
+  description: text("description"),
+  courseId: varchar("course_id").notNull(),
+  minimumVersion: varchar("minimum_version"), // Minimum course version required
+  targetRole: userRoleEnum("target_role"), // operative, supervisor, leadership
+  targetTeamId: varchar("target_team_id"), // Specific team requirement
+  renewalDays: integer("renewal_days"), // Days until renewal required
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// PDP course links - connect development plans to courses
+export const pdpCourseLinks = pgTable("pdp_course_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developmentPlanId: varchar("development_plan_id").notNull(),
+  courseId: varchar("course_id").notNull(),
+  courseVersionId: varchar("course_version_id"), // Specific version if locked
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -537,6 +745,86 @@ export const insertRecognitionSchema = createInsertSchema(recognitions).omit({
   createdAt: true,
 });
 
+// LMS Insert Schemas
+export const insertCourseSchema = createInsertSchema(courses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCourseVersionSchema = createInsertSchema(courseVersions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCourseModuleSchema = createInsertSchema(courseModules).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertLessonSchema = createInsertSchema(lessons).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertQuizSchema = createInsertSchema(quizzes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertQuizQuestionSchema = createInsertSchema(quizQuestions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertEnrollmentSchema = createInsertSchema(enrollments).omit({
+  id: true,
+  enrolledAt: true,
+});
+
+export const insertLessonProgressSchema = createInsertSchema(lessonProgress).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertQuizAttemptSchema = createInsertSchema(quizAttempts).omit({
+  id: true,
+  startedAt: true,
+});
+
+export const insertTrainingRecordSchema = createInsertSchema(trainingRecords).omit({
+  id: true,
+  lockedAt: true,
+  createdAt: true,
+});
+
+export const insertCertificateSchema = createInsertSchema(certificates).omit({
+  id: true,
+  issuedAt: true,
+});
+
+export const insertBadgeSchema = createInsertSchema(badges).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserBadgeSchema = createInsertSchema(userBadges).omit({
+  id: true,
+  awardedAt: true,
+});
+
+export const insertTrainingRequirementSchema = createInsertSchema(trainingRequirements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPdpCourseLinkSchema = createInsertSchema(pdpCourseLinks).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -553,6 +841,23 @@ export type LearningResource = typeof learningResources.$inferSelect;
 export type Meeting = typeof meetings.$inferSelect;
 export type Recognition = typeof recognitions.$inferSelect;
 
+// LMS Types
+export type Course = typeof courses.$inferSelect;
+export type CourseVersion = typeof courseVersions.$inferSelect;
+export type CourseModule = typeof courseModules.$inferSelect;
+export type Lesson = typeof lessons.$inferSelect;
+export type Quiz = typeof quizzes.$inferSelect;
+export type QuizQuestion = typeof quizQuestions.$inferSelect;
+export type Enrollment = typeof enrollments.$inferSelect;
+export type LessonProgress = typeof lessonProgress.$inferSelect;
+export type QuizAttempt = typeof quizAttempts.$inferSelect;
+export type TrainingRecord = typeof trainingRecords.$inferSelect;
+export type Certificate = typeof certificates.$inferSelect;
+export type Badge = typeof badges.$inferSelect;
+export type UserBadge = typeof userBadges.$inferSelect;
+export type TrainingRequirement = typeof trainingRequirements.$inferSelect;
+export type PdpCourseLink = typeof pdpCourseLinks.$inferSelect;
+
 export type InsertCompanyObjective = z.infer<typeof insertCompanyObjectiveSchema>;
 export type InsertTeamObjective = z.infer<typeof insertTeamObjectiveSchema>;
 export type InsertKeyResult = z.infer<typeof insertKeyResultSchema>;
@@ -563,3 +868,20 @@ export type InsertUserCompetency = z.infer<typeof insertUserCompetencySchema>;
 export type InsertDevelopmentPlan = z.infer<typeof insertDevelopmentPlanSchema>;
 export type InsertMeeting = z.infer<typeof insertMeetingSchema>;
 export type InsertRecognition = z.infer<typeof insertRecognitionSchema>;
+
+// LMS Insert Types
+export type InsertCourse = z.infer<typeof insertCourseSchema>;
+export type InsertCourseVersion = z.infer<typeof insertCourseVersionSchema>;
+export type InsertCourseModule = z.infer<typeof insertCourseModuleSchema>;
+export type InsertLesson = z.infer<typeof insertLessonSchema>;
+export type InsertQuiz = z.infer<typeof insertQuizSchema>;
+export type InsertQuizQuestion = z.infer<typeof insertQuizQuestionSchema>;
+export type InsertEnrollment = z.infer<typeof insertEnrollmentSchema>;
+export type InsertLessonProgress = z.infer<typeof insertLessonProgressSchema>;
+export type InsertQuizAttempt = z.infer<typeof insertQuizAttemptSchema>;
+export type InsertTrainingRecord = z.infer<typeof insertTrainingRecordSchema>;
+export type InsertCertificate = z.infer<typeof insertCertificateSchema>;
+export type InsertBadge = z.infer<typeof insertBadgeSchema>;
+export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
+export type InsertTrainingRequirement = z.infer<typeof insertTrainingRequirementSchema>;
+export type InsertPdpCourseLink = z.infer<typeof insertPdpCourseLinkSchema>;

@@ -13,6 +13,22 @@ import {
   learningResources,
   meetings,
   recognitions,
+  // LMS tables
+  courses,
+  courseVersions,
+  courseModules,
+  lessons,
+  quizzes,
+  quizQuestions,
+  enrollments,
+  lessonProgress,
+  quizAttempts,
+  trainingRecords,
+  certificates,
+  badges,
+  userBadges,
+  trainingRequirements,
+  pdpCourseLinks,
   type User,
   type UpsertUser,
   type CompanyObjective,
@@ -26,6 +42,22 @@ import {
   type LearningResource,
   type Meeting,
   type Recognition,
+  // LMS types
+  type Course,
+  type CourseVersion,
+  type CourseModule,
+  type Lesson,
+  type Quiz,
+  type QuizQuestion,
+  type Enrollment,
+  type LessonProgress,
+  type QuizAttempt,
+  type TrainingRecord,
+  type Certificate,
+  type Badge,
+  type UserBadge,
+  type TrainingRequirement,
+  type PdpCourseLink,
   type InsertCompanyObjective,
   type InsertTeamObjective,
   type InsertTeamKeyResult,
@@ -35,6 +67,22 @@ import {
   type InsertDevelopmentPlan,
   type InsertMeeting,
   type InsertRecognition,
+  // LMS insert types
+  type InsertCourse,
+  type InsertCourseVersion,
+  type InsertCourseModule,
+  type InsertLesson,
+  type InsertQuiz,
+  type InsertQuizQuestion,
+  type InsertEnrollment,
+  type InsertLessonProgress,
+  type InsertQuizAttempt,
+  type InsertTrainingRecord,
+  type InsertCertificate,
+  type InsertBadge,
+  type InsertUserBadge,
+  type InsertTrainingRequirement,
+  type InsertPdpCourseLink,
   insertTeamSchema,
   updateUserProfileSchema,
 } from "@shared/schema";
@@ -84,6 +132,7 @@ export interface IStorage {
   // Development plans
   getUserDevelopmentPlans(userId: string): Promise<DevelopmentPlan[]>;
   createDevelopmentPlan(plan: InsertDevelopmentPlan): Promise<DevelopmentPlan>;
+  getDevelopmentPlan(planId: string): Promise<DevelopmentPlan | undefined>;
   
   // Learning resources
   getLearningResources(): Promise<LearningResource[]>;
@@ -128,6 +177,80 @@ export interface IStorage {
     avgDevelopmentProgress: number;
     recognitionsSent: number;
   }>;
+
+  // LMS - Course Management
+  getCourses(): Promise<Course[]>;
+  getCourse(courseId: string): Promise<Course | undefined>;
+  createCourse(course: InsertCourse): Promise<Course>;
+  updateCourse(courseId: string, updates: Partial<InsertCourse>): Promise<Course>;
+  publishCourseVersion(courseId: string, version: string, changelog: string, publishedBy: string): Promise<CourseVersion>;
+  getCourseVersions(courseId: string): Promise<CourseVersion[]>;
+  getCurrentCourseVersion(courseId: string): Promise<CourseVersion | undefined>;
+
+  // LMS - Course Content
+  getCourseModules(courseVersionId: string): Promise<CourseModule[]>;
+  createCourseModule(module: InsertCourseModule): Promise<CourseModule>;
+  updateCourseModule(moduleId: string, updates: Partial<InsertCourseModule>): Promise<CourseModule>;
+  deleteCourseModule(moduleId: string): Promise<void>;
+  
+  getLessons(moduleId: string): Promise<Lesson[]>;
+  getLesson(lessonId: string): Promise<Lesson | undefined>;
+  createLesson(lesson: InsertLesson): Promise<Lesson>;
+  updateLesson(lessonId: string, updates: Partial<InsertLesson>): Promise<Lesson>;
+  deleteLesson(lessonId: string): Promise<void>;
+
+  // LMS - Quizzes and Assessments
+  getQuiz(lessonId: string): Promise<Quiz | undefined>;
+  createQuiz(quiz: InsertQuiz): Promise<Quiz>;
+  updateQuiz(quizId: string, updates: Partial<InsertQuiz>): Promise<Quiz>;
+  getQuizQuestions(quizId: string): Promise<QuizQuestion[]>;
+  createQuizQuestion(question: InsertQuizQuestion): Promise<QuizQuestion>;
+  startQuizAttempt(attempt: InsertQuizAttempt): Promise<QuizAttempt>;
+  submitQuizAttempt(attemptId: string, answers: any, timeSpent: number): Promise<QuizAttempt>;
+  getQuizAttempt(attemptId: string): Promise<QuizAttempt | undefined>;
+
+  // LMS - Enrollments and Progress
+  enrollUser(enrollment: InsertEnrollment): Promise<Enrollment>;
+  getUserEnrollments(userId: string): Promise<Enrollment[]>;
+  getEnrollment(enrollmentId: string): Promise<Enrollment | undefined>;
+  updateEnrollmentProgress(enrollmentId: string, progress: number): Promise<Enrollment>;
+  completeEnrollment(enrollmentId: string): Promise<Enrollment>;
+  
+  updateLessonProgress(progress: InsertLessonProgress): Promise<LessonProgress>;
+  getLessonProgress(enrollmentId: string, lessonId: string): Promise<LessonProgress | undefined>;
+  getUserLessonProgress(enrollmentId: string): Promise<LessonProgress[]>;
+
+  // LMS - Certificates and Badges
+  issueCertificate(certificate: InsertCertificate): Promise<Certificate>;
+  getUserCertificates(userId: string): Promise<Certificate[]>;
+  getCertificate(certificateId: string): Promise<Certificate | undefined>;
+  
+  createBadge(badge: InsertBadge): Promise<Badge>;
+  getBadges(): Promise<Badge[]>;
+  awardUserBadge(userBadge: InsertUserBadge): Promise<UserBadge>;
+  getUserBadges(userId: string): Promise<UserBadge[]>;
+
+  // LMS - Training Records (ISO Compliance)
+  createTrainingRecord(record: InsertTrainingRecord): Promise<TrainingRecord>;
+  getUserTrainingRecords(userId: string): Promise<TrainingRecord[]>;
+  getTrainingRecords(filters?: { 
+    userId?: string; 
+    courseId?: string; 
+    completedAfter?: Date; 
+    completedBefore?: Date; 
+  }): Promise<TrainingRecord[]>;
+  
+  // LMS - Training Requirements & Matrix
+  getTrainingRequirements(): Promise<TrainingRequirement[]>;
+  createTrainingRequirement(requirement: InsertTrainingRequirement): Promise<TrainingRequirement>;
+  updateTrainingRequirement(requirementId: string, updates: Partial<InsertTrainingRequirement>): Promise<TrainingRequirement>;
+  deleteTrainingRequirement(requirementId: string): Promise<void>;
+  getTrainingMatrix(filters?: { role?: string; teamId?: string; }): Promise<any[]>;
+
+  // LMS - PDP Integration
+  linkCourseToPDP(link: InsertPdpCourseLink): Promise<PdpCourseLink>;
+  getPDPCourseLinks(developmentPlanId: string): Promise<PdpCourseLink[]>;
+  unlinkCourseFromPDP(linkId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -403,6 +526,11 @@ export class DatabaseStorage implements IStorage {
       .values(plan)
       .returning();
     return created;
+  }
+
+  async getDevelopmentPlan(planId: string): Promise<DevelopmentPlan | undefined> {
+    const [plan] = await db.select().from(developmentPlans).where(eq(developmentPlans.id, planId));
+    return plan;
   }
 
   // Learning resources
@@ -726,6 +854,268 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(eq(users.teamId, teamId))
       .orderBy(users.firstName, users.lastName);
+  }
+
+  // LMS - Course Management (stub implementations)
+  async getCourses(): Promise<Course[]> {
+    return await db.select().from(courses).orderBy(courses.title);
+  }
+
+  async getCourse(courseId: string): Promise<Course | undefined> {
+    const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
+    return course;
+  }
+
+  async createCourse(course: InsertCourse): Promise<Course> {
+    const [created] = await db.insert(courses).values(course).returning();
+    return created;
+  }
+
+  async updateCourse(courseId: string, updates: Partial<InsertCourse>): Promise<Course> {
+    const [updated] = await db
+      .update(courses)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(courses.id, courseId))
+      .returning();
+    return updated;
+  }
+
+  async publishCourseVersion(courseId: string, version: string, changelog: string, publishedBy: string): Promise<CourseVersion> {
+    throw new Error("Not implemented yet");
+  }
+
+  async getCourseVersions(courseId: string): Promise<CourseVersion[]> {
+    return await db.select().from(courseVersions).where(eq(courseVersions.courseId, courseId));
+  }
+
+  async getCurrentCourseVersion(courseId: string): Promise<CourseVersion | undefined> {
+    throw new Error("Not implemented yet");
+  }
+
+  // LMS - Course Content (stub implementations)
+  async getCourseModules(courseVersionId: string): Promise<CourseModule[]> {
+    return await db.select().from(courseModules).where(eq(courseModules.courseVersionId, courseVersionId));
+  }
+
+  async createCourseModule(module: InsertCourseModule): Promise<CourseModule> {
+    const [created] = await db.insert(courseModules).values(module).returning();
+    return created;
+  }
+
+  async updateCourseModule(moduleId: string, updates: Partial<InsertCourseModule>): Promise<CourseModule> {
+    const [updated] = await db
+      .update(courseModules)
+      .set(updates)
+      .where(eq(courseModules.id, moduleId))
+      .returning();
+    return updated;
+  }
+
+  async deleteCourseModule(moduleId: string): Promise<void> {
+    await db.delete(courseModules).where(eq(courseModules.id, moduleId));
+  }
+
+  async getLessons(moduleId: string): Promise<Lesson[]> {
+    return await db.select().from(lessons).where(eq(lessons.moduleId, moduleId));
+  }
+
+  async getLesson(lessonId: string): Promise<Lesson | undefined> {
+    const [lesson] = await db.select().from(lessons).where(eq(lessons.id, lessonId));
+    return lesson;
+  }
+
+  async createLesson(lesson: InsertLesson): Promise<Lesson> {
+    const [created] = await db.insert(lessons).values(lesson).returning();
+    return created;
+  }
+
+  async updateLesson(lessonId: string, updates: Partial<InsertLesson>): Promise<Lesson> {
+    const [updated] = await db
+      .update(lessons)
+      .set(updates)
+      .where(eq(lessons.id, lessonId))
+      .returning();
+    return updated;
+  }
+
+  async deleteLesson(lessonId: string): Promise<void> {
+    await db.delete(lessons).where(eq(lessons.id, lessonId));
+  }
+
+  // LMS - Quizzes and Assessments (stub implementations)
+  async getQuiz(lessonId: string): Promise<Quiz | undefined> {
+    const [quiz] = await db.select().from(quizzes).where(eq(quizzes.lessonId, lessonId));
+    return quiz;
+  }
+
+  async createQuiz(quiz: InsertQuiz): Promise<Quiz> {
+    const [created] = await db.insert(quizzes).values(quiz).returning();
+    return created;
+  }
+
+  async updateQuiz(quizId: string, updates: Partial<InsertQuiz>): Promise<Quiz> {
+    const [updated] = await db
+      .update(quizzes)
+      .set(updates)
+      .where(eq(quizzes.id, quizId))
+      .returning();
+    return updated;
+  }
+
+  async getQuizQuestions(quizId: string): Promise<QuizQuestion[]> {
+    return await db.select().from(quizQuestions).where(eq(quizQuestions.quizId, quizId));
+  }
+
+  async createQuizQuestion(question: InsertQuizQuestion): Promise<QuizQuestion> {
+    const [created] = await db.insert(quizQuestions).values(question).returning();
+    return created;
+  }
+
+  async startQuizAttempt(attempt: InsertQuizAttempt): Promise<QuizAttempt> {
+    const [created] = await db.insert(quizAttempts).values(attempt).returning();
+    return created;
+  }
+
+  async submitQuizAttempt(attemptId: string, answers: any, timeSpent: number): Promise<QuizAttempt> {
+    throw new Error("Not implemented yet");
+  }
+
+  async getQuizAttempt(attemptId: string): Promise<QuizAttempt | undefined> {
+    const [attempt] = await db.select().from(quizAttempts).where(eq(quizAttempts.id, attemptId));
+    return attempt;
+  }
+
+  // LMS - Enrollments and Progress (stub implementations)
+  async enrollUser(enrollment: InsertEnrollment): Promise<Enrollment> {
+    const [created] = await db.insert(enrollments).values(enrollment).returning();
+    return created;
+  }
+
+  async getUserEnrollments(userId: string): Promise<Enrollment[]> {
+    return await db.select().from(enrollments).where(eq(enrollments.userId, userId));
+  }
+
+  async getEnrollment(enrollmentId: string): Promise<Enrollment | undefined> {
+    const [enrollment] = await db.select().from(enrollments).where(eq(enrollments.id, enrollmentId));
+    return enrollment;
+  }
+
+  async updateEnrollmentProgress(enrollmentId: string, progress: number): Promise<Enrollment> {
+    const [updated] = await db
+      .update(enrollments)
+      .set({ progress })
+      .where(eq(enrollments.id, enrollmentId))
+      .returning();
+    return updated;
+  }
+
+  async completeEnrollment(enrollmentId: string): Promise<Enrollment> {
+    throw new Error("Not implemented yet");
+  }
+
+  async updateLessonProgress(progress: InsertLessonProgress): Promise<LessonProgress> {
+    throw new Error("Not implemented yet");
+  }
+
+  async getLessonProgress(enrollmentId: string, lessonId: string): Promise<LessonProgress | undefined> {
+    throw new Error("Not implemented yet");
+  }
+
+  async getUserLessonProgress(enrollmentId: string): Promise<LessonProgress[]> {
+    return await db.select().from(lessonProgress).where(eq(lessonProgress.enrollmentId, enrollmentId));
+  }
+
+  // LMS - Certificates and Badges (stub implementations)
+  async issueCertificate(certificate: InsertCertificate): Promise<Certificate> {
+    const [created] = await db.insert(certificates).values(certificate).returning();
+    return created;
+  }
+
+  async getUserCertificates(userId: string): Promise<Certificate[]> {
+    return await db.select().from(certificates).where(eq(certificates.userId, userId));
+  }
+
+  async getCertificate(certificateId: string): Promise<Certificate | undefined> {
+    const [certificate] = await db.select().from(certificates).where(eq(certificates.id, certificateId));
+    return certificate;
+  }
+
+  async createBadge(badge: InsertBadge): Promise<Badge> {
+    const [created] = await db.insert(badges).values(badge).returning();
+    return created;
+  }
+
+  async getBadges(): Promise<Badge[]> {
+    return await db.select().from(badges);
+  }
+
+  async awardUserBadge(userBadge: InsertUserBadge): Promise<UserBadge> {
+    const [created] = await db.insert(userBadges).values(userBadge).returning();
+    return created;
+  }
+
+  async getUserBadges(userId: string): Promise<UserBadge[]> {
+    return await db.select().from(userBadges).where(eq(userBadges.userId, userId));
+  }
+
+  // LMS - Training Records (ISO Compliance) (stub implementations)
+  async createTrainingRecord(record: InsertTrainingRecord): Promise<TrainingRecord> {
+    const [created] = await db.insert(trainingRecords).values(record).returning();
+    return created;
+  }
+
+  async getUserTrainingRecords(userId: string): Promise<TrainingRecord[]> {
+    return await db.select().from(trainingRecords).where(eq(trainingRecords.userId, userId));
+  }
+
+  async getTrainingRecords(filters?: { 
+    userId?: string; 
+    courseId?: string; 
+    completedAfter?: Date; 
+    completedBefore?: Date; 
+  }): Promise<TrainingRecord[]> {
+    throw new Error("Not implemented yet");
+  }
+
+  // LMS - Training Requirements & Matrix (stub implementations)
+  async getTrainingRequirements(): Promise<TrainingRequirement[]> {
+    return await db.select().from(trainingRequirements);
+  }
+
+  async createTrainingRequirement(requirement: InsertTrainingRequirement): Promise<TrainingRequirement> {
+    const [created] = await db.insert(trainingRequirements).values(requirement).returning();
+    return created;
+  }
+
+  async updateTrainingRequirement(requirementId: string, updates: Partial<InsertTrainingRequirement>): Promise<TrainingRequirement> {
+    const [updated] = await db
+      .update(trainingRequirements)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(trainingRequirements.id, requirementId))
+      .returning();
+    return updated;
+  }
+
+  async deleteTrainingRequirement(requirementId: string): Promise<void> {
+    await db.delete(trainingRequirements).where(eq(trainingRequirements.id, requirementId));
+  }
+
+  async getTrainingMatrix(filters?: { role?: string; teamId?: string; }): Promise<any[]> {
+    throw new Error("Not implemented yet");
+  }
+
+  // LMS - PDP Integration (stub implementations)
+  async linkCourseToPDP(link: InsertPdpCourseLink): Promise<PdpCourseLink> {
+    const [created] = await db.insert(pdpCourseLinks).values(link).returning();
+    return created;
+  }
+
+  async getPDPCourseLinks(developmentPlanId: string): Promise<PdpCourseLink[]> {
+    return await db.select().from(pdpCourseLinks).where(eq(pdpCourseLinks.developmentPlanId, developmentPlanId));
+  }
+
+  async unlinkCourseFromPDP(linkId: string): Promise<void> {
+    await db.delete(pdpCourseLinks).where(eq(pdpCourseLinks.id, linkId));
   }
 }
 

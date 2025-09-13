@@ -15,7 +15,81 @@ import {
   insertRecognitionSchema,
   insertTeamSchema,
   updateUserProfileSchema,
+  // LMS schemas
+  insertCourseSchema,
+  insertCourseVersionSchema,
+  insertCourseModuleSchema,
+  insertLessonSchema,
+  insertQuizSchema,
+  insertQuizQuestionSchema,
+  insertEnrollmentSchema,
+  insertLessonProgressSchema,
+  insertQuizAttemptSchema,
+  insertTrainingRecordSchema,
+  insertCertificateSchema,
+  insertBadgeSchema,
+  insertUserBadgeSchema,
+  insertTrainingRequirementSchema,
+  insertPdpCourseLinkSchema,
 } from "@shared/schema";
+
+// Authorization helper functions
+function requireRole(allowedRoles: string[]) {
+  return async (req: any, res: any, next: any) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (!user || !allowedRoles.includes(user.role)) {
+        return res.status(403).json({ 
+          message: `Access denied. Required role: ${allowedRoles.join(' or ')}` 
+        });
+      }
+      req.currentUser = user;
+      next();
+    } catch (error) {
+      console.error("Error checking user role:", error);
+      return res.status(500).json({ message: "Authorization check failed" });
+    }
+  };
+}
+
+function requireLeadership() {
+  return requireRole(['leadership']);
+}
+
+function requireSupervisorOrLeadership() {
+  return requireRole(['supervisor', 'leadership']);
+}
+
+async function verifyEnrollmentOwnership(enrollmentId: string, userId: string): Promise<boolean> {
+  try {
+    const enrollment = await storage.getEnrollment(enrollmentId);
+    return enrollment?.userId === userId;
+  } catch (error) {
+    console.error("Error verifying enrollment ownership:", error);
+    return false;
+  }
+}
+
+async function verifyQuizAttemptOwnership(attemptId: string, userId: string): Promise<boolean> {
+  try {
+    const attempt = await storage.getQuizAttempt(attemptId);
+    return attempt?.userId === userId;
+  } catch (error) {
+    console.error("Error verifying quiz attempt ownership:", error);
+    return false;
+  }
+}
+
+function handleValidationError(error: any, res: any, action: string) {
+  if (error.name === 'ZodError') {
+    return res.status(400).json({ 
+      message: `Invalid data provided for ${action}`, 
+      errors: error.errors 
+    });
+  }
+  console.error(`Error ${action}:`, error);
+  return res.status(500).json({ message: `Failed to ${action}` });
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -736,6 +810,342 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching recognition stats:", error);
       res.status(500).json({ message: "Failed to fetch recognition stats" });
+    }
+  });
+
+  // ======================
+  // LMS API Routes
+  // ======================
+
+  // Course Catalog & Management
+  app.get('/api/lms/courses', isAuthenticated, async (req, res) => {
+    try {
+      const courses = await storage.getCourses();
+      res.json(courses);
+    } catch (error) {
+      console.error("Error fetching courses:", error);
+      res.status(500).json({ message: "Failed to fetch courses" });
+    }
+  });
+
+  app.get('/api/lms/courses/:id', isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const course = await storage.getCourse(id);
+      if (!course) {
+        return res.status(404).json({ message: "Course not found" });
+      }
+      res.json(course);
+    } catch (error) {
+      console.error("Error fetching course:", error);
+      res.status(500).json({ message: "Failed to fetch course" });
+    }
+  });
+
+  app.post('/api/lms/courses', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const courseData = insertCourseSchema.parse({ ...req.body, createdBy: userId });
+      const course = await storage.createCourse(courseData);
+      res.json(course);
+    } catch (error: any) {
+      return handleValidationError(error, res, "create course");
+    }
+  });
+
+  // Course Content
+  app.get('/api/lms/courses/:courseVersionId/modules', isAuthenticated, async (req, res) => {
+    try {
+      const { courseVersionId } = req.params;
+      const modules = await storage.getCourseModules(courseVersionId);
+      res.json(modules);
+    } catch (error) {
+      console.error("Error fetching course modules:", error);
+      res.status(500).json({ message: "Failed to fetch course modules" });
+    }
+  });
+
+  app.get('/api/lms/modules/:moduleId/lessons', isAuthenticated, async (req, res) => {
+    try {
+      const { moduleId } = req.params;
+      const lessons = await storage.getLessons(moduleId);
+      res.json(lessons);
+    } catch (error) {
+      console.error("Error fetching lessons:", error);
+      res.status(500).json({ message: "Failed to fetch lessons" });
+    }
+  });
+
+  app.get('/api/lms/lessons/:id', isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const lesson = await storage.getLesson(id);
+      if (!lesson) {
+        return res.status(404).json({ message: "Lesson not found" });
+      }
+      res.json(lesson);
+    } catch (error) {
+      console.error("Error fetching lesson:", error);
+      res.status(500).json({ message: "Failed to fetch lesson" });
+    }
+  });
+
+  // Enrollments
+  app.post('/api/lms/enrollments', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const enrollmentData = insertEnrollmentSchema.parse({ ...req.body, userId });
+      const enrollment = await storage.enrollUser(enrollmentData);
+      res.json(enrollment);
+    } catch (error: any) {
+      return handleValidationError(error, res, "create enrollment");
+    }
+  });
+
+  app.get('/api/lms/enrollments/me', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const enrollments = await storage.getUserEnrollments(userId);
+      res.json(enrollments);
+    } catch (error) {
+      console.error("Error fetching enrollments:", error);
+      res.status(500).json({ message: "Failed to fetch enrollments" });
+    }
+  });
+
+  app.get('/api/lms/enrollments/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify enrollment ownership
+      const isOwner = await verifyEnrollmentOwnership(id, userId);
+      if (!isOwner) {
+        return res.status(403).json({ message: "You can only access your own enrollments" });
+      }
+      
+      const enrollment = await storage.getEnrollment(id);
+      if (!enrollment) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+      res.json(enrollment);
+    } catch (error) {
+      console.error("Error fetching enrollment:", error);
+      res.status(500).json({ message: "Failed to fetch enrollment" });
+    }
+  });
+
+  // Progress Tracking
+  app.patch('/api/lms/progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Verify enrollment ownership before updating progress
+      if (req.body.enrollmentId) {
+        const isOwner = await verifyEnrollmentOwnership(req.body.enrollmentId, userId);
+        if (!isOwner) {
+          return res.status(403).json({ message: "You can only update progress for your own enrollments" });
+        }
+      }
+      
+      const progressData = insertLessonProgressSchema.parse(req.body);
+      const progress = await storage.updateLessonProgress(progressData);
+      res.json(progress);
+    } catch (error: any) {
+      return handleValidationError(error, res, "update lesson progress");
+    }
+  });
+
+  app.get('/api/lms/enrollments/:enrollmentId/progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify enrollment ownership
+      const isOwner = await verifyEnrollmentOwnership(enrollmentId, userId);
+      if (!isOwner) {
+        return res.status(403).json({ message: "You can only view progress for your own enrollments" });
+      }
+      
+      const progress = await storage.getUserLessonProgress(enrollmentId);
+      res.json(progress);
+    } catch (error) {
+      console.error("Error fetching lesson progress:", error);
+      res.status(500).json({ message: "Failed to fetch lesson progress" });
+    }
+  });
+
+  // Quizzes and Assessments
+  app.get('/api/lms/lessons/:lessonId/quiz', isAuthenticated, async (req, res) => {
+    try {
+      const { lessonId } = req.params;
+      const quiz = await storage.getQuiz(lessonId);
+      if (!quiz) {
+        return res.status(404).json({ message: "No quiz found for this lesson" });
+      }
+      
+      const questions = await storage.getQuizQuestions(quiz.id);
+      res.json({ ...quiz, questions });
+    } catch (error) {
+      console.error("Error fetching quiz:", error);
+      res.status(500).json({ message: "Failed to fetch quiz" });
+    }
+  });
+
+  app.post('/api/lms/quizzes/:quizId/attempts', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { quizId } = req.params;
+      const { enrollmentId, attemptNumber } = req.body;
+      
+      // Verify enrollment ownership before allowing quiz attempt
+      if (enrollmentId) {
+        const isOwner = await verifyEnrollmentOwnership(enrollmentId, userId);
+        if (!isOwner) {
+          return res.status(403).json({ message: "You can only take quizzes for your own enrollments" });
+        }
+      }
+      
+      const attemptData = insertQuizAttemptSchema.parse({
+        quizId,
+        userId,
+        enrollmentId,
+        attemptNumber,
+      });
+      
+      const attempt = await storage.startQuizAttempt(attemptData);
+      res.json(attempt);
+    } catch (error: any) {
+      return handleValidationError(error, res, "start quiz attempt");
+    }
+  });
+
+  app.post('/api/lms/quiz-attempts/:attemptId/submit', isAuthenticated, async (req: any, res) => {
+    try {
+      const { attemptId } = req.params;
+      const { answers, timeSpent } = req.body;
+      const userId = req.user.claims.sub;
+      
+      // Verify quiz attempt ownership
+      const isOwner = await verifyQuizAttemptOwnership(attemptId, userId);
+      if (!isOwner) {
+        return res.status(403).json({ message: "You can only submit your own quiz attempts" });
+      }
+      
+      const attempt = await storage.submitQuizAttempt(attemptId, answers, timeSpent);
+      res.json(attempt);
+    } catch (error: any) {
+      return handleValidationError(error, res, "submit quiz attempt");
+    }
+  });
+
+  // Certificates and Badges
+  app.get('/api/lms/certificates/me', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const certificates = await storage.getUserCertificates(userId);
+      res.json(certificates);
+    } catch (error) {
+      console.error("Error fetching certificates:", error);
+      res.status(500).json({ message: "Failed to fetch certificates" });
+    }
+  });
+
+  app.get('/api/lms/badges/me', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const badges = await storage.getUserBadges(userId);
+      res.json(badges);
+    } catch (error) {
+      console.error("Error fetching badges:", error);
+      res.status(500).json({ message: "Failed to fetch badges" });
+    }
+  });
+
+  app.get('/api/lms/badges', isAuthenticated, async (req, res) => {
+    try {
+      const badges = await storage.getBadges();
+      res.json(badges);
+    } catch (error) {
+      console.error("Error fetching badges:", error);
+      res.status(500).json({ message: "Failed to fetch badges" });
+    }
+  });
+
+  // Training Records (ISO Compliance)
+  app.get('/api/lms/training-records/me', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const records = await storage.getUserTrainingRecords(userId);
+      res.json(records);
+    } catch (error) {
+      console.error("Error fetching training records:", error);
+      res.status(500).json({ message: "Failed to fetch training records" });
+    }
+  });
+
+  // Training Requirements & Matrix (Admin only)
+  app.get('/api/lms/training-requirements', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const requirements = await storage.getTrainingRequirements();
+      res.json(requirements);
+    } catch (error) {
+      console.error("Error fetching training requirements:", error);
+      res.status(500).json({ message: "Failed to fetch training requirements" });
+    }
+  });
+
+  app.get('/api/lms/training-matrix', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { role, teamId } = req.query;
+      const matrix = await storage.getTrainingMatrix({ 
+        role: role as string, 
+        teamId: teamId as string 
+      });
+      res.json(matrix);
+    } catch (error) {
+      console.error("Error fetching training matrix:", error);
+      res.status(500).json({ message: "Failed to fetch training matrix" });
+    }
+  });
+
+  // PDP Integration
+  app.post('/api/lms/pdp-links', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const linkData = insertPdpCourseLinkSchema.parse(req.body);
+      const link = await storage.linkCourseToPDP(linkData);
+      res.json(link);
+    } catch (error: any) {
+      return handleValidationError(error, res, "link course to development plan");
+    }
+  });
+
+  app.get('/api/lms/development-plans/:planId/courses', isAuthenticated, async (req: any, res) => {
+    try {
+      const { planId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify the development plan belongs to the user or user has supervisory access
+      const plan = await storage.getDevelopmentPlan(planId);
+      if (!plan) {
+        return res.status(404).json({ message: "Development plan not found" });
+      }
+      
+      // Users can only access their own PDPs unless they're supervisors/leadership
+      const user = await storage.getUser(userId);
+      const canAccess = plan.userId === userId || 
+                       user?.role === 'supervisor' || 
+                       user?.role === 'leadership';
+      
+      if (!canAccess) {
+        return res.status(403).json({ message: "You can only access your own development plans" });
+      }
+      
+      const links = await storage.getPDPCourseLinks(planId);
+      res.json(links);
+    } catch (error) {
+      console.error("Error fetching PDP course links:", error);
+      res.status(500).json({ message: "Failed to fetch course links" });
     }
   });
 

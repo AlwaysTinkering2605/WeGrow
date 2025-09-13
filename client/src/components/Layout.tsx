@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -14,6 +14,7 @@ import {
   BarChart3,
   Settings,
   UsersRound,
+  GraduationCap,
 } from "lucide-react";
 import Dashboard from "./Dashboard";
 import Goals from "./Goals";
@@ -21,6 +22,7 @@ import Development from "./Development";
 import Recognition from "./Recognition";
 import Meetings from "./Meetings";
 import Profile from "./Profile";
+import Learning from "./Learning";
 
 // Role-based components
 import TeamManagement from "./TeamManagement";
@@ -28,18 +30,37 @@ import TeamObjectives from "./TeamObjectives";
 import Reports from "./Reports";
 import CompanySettings from "./CompanySettings";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "profile" | "team" | "team-objectives" | "reports" | "settings";
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "team" | "team-objectives" | "reports" | "settings";
 
 export default function Layout() {
-  const [activeTab, setActiveTab] = useState<TabType>("dashboard");
+  const [location] = useLocation();
   const { user } = useAuth();
   const isMobile = useIsMobile();
+
+  // Extract active tab from URL
+  const getActiveTab = (): TabType => {
+    if (location === "/" || location === "/dashboard") return "dashboard";
+    if (location === "/goals") return "goals";
+    if (location === "/development") return "development";
+    if (location.startsWith("/learning")) return "learning";
+    if (location === "/recognition") return "recognition";
+    if (location === "/meetings") return "meetings";
+    if (location === "/profile") return "profile";
+    if (location === "/team") return "team";
+    if (location === "/team-objectives") return "team-objectives";
+    if (location === "/reports") return "reports";
+    if (location === "/settings") return "settings";
+    return "dashboard";
+  };
+
+  const activeTab = getActiveTab();
 
   // Base tabs available to all users
   const baseTabs = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, component: Dashboard },
     { id: "goals", label: "My Goals", icon: Target, component: Goals },
     { id: "development", label: "Development", icon: BookOpen, component: Development },
+    { id: "learning", label: "Learning", icon: GraduationCap, component: Learning },
     { id: "recognition", label: "Recognition", icon: Star, component: Recognition },
     { id: "meetings", label: "1-on-1s", icon: Users, component: Meetings },
     { id: "profile", label: "Profile", icon: User, component: Profile },
@@ -77,21 +98,24 @@ export default function Layout() {
       return (
         <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50">
           <div className="grid grid-cols-5 gap-1 py-2">
-            {tabs.slice(0, 5).map((tab) => {
+            {/* Show only the first 5 base tabs to avoid overcrowding */}
+            {baseTabs.slice(0, 5).map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
+              const href = tab.id === "dashboard" ? "/" : `/${tab.id}`;
+              const mobileLabel = tab.label === "My Goals" ? "Goals" : tab.label === "Recognition" ? "Kudos" : tab.label;
               return (
-                <button
+                <Link
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as TabType)}
-                  className={`flex flex-col items-center p-2 text-xs ${
+                  href={href}
+                  className={`flex flex-col items-center p-2 text-xs no-underline ${
                     isActive ? "text-primary" : "text-muted-foreground"
                   }`}
                   data-testid={`tab-${tab.id}`}
                 >
                   <Icon className="w-5 h-5 mb-1" />
-                  <span>{tab.label === "My Goals" ? "Goals" : tab.label === "Development" ? "Learning" : tab.label === "Recognition" ? "Kudos" : tab.label}</span>
-                </button>
+                  <span>{mobileLabel}</span>
+                </Link>
               );
             })}
           </div>
@@ -113,11 +137,12 @@ export default function Layout() {
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
+              const href = tab.id === "dashboard" ? "/" : `/${tab.id}`;
               return (
-                <button
+                <Link
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as TabType)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left ${
+                  href={href}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left no-underline ${
                     isActive
                       ? "text-primary bg-primary/10"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -126,7 +151,7 @@ export default function Layout() {
                 >
                   <Icon className="w-5 h-5" />
                   <span>{tab.label}</span>
-                </button>
+                </Link>
               );
             })}
           </nav>

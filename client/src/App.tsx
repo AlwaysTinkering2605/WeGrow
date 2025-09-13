@@ -18,6 +18,18 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={Home} />
+          <Route path="/dashboard" component={Home} />
+          <Route path="/goals" component={Home} />
+          <Route path="/development" component={Home} />
+          <Route path="/learning" component={Home} />
+          <Route path="/learning/:tab" component={Home} />
+          <Route path="/recognition" component={Home} />
+          <Route path="/meetings" component={Home} />
+          <Route path="/profile" component={Home} />
+          <Route path="/team" component={Home} />
+          <Route path="/team-objectives" component={Home} />
+          <Route path="/reports" component={Home} />
+          <Route path="/settings" component={Home} />
         </>
       )}
       <Route component={NotFound} />

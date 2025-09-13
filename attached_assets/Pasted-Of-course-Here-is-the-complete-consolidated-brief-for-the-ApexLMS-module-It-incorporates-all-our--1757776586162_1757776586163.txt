@@ -1,0 +1,79 @@
+Of course. Here is the complete, consolidated brief for the ApexLMS module. It incorporates all our previous discussions, including the core LMS features, the video hosting requirements, and the critical ISO 9001 compliance functionality.
+
+This single document can be handed directly to your developer.
+
+---
+
+### **Project Brief: ApexLMS - Integrated Learning & Compliance System**
+
+**Document Version:** 2.0 (Consolidated)
+**Date:** 13 September 2025
+
+**1. Vision & Strategic Fit**
+
+The vision for ApexLMS is to create a seamless, "best in class" learning and compliance engine that lives entirely within the Apex ecosystem. This module will close the loop between identifying a development need in a PDP and fulfilling it with targeted training.
+
+Crucially, ApexLMS will be engineered to serve as our **single source of truth for all training-related ISO 9001 compliance**. It will automate the generation of audit-ready documentation, streamline the demonstration of employee competence, and transform our approach to quality management. By integrating learning, performance, and compliance, Apex will provide a significant competitive advantage and operational efficiency.
+
+**2. User Journeys & Experience**
+
+* **Maria, the Cleaning Operative (The Learner):** Maria receives a push notification for her annual "Manual Handling" refresher course. On her break, she watches a short video and completes a quiz on her phone. Upon passing, the system automatically marks her PDP goal as complete, adds a new certificate to her permanent training record, and updates her compliance status on the company's Training Matrix to "Green."
+
+* **David, the Area Supervisor (The Manager):** Before a client meeting, David quickly generates a Training Matrix for his team directly from his tablet. He exports the PDF to show the client that every operative on their site is fully certified in "Health & Safety" and "COSHH." During a 1-on-1, he maps out a career path for a high-performing operative by assigning a "Leadership Skills" learning path directly from the PDP interface.
+
+* **Sarah, the Compliance & Operations Director (The Strategist):** During an ISO 9001 audit, the auditor asks for evidence of competence for all new hires in the last 6 months. From her laptop, Sarah accesses the ApexLMS reporting dashboard. She filters by "Hire Date" and "Job Role," instantly generating a comprehensive report showing that 100% of new operatives have completed their mandatory onboarding training. When asked for the Training Matrix, she generates and exports a live, up-to-the-minute version in under 30 seconds.
+
+**3. Core Functionality & Features**
+
+**A. Course Authoring & Management**
+
+1.  **Intuitive Course Builder:** A simple, web-based, drag-and-drop interface for creating courses composed of **Modules** and **Lessons**.
+2.  **Content Blocks:** Support for Rich Text, PDF/Document viewing, Video embedding, and a robust Quiz/Assessment engine.
+3.  **Advanced Quiz Engine:** Support for multiple choice, true/false, and image-based questions. Ability to set passing scores, limit retakes, and randomize questions.
+4.  **Course Versioning (ISO Requirement):** When a course is updated, it must be saved as a new version (e.g., "COSHH v2.1"). All previous versions must be archived and accessible. Training records must clearly state which version of a course an employee completed.
+5.  **User & Enrollment Management:** Ability to enroll individuals or groups (by role, site, etc.), set deadlines, and configure automated reminders.
+
+**B. Learner Experience & Records**
+
+1.  **Personalised "My Learning" Dashboard:** A clear, mobile-first view of assigned, in-progress, and completed courses.
+2.  **Mobile-First Course Player:** A distraction-free interface with smart resume functionality, allowing users to stop and start seamlessly.
+3.  **Course Catalog:** A searchable library of optional courses where users can self-enroll.
+4.  **Certification & Gamification:** Automatically generate branded PDF certificates upon completion. Award digital badges displayed on user profiles to encourage engagement.
+5.  **Immutable Training Record (ISO Requirement):** Each user profile must contain a permanent, unchangeable "Training Transcript" tab. It will list every course taken, the version, completion date, score, a link to the certificate, and any records of training effectiveness checks.
+
+**C. ISO 9001 Compliance & Reporting Engine**
+
+1.  **Dynamic Training Matrix Generator (Cornerstone Feature):**
+    * A live, on-demand report, not a static file.
+    * **Filterable:** By user, job role, team, site, or any other user group.
+    * **Configurable:** Select which competencies or courses to display.
+    * **Visual & Clear:** A grid with employees as rows and courses as columns. Cells are color-coded (Green for Compliant, Red for Overdue, etc.) and display the last completion date.
+    * **Exportable:** Must be exportable to both audit-ready PDF and editable CSV/Excel formats.
+
+2.  **Competency Management & Role Profiles:**
+    * An admin area to define job roles and map the specific mandatory competencies and courses required for each.
+    * When a new user is assigned a role, the system **automatically enrolls them** in all required training, creating a consistent onboarding process.
+
+3.  **Training Effectiveness Review:**
+    * The system must support the creation of follow-up "effectiveness checks."
+    * This could be an automated prompt to a manager 30 days post-training to conduct a practical observation or a simple confirmation.
+    * The result of this check must be stored alongside the original training record, closing the loop for auditors.
+
+**4. Crucial Integration with Core Apex Modules**
+
+* **PDP Integration:** When creating a PDP goal, allow managers/users to link it directly to a course or learning path in the LMS. The goal's progress must automatically update based on course completion.
+* **User Profile Integration:** The "Training Transcript" and earned badges must be prominently displayed on the user's profile.
+* **Recognition Wall Integration:** The system can be configured to automatically post a "Shout-Out" when an employee completes a significant certification.
+
+**5. Technical & Implementation Requirements**
+
+1.  **Video Hosting (Mandatory):**
+    * The system **must** integrate with a professional video hosting provider (e.g., **Vimeo Pro, Wistia**).
+    * This is required for:
+        * **Security:** Using domain-level privacy to ensure videos only play within the Apex app.
+        * **Professional UX:** Providing a completely brand-free, ad-free, and distraction-free player.
+        * **Advanced Analytics:** Using the provider's API to track watch percentage and trigger automated lesson completion events.
+    * Using YouTube Unlisted links is **unacceptable for the final production version** due to security, UX, and tracking limitations. It may only be used for early-stage prototyping.
+
+2.  **Scalability:** The architecture must handle storage and streaming of video and document content efficiently without slowing down the core application.
+3.  **Future-Proofing:** Consider building for SCORM compatibility to allow for the future import of third-party training content.

@@ -2,6 +2,8 @@
 
 Apex is a Performance & Development Platform designed for cleaning companies to integrate Personal Development Plans (PDPs) with Objectives and Key Results (OKR) in a simple, mobile-first application. The platform targets three user types: cleaning operatives, area supervisors, and senior leadership, with a focus on goal alignment from company level down to individual objectives.
 
+**Recent LMS Implementation (Sept 13, 2025)**: Completed comprehensive Learning Management System foundation with secure API, database schema, and ready for frontend integration.
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -28,6 +30,7 @@ Preferred communication style: Simple, everyday language.
 - **Drizzle ORM**: Type-safe database access with schema-first approach
 - **Shared Schema**: Common type definitions between client and server in `/shared/schema.ts`
 - **Session Storage**: Database-backed session management for authentication
+- **LMS Schema**: 14 comprehensive tables for courses, modules, lessons, enrollments, progress tracking, quizzes, certificates, badges, training records, and PDP integration
 
 ## Core Data Models
 - **Users**: Role-based (operative, supervisor, leadership) with hierarchical relationships
@@ -37,6 +40,7 @@ Preferred communication style: Simple, everyday language.
 - **Development Plans**: Personal development tracking with competencies
 - **Recognition System**: Peer recognition tied to company values
 - **Meeting Management**: 1-on-1 meeting scheduling and notes
+- **LMS System**: Courses, modules, lessons, enrollments, progress tracking, quizzes, assessments, certificates, badges, training records, and compliance tracking
 
 ## Authentication & Authorization
 - **Replit Auth Integration**: OIDC-based authentication using Replit's identity provider
