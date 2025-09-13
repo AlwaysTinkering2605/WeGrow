@@ -206,7 +206,7 @@ export default function Profile() {
                   Edit Profile
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
+              <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Edit Profile</DialogTitle>
                 </DialogHeader>
@@ -295,37 +295,43 @@ export default function Profile() {
                         <FormItem>
                           <FormLabel>Profile Image</FormLabel>
                           <FormControl>
-                            <div className="space-y-4">
-                              <ObjectUploader
-                                maxNumberOfFiles={1}
-                                maxFileSize={5 * 1024 * 1024} // 5MB
-                                onGetUploadParameters={async () => {
-                                  const response = await apiRequest('POST', '/api/objects/upload');
-                                  const { uploadURL } = await response.json();
-                                  return { method: 'PUT' as const, url: uploadURL };
-                                }}
-                                onComplete={async (result) => {
-                                  const uploaded = result.successful?.[0];
-                                  if (!uploaded) return;
-                                  const path = uploaded.uploadURL || uploaded.response?.uploadURL;
-                                  const response = await apiRequest('PUT', '/api/profile-images', { profileImageURL: path });
-                                  const { objectPath } = await response.json();
-                                  profileForm.setValue('profileImageUrl', objectPath, { shouldValidate: true });
-                                  toast({ title: 'Photo uploaded successfully' });
-                                }}
-                                buttonClassName="w-full"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <Upload className="mr-2 h-4 w-4"/>
-                                  <span>Upload Profile Photo</span>
-                                </div>
-                              </ObjectUploader>
-                              <Input
-                                {...field}
-                                value={field.value || ""}
-                                placeholder="Or enter image URL"
-                                data-testid="input-profile-image"
-                              />
+                            <div className="space-y-3">
+                              <div className="relative">
+                                <ObjectUploader
+                                  maxNumberOfFiles={1}
+                                  maxFileSize={5 * 1024 * 1024} // 5MB
+                                  onGetUploadParameters={async () => {
+                                    const response = await apiRequest('POST', '/api/objects/upload');
+                                    const { uploadURL } = await response.json();
+                                    return { method: 'PUT' as const, url: uploadURL };
+                                  }}
+                                  onComplete={async (result) => {
+                                    const uploaded = result.successful?.[0];
+                                    if (!uploaded) return;
+                                    const path = uploaded.uploadURL || uploaded.response?.uploadURL;
+                                    const response = await apiRequest('PUT', '/api/profile-images', { profileImageURL: path });
+                                    const { objectPath } = await response.json();
+                                    profileForm.setValue('profileImageUrl', objectPath, { shouldValidate: true });
+                                    toast({ title: 'Photo uploaded successfully' });
+                                  }}
+                                  buttonClassName="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                                >
+                                  <div className="flex items-center justify-center gap-2 py-2">
+                                    <Upload className="h-4 w-4"/>
+                                    <span>Upload Profile Photo</span>
+                                  </div>
+                                </ObjectUploader>
+                              </div>
+                              <div className="relative">
+                                <Label className="text-xs text-muted-foreground">Or enter image URL:</Label>
+                                <Input
+                                  {...field}
+                                  value={field.value || ""}
+                                  placeholder="https://example.com/image.jpg"
+                                  data-testid="input-profile-image"
+                                  className="mt-1"
+                                />
+                              </div>
                             </div>
                           </FormControl>
                           <FormDescription>

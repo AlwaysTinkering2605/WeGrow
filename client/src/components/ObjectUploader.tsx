@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import Uppy from "@uppy/core";
-import { DashboardModal } from "@uppy/react";
+import { Dashboard } from "@uppy/react";
 import AwsS3 from "@uppy/aws-s3";
 import type { UploadResult } from "@uppy/core";
 import { Button } from "@/components/ui/button";
@@ -56,7 +56,7 @@ export function ObjectUploader({
   buttonClassName,
   children,
 }: ObjectUploaderProps) {
-  const [showModal, setShowModal] = useState(false);
+  const [showUploader, setShowUploader] = useState(false);
   const [uppy] = useState(() =>
     new Uppy({
       restrictions: {
@@ -75,18 +75,32 @@ export function ObjectUploader({
   );
 
   return (
-    <div>
-      <Button type="button" onClick={() => setShowModal(true)} className={buttonClassName} data-testid="button-upload-photo">
+    <div className="space-y-3">
+      <Button 
+        type="button" 
+        onClick={() => setShowUploader(!showUploader)} 
+        className={buttonClassName} 
+        data-testid="button-upload-photo"
+        variant={showUploader ? "secondary" : "default"}
+      >
         {children}
       </Button>
 
-      <DashboardModal
-        uppy={uppy}
-        open={showModal}
-        onRequestClose={() => setShowModal(false)}
-        proudlyDisplayPoweredByUppy={false}
-        className="!w-[90vw] !h-[80vh] !max-w-4xl !max-h-[80vh] !overflow-auto"
-      />
+      {showUploader && (
+        <div className="border border-border rounded-lg overflow-hidden">
+          <Dashboard
+            uppy={uppy}
+            proudlyDisplayPoweredByUppy={false}
+            height={200}
+            hideUploadButton={false}
+            hideRetryButton={false}
+            hidePauseResumeButton={true}
+            hideCancelButton={false}
+            hideProgressDetails={false}
+            className="!bg-background"
+          />
+        </div>
+      )}
     </div>
   );
 }
