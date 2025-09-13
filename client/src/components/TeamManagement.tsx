@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Users, 
@@ -26,31 +29,27 @@ import {
   UserPlus,
   Settings
 } from "lucide-react";
+import { 
+  insertTeamSchema,
+  type User
+} from "@shared/schema";
+import type { z } from "zod";
 
-interface Team {
+// Team type inferred from database schema
+type Team = {
   id: string;
   name: string;
-  description?: string;
-  departmentType: string;
-  managerId?: string;
-  parentTeamId?: string;
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  description?: string | null;
+  department?: string | null;
+  teamLeadId: string;
+  parentTeamId?: string | null;
+  isActive?: boolean | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
   children?: Team[];
-}
+};
 
-interface User {
-  id: string;
-  email: string;
-  firstName?: string;
-  lastName?: string;
-  role: string;
-  teamId?: string;
-  managerId?: string;
-  mobilePhone?: string;
-  profilePhotoUrl?: string;
-}
+type InsertTeamData = z.infer<typeof insertTeamSchema>;
 
 export default function TeamManagement() {
   const { user } = useAuth();
@@ -59,11 +58,31 @@ export default function TeamManagement() {
   const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
   const [isEditTeamOpen, setIsEditTeamOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-  const [teamFormData, setTeamFormData] = useState({
-    name: "",
-    description: "",
-    departmentType: "operations",
-    parentTeamId: ""
+
+  // Create team form with proper validation
+  const createForm = useForm<InsertTeamData>({
+    resolver: zodResolver(insertTeamSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      department: "operations",
+      teamLeadId: "",
+      parentTeamId: "",
+      isActive: true,
+    },
+  });
+
+  // Edit team form with partial validation for updates
+  const editForm = useForm<Partial<InsertTeamData>>({
+    resolver: zodResolver(insertTeamSchema.partial()),
+    defaultValues: {
+      name: "",
+      description: "",
+      department: "operations", 
+      teamLeadId: "",
+      parentTeamId: "",
+      isActive: true,
+    },
   });
 
   // Fetch teams data
@@ -92,7 +111,7 @@ export default function TeamManagement() {
 
   // Create team mutation
   const createTeamMutation = useMutation({
-    mutationFn: (teamData: any) => apiRequest("/api/teams", {
+    mutationFn: (teamData: InsertTeamData) => apiRequest("/api/teams", {
       method: "POST",
       body: JSON.stringify(teamData),
     }),
@@ -100,7 +119,7 @@ export default function TeamManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teams/hierarchy"] });
       setIsCreateTeamOpen(false);
-      setTeamFormData({ name: "", description: "", departmentType: "operations", parentTeamId: "" });
+      createForm.reset();
       toast({
         title: "Team Created",
         description: "Team has been created successfully.",
@@ -117,15 +136,17 @@ export default function TeamManagement() {
 
   // Update team mutation
   const updateTeamMutation = useMutation({
-    mutationFn: ({ id, ...updates }: any) => apiRequest(`/api/teams/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(updates),
-    }),
+    mutationFn: ({ id, ...updates }: { id: string } & Partial<InsertTeamData>) => 
+      apiRequest(`/api/teams/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(updates),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teams/hierarchy"] });
       setIsEditTeamOpen(false);
       setSelectedTeam(null);
+      editForm.reset();
       toast({
         title: "Team Updated",
         description: "Team has been updated successfully.",
@@ -198,35 +219,28 @@ export default function TeamManagement() {
     );
   }
 
-  const handleCreateTeam = () => {
-    if (!teamFormData.name.trim()) {
-      toast({
-        title: "Error",
-        description: "Team name is required.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    createTeamMutation.mutate(teamFormData);
+  const handleCreateTeam = (data: InsertTeamData) => {
+    createTeamMutation.mutate(data);
   };
 
   const handleEditTeam = (team: Team) => {
     setSelectedTeam(team);
-    setTeamFormData({
+    editForm.reset({
       name: team.name,
       description: team.description || "",
-      departmentType: team.departmentType,
-      parentTeamId: team.parentTeamId || ""
+      department: team.department || "operations",
+      teamLeadId: team.teamLeadId,
+      parentTeamId: team.parentTeamId || "",
+      isActive: team.isActive ?? true,
     });
     setIsEditTeamOpen(true);
   };
 
-  const handleUpdateTeam = () => {
-    if (!selectedTeam || !teamFormData.name.trim()) {
+  const handleUpdateTeam = (data: Partial<InsertTeamData>) => {
+    if (!selectedTeam) {
       toast({
         title: "Error",
-        description: "Team name is required.",
+        description: "No team selected for update.",
         variant: "destructive",
       });
       return;
@@ -234,7 +248,7 @@ export default function TeamManagement() {
 
     updateTeamMutation.mutate({
       id: selectedTeam.id,
-      ...teamFormData
+      ...data
     });
   };
 
@@ -323,76 +337,137 @@ export default function TeamManagement() {
             <DialogHeader>
               <DialogTitle>Create New Team</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Team Name</Label>
-                <Input
-                  id="name"
-                  value={teamFormData.name}
-                  onChange={(e) => setTeamFormData({ ...teamFormData, name: e.target.value })}
-                  placeholder="Enter team name"
-                  data-testid="input-team-name"
+            <Form {...createForm}>
+              <form onSubmit={createForm.handleSubmit(handleCreateTeam)} className="space-y-4">
+                <FormField
+                  control={createForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Team Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="Enter team name"
+                          data-testid="input-team-name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={teamFormData.description}
-                  onChange={(e) => setTeamFormData({ ...teamFormData, description: e.target.value })}
-                  placeholder="Enter team description"
-                  data-testid="input-team-description"
+                
+                <FormField
+                  control={createForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Enter team description"
+                          data-testid="input-team-description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div>
-                <Label htmlFor="departmentType">Department Type</Label>
-                <Select
-                  value={teamFormData.departmentType}
-                  onValueChange={(value) => setTeamFormData({ ...teamFormData, departmentType: value })}
-                >
-                  <SelectTrigger data-testid="select-department-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="operations">Operations</SelectItem>
-                    <SelectItem value="commercial">Commercial</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="leadership">Leadership</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="parentTeam">Parent Team (Optional)</Label>
-                <Select
-                  value={teamFormData.parentTeamId}
-                  onValueChange={(value) => setTeamFormData({ ...teamFormData, parentTeamId: value })}
-                >
-                  <SelectTrigger data-testid="select-parent-team">
-                    <SelectValue placeholder="Select parent team" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">No Parent Team</SelectItem>
-                    {teams.map((team: Team) => (
-                      <SelectItem key={team.id} value={team.id}>
-                        {team.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsCreateTeamOpen(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleCreateTeam}
-                  disabled={createTeamMutation.isPending}
-                  data-testid="button-create-team-submit"
-                >
-                  {createTeamMutation.isPending ? "Creating..." : "Create Team"}
-                </Button>
-              </div>
-            </div>
+
+                <FormField
+                  control={createForm.control}
+                  name="department"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Department</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-department">
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="operations">Operations</SelectItem>
+                          <SelectItem value="commercial">Commercial</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="leadership">Leadership</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={createForm.control}
+                  name="teamLeadId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Team Lead (Required)</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-team-lead">
+                            <SelectValue placeholder="Select team lead" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {allUsers.filter((user: User) => 
+                            user.role === 'supervisor' || user.role === 'leadership'
+                          ).map((user: User) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.firstName && user.lastName 
+                                ? `${user.firstName} ${user.lastName}` 
+                                : user.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={createForm.control}
+                  name="parentTeamId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Parent Team (Optional)</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-parent-team">
+                            <SelectValue placeholder="Select parent team" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">No Parent Team</SelectItem>
+                          {teams.map((team: Team) => (
+                            <SelectItem key={team.id} value={team.id}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={() => setIsCreateTeamOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit"
+                    disabled={createTeamMutation.isPending}
+                    data-testid="button-create-team-submit"
+                  >
+                    {createTeamMutation.isPending ? "Creating..." : "Create Team"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
       </div>
@@ -687,76 +762,137 @@ export default function TeamManagement() {
           <DialogHeader>
             <DialogTitle>Edit Team</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-name">Team Name</Label>
-              <Input
-                id="edit-name"
-                value={teamFormData.name}
-                onChange={(e) => setTeamFormData({ ...teamFormData, name: e.target.value })}
-                placeholder="Enter team name"
-                data-testid="input-edit-team-name"
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(handleUpdateTeam)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Team Name</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Enter team name"
+                        data-testid="input-edit-team-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div>
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                value={teamFormData.description}
-                onChange={(e) => setTeamFormData({ ...teamFormData, description: e.target.value })}
-                placeholder="Enter team description"
-                data-testid="input-edit-team-description"
+              
+              <FormField
+                control={editForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        placeholder="Enter team description"
+                        data-testid="input-edit-team-description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div>
-              <Label htmlFor="edit-departmentType">Department Type</Label>
-              <Select
-                value={teamFormData.departmentType}
-                onValueChange={(value) => setTeamFormData({ ...teamFormData, departmentType: value })}
-              >
-                <SelectTrigger data-testid="select-edit-department-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="operations">Operations</SelectItem>
-                  <SelectItem value="commercial">Commercial</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="leadership">Leadership</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="edit-parentTeam">Parent Team (Optional)</Label>
-              <Select
-                value={teamFormData.parentTeamId}
-                onValueChange={(value) => setTeamFormData({ ...teamFormData, parentTeamId: value })}
-              >
-                <SelectTrigger data-testid="select-edit-parent-team">
-                  <SelectValue placeholder="Select parent team" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">No Parent Team</SelectItem>
-                  {teams.filter((team: Team) => team.id !== selectedTeam?.id).map((team: Team) => (
-                    <SelectItem key={team.id} value={team.id}>
-                      {team.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setIsEditTeamOpen(false)}>
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleUpdateTeam}
-                disabled={updateTeamMutation.isPending}
-                data-testid="button-update-team-submit"
-              >
-                {updateTeamMutation.isPending ? "Updating..." : "Update Team"}
-              </Button>
-            </div>
-          </div>
+
+              <FormField
+                control={editForm.control}
+                name="department"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Department</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-department">
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="operations">Operations</SelectItem>
+                        <SelectItem value="commercial">Commercial</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="leadership">Leadership</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="teamLeadId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Team Lead (Required)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-team-lead">
+                          <SelectValue placeholder="Select team lead" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {allUsers.filter((user: User) => 
+                          user.role === 'supervisor' || user.role === 'leadership'
+                        ).map((user: User) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.firstName && user.lastName 
+                              ? `${user.firstName} ${user.lastName}` 
+                              : user.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="parentTeamId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Parent Team (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-parent-team">
+                          <SelectValue placeholder="Select parent team" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">No Parent Team</SelectItem>
+                        {teams.filter((team: Team) => team.id !== selectedTeam?.id).map((team: Team) => (
+                          <SelectItem key={team.id} value={team.id}>
+                            {team.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={() => setIsEditTeamOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={updateTeamMutation.isPending}
+                  data-testid="button-update-team-submit"
+                >
+                  {updateTeamMutation.isPending ? "Updating..." : "Update Team"}
+                </Button>
+              </div>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>
