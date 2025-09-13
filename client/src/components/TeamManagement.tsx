@@ -67,7 +67,7 @@ export default function TeamManagement() {
       description: "",
       department: "operations",
       teamLeadId: "",
-      parentTeamId: "",
+      parentTeamId: undefined,
       isActive: true,
     },
   });
@@ -80,7 +80,7 @@ export default function TeamManagement() {
       description: "",
       department: "operations", 
       teamLeadId: "",
-      parentTeamId: "",
+      parentTeamId: undefined,
       isActive: true,
     },
   });
@@ -111,10 +111,7 @@ export default function TeamManagement() {
 
   // Create team mutation
   const createTeamMutation = useMutation({
-    mutationFn: (teamData: InsertTeamData) => apiRequest("/api/teams", {
-      method: "POST",
-      body: JSON.stringify(teamData),
-    }),
+    mutationFn: (teamData: InsertTeamData) => apiRequest("POST", "/api/teams", teamData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teams/hierarchy"] });
@@ -137,10 +134,7 @@ export default function TeamManagement() {
   // Update team mutation
   const updateTeamMutation = useMutation({
     mutationFn: ({ id, ...updates }: { id: string } & Partial<InsertTeamData>) => 
-      apiRequest(`/api/teams/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(updates),
-      }),
+      apiRequest("PUT", `/api/teams/${id}`, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teams/hierarchy"] });
@@ -163,9 +157,7 @@ export default function TeamManagement() {
 
   // Delete team mutation (leadership only)
   const deleteTeamMutation = useMutation({
-    mutationFn: (teamId: string) => apiRequest(`/api/teams/${teamId}`, {
-      method: "DELETE",
-    }),
+    mutationFn: (teamId: string) => apiRequest("DELETE", `/api/teams/${teamId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teams/hierarchy"] });
@@ -186,10 +178,7 @@ export default function TeamManagement() {
   // Assign user to team mutation
   const assignUserMutation = useMutation({
     mutationFn: ({ userId, teamId }: { userId: string; teamId: string }) => 
-      apiRequest(`/api/users/${userId}/team`, {
-        method: "PUT",
-        body: JSON.stringify({ teamId }),
-      }),
+      apiRequest("PUT", `/api/users/${userId}/team`, { teamId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/team/members"] });
@@ -236,7 +225,7 @@ export default function TeamManagement() {
       description: team.description || "",
       department: team.department || "operations",
       teamLeadId: team.teamLeadId,
-      parentTeamId: team.parentTeamId || "",
+      parentTeamId: team.parentTeamId ?? undefined,
       isActive: team.isActive ?? true,
     });
     setIsEditTeamOpen(true);
@@ -379,6 +368,7 @@ export default function TeamManagement() {
                       <FormControl>
                         <Textarea
                           {...field}
+                          value={field.value || ""}
                           placeholder="Enter team description"
                           data-testid="input-team-description"
                         />
@@ -394,7 +384,7 @@ export default function TeamManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Department</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger data-testid="select-department">
                             <SelectValue placeholder="Select department" />
@@ -418,7 +408,7 @@ export default function TeamManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Team Lead (Required)</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger data-testid="select-team-lead">
                             <SelectValue placeholder="Select team lead" />
@@ -447,14 +437,14 @@ export default function TeamManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Parent Team (Optional)</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                      <Select onValueChange={(value) => field.onChange(value === "none" ? undefined : value)} value={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger data-testid="select-parent-team">
                             <SelectValue placeholder="Select parent team" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">No Parent Team</SelectItem>
+                          <SelectItem value="none">No Parent Team</SelectItem>
                           {teams.map((team: Team) => (
                             <SelectItem key={team.id} value={team.id}>
                               {team.name}
@@ -872,14 +862,14 @@ export default function TeamManagement() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Parent Team (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <Select onValueChange={(value) => field.onChange(value === "none" ? undefined : value)} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger data-testid="select-edit-parent-team">
                           <SelectValue placeholder="Select parent team" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">No Parent Team</SelectItem>
+                        <SelectItem value="none">No Parent Team</SelectItem>
                         {teams.filter((team: Team) => team.id !== selectedTeam?.id).map((team: Team) => (
                           <SelectItem key={team.id} value={team.id}>
                             {team.name}

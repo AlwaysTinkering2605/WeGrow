@@ -85,6 +85,7 @@ export function ObjectUploader({
         open={showModal}
         onRequestClose={() => setShowModal(false)}
         proudlyDisplayPoweredByUppy={false}
+        className="!w-[90vw] !h-[80vh] !max-w-4xl !max-h-[80vh] !overflow-auto"
       />
     </div>
   );
