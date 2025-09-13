@@ -1,11 +1,16 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation, useParams } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { 
   BookOpen, 
   Play, 
@@ -25,6 +30,7 @@ import {
 
 export default function Learning() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [location] = useLocation();
   const params = useParams();
   
@@ -35,6 +41,11 @@ export default function Learning() {
   };
 
   const activeTab = getActiveTab();
+
+  // Course catalog state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedRole, setSelectedRole] = useState("all");
 
   // Fetch LMS data using React Query with proper typing
   const { data: enrollments, isLoading: enrollmentsLoading, error: enrollmentsError, refetch: refetchEnrollments } = useQuery<any[]>({
@@ -57,6 +68,38 @@ export default function Learning() {
     retry: false,
   });
 
+  // Fetch available courses for the catalog
+  const { data: availableCourses, isLoading: coursesLoading, error: coursesError, refetch: refetchCourses } = useQuery<any[]>({
+    queryKey: ["/api/lms/courses"],
+    retry: false,
+  });
+
+  // Enrollment mutation
+  const enrollMutation = useMutation({
+    mutationFn: async (courseId: string) => {
+      const response = await apiRequest("POST", "/api/lms/enrollments", {
+        courseId
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Enrollment Successful",
+        description: "You've been enrolled in the course. Check your dashboard to start learning!",
+      });
+      // Refresh enrollments and courses data
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/courses"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Enrollment Failed",
+        description: error.message || "Failed to enroll in course. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Calculate learning metrics from real data with proper fallbacks
   const enrolledCourses = Array.isArray(enrollments) ? enrollments : [];
   const recentCertificates = Array.isArray(certificates) ? certificates : [];
@@ -70,6 +113,23 @@ export default function Learning() {
     { id: "1", title: "ISO 9001 Quality Standards", dueDate: "2025-09-20", priority: "high" },
     { id: "2", title: "Environmental Compliance", dueDate: "2025-10-01", priority: "medium" }
   ];
+
+  // Filter and search logic for course catalog
+  const filteredCourses = Array.isArray(availableCourses) ? availableCourses.filter((course: any) => {
+    const matchesSearch = searchQuery === "" || 
+      course.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      course.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesCategory = selectedCategory === "all" || course.category === selectedCategory;
+    const matchesRole = selectedRole === "all" || course.targetRole === selectedRole || !course.targetRole;
+    
+    return matchesSearch && matchesCategory && matchesRole;
+  }) : [];
+
+  // Check if user is already enrolled in a course
+  const isEnrolledInCourse = (courseId: string) => {
+    return enrolledCourses.some((enrollment: any) => enrollment.courseId === courseId);
+  };
 
   // Loading state for the main dashboard
   const isMainLoading = enrollmentsLoading || certificatesLoading || badgesLoading || trainingRecordsLoading;
@@ -396,18 +456,188 @@ export default function Learning() {
         </div>)}
 
         {activeTab === "courses" && (<div className="space-y-6">
-          <Card data-testid="card-course-catalog">
+          {/* Search and Filter Controls */}
+          <Card data-testid="card-course-filters">
             <CardHeader>
               <CardTitle>Course Catalog</CardTitle>
-              <CardDescription>Browse available courses and start learning</CardDescription>
+              <CardDescription>Browse and enroll in available courses</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">Course catalog coming soon...</p>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <Input
+                    placeholder="Search courses..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    data-testid="input-course-search"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger className="w-40" data-testid="select-category">
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      <SelectItem value="Safety">Safety</SelectItem>
+                      <SelectItem value="Compliance">Compliance</SelectItem>
+                      <SelectItem value="Soft Skills">Soft Skills</SelectItem>
+                      <SelectItem value="Technical">Technical</SelectItem>
+                      <SelectItem value="Leadership">Leadership</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedRole} onValueChange={setSelectedRole}>
+                    <SelectTrigger className="w-40" data-testid="select-role">
+                      <SelectValue placeholder="Role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Roles</SelectItem>
+                      <SelectItem value="operative">Operative</SelectItem>
+                      <SelectItem value="supervisor">Supervisor</SelectItem>
+                      <SelectItem value="leadership">Leadership</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Course Grid */}
+          <div data-testid="course-grid">
+            {coursesError ? (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+                  <p className="text-destructive mb-2">Failed to load courses</p>
+                  <Button variant="outline" onClick={() => refetchCourses()} data-testid="button-retry-courses">
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Retry
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : coursesLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <Card key={i} className="animate-pulse" data-testid={`course-skeleton-${i}`}>
+                    <CardHeader>
+                      <Skeleton className="h-6 w-3/4 mb-2" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-2/3" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex gap-2">
+                          <Skeleton className="h-5 w-16" />
+                          <Skeleton className="h-5 w-20" />
+                        </div>
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-9 w-full" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : filteredCourses.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredCourses.map((course: any) => (
+                  <Card key={course.id} className="hover:shadow-md transition-shadow" data-testid={`course-card-${course.id}`}>
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg line-clamp-2">{course.title || 'Untitled Course'}</CardTitle>
+                          <CardDescription className="mt-2 line-clamp-3">
+                            {course.description || 'No description available'}
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="secondary">{course.category || 'General'}</Badge>
+                        {course.difficulty && (
+                          <Badge variant="outline">{course.difficulty}</Badge>
+                        )}
+                        {course.targetRole && (
+                          <Badge variant="outline">{course.targetRole}</Badge>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span className="flex items-center">
+                          <Clock className="w-4 h-4 mr-1" />
+                          {course.duration || course.estimatedHours || 'Unknown'} {course.estimatedHours ? 'hours' : ''}
+                        </span>
+                        <span className="flex items-center">
+                          <Users className="w-4 h-4 mr-1" />
+                          {course.enrolledCount || 0} enrolled
+                        </span>
+                      </div>
+
+                      <div className="pt-2">
+                        {isEnrolledInCourse(course.id) ? (
+                          <Button 
+                            className="w-full" 
+                            variant="outline" 
+                            disabled
+                            data-testid={`button-enrolled-${course.id}`}
+                          >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Enrolled
+                          </Button>
+                        ) : (
+                          <Button 
+                            className="w-full" 
+                            onClick={() => enrollMutation.mutate(course.id)}
+                            disabled={enrollMutation.isPending}
+                            data-testid={`button-enroll-${course.id}`}
+                          >
+                            {enrollMutation.isPending ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                Enrolling...
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-4 h-4 mr-2" />
+                                Enroll Now
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No courses found</h3>
+                  <p className="text-muted-foreground mb-4">
+                    {searchQuery || selectedCategory !== "all" || selectedRole !== "all" 
+                      ? "Try adjusting your search or filters"
+                      : "No courses are currently available"
+                    }
+                  </p>
+                  {(searchQuery || selectedCategory !== "all" || selectedRole !== "all") && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSelectedCategory("all");
+                        setSelectedRole("all");
+                      }}
+                      data-testid="button-clear-filters"
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>)}
 
         {activeTab === "certificates" && (<div className="space-y-6">
