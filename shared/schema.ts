@@ -516,6 +516,14 @@ export const insertDevelopmentPlanSchema = createInsertSchema(developmentPlans).
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  targetDate: z.string().optional()
+    .refine((str) => {
+      if (!str) return true; // Optional field
+      const date = new Date(str);
+      return !isNaN(date.getTime());
+    }, "Invalid date format")
+    .transform((str) => str ? new Date(str) : undefined),
 });
 
 export const insertMeetingSchema = createInsertSchema(meetings).omit({
