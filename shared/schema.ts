@@ -33,6 +33,19 @@ export const confidenceLevelEnum = pgEnum("confidence_level", ["green", "amber",
 // Company values enum
 export const companyValueEnum = pgEnum("company_value", ["excellence", "teamwork", "innovation", "reliability"]);
 
+// Teams table - formal team structure
+export const teams = pgTable("teams", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  parentTeamId: varchar("parent_team_id"), // For team hierarchies
+  teamLeadId: varchar("team_lead_id").notNull(),
+  department: varchar("department"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Users table - required for Replit Auth
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -40,9 +53,11 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  mobilePhone: varchar("mobile_phone"),
   role: userRoleEnum("role").default("operative").notNull(),
   managerId: varchar("manager_id"),
-  teamName: varchar("team_name"),
+  teamId: varchar("team_id"), // Reference to teams table
+  teamName: varchar("team_name"), // Keep for backward compatibility during transition
   jobTitle: varchar("job_title"),
   startDate: timestamp("start_date"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -211,12 +226,32 @@ export const recognitions = pgTable("recognitions", {
 });
 
 // Relations
+export const teamsRelations = relations(teams, ({ one, many }) => ({
+  parentTeam: one(teams, {
+    fields: [teams.parentTeamId],
+    references: [teams.id],
+    relationName: "parentTeam",
+  }),
+  subTeams: many(teams, { relationName: "parentTeam" }),
+  teamLead: one(users, {
+    fields: [teams.teamLeadId],
+    references: [users.id],
+  }),
+  members: many(users),
+}));
+
 export const usersRelations = relations(users, ({ one, many }) => ({
   manager: one(users, {
     fields: [users.managerId],
     references: [users.id],
+    relationName: "manager",
   }),
-  directReports: many(users),
+  directReports: many(users, { relationName: "manager" }),
+  team: one(teams, {
+    fields: [users.teamId],
+    references: [teams.id],
+  }),
+  ledTeams: many(teams), // Teams this user leads
   goals: many(goals),
   checkIns: many(weeklyCheckIns),
   competencies: many(userCompetencies),
@@ -357,6 +392,12 @@ export const recognitionsRelations = relations(recognitions, ({ one }) => ({
 }));
 
 // Insert schemas
+export const insertTeamSchema = createInsertSchema(teams).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -367,6 +408,12 @@ export const upsertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
   updatedAt: true,
 });
+
+export const updateUserProfileSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).partial();
 
 export const insertCompanyObjectiveSchema = createInsertSchema(companyObjectives).omit({
   id: true,

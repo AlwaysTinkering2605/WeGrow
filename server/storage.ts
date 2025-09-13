@@ -1,5 +1,6 @@
 import {
   users,
+  teams,
   companyObjectives,
   teamObjectives,
   teamKeyResults,
@@ -34,6 +35,8 @@ import {
   type InsertDevelopmentPlan,
   type InsertMeeting,
   type InsertRecognition,
+  insertTeamSchema,
+  updateUserProfileSchema,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -100,6 +103,21 @@ export interface IStorage {
   // Team Management
   getTeamMembers(userId: string): Promise<User[]>;
   getTeamGoals(userId: string): Promise<Goal[]>;
+
+  // Formal Teams Management
+  getAllTeams(): Promise<any[]>;
+  getTeam(teamId: string): Promise<any | undefined>;
+  createTeam(team: any): Promise<any>;
+  updateTeam(teamId: string, updates: any): Promise<any>;
+  deleteTeam(teamId: string): Promise<void>;
+  getTeamHierarchy(): Promise<any[]>;
+  assignUserToTeam(userId: string, teamId: string): Promise<User>;
+
+  // Enhanced User Profile Management
+  updateUserProfile(userId: string, updates: any, updatedByUserId: string): Promise<User>;
+  updateUserRole(userId: string, newRole: string, updatedByUserId: string): Promise<User>;
+  getUsersByManager(managerId: string): Promise<User[]>;
+  getUsersInTeam(teamId: string): Promise<User[]>;
 
   // Company Reports
   getCompanyMetrics(): Promise<{
@@ -594,6 +612,120 @@ export class DatabaseStorage implements IStorage {
       avgDevelopmentProgress,
       recognitionsSent: recognitionCount?.count || 0,
     };
+  }
+
+  // Formal Teams Management
+  async getAllTeams(): Promise<any[]> {
+    return await db
+      .select()
+      .from(teams)
+      .where(eq(teams.isActive, true))
+      .orderBy(teams.name);
+  }
+
+  async getTeam(teamId: string): Promise<any | undefined> {
+    const [team] = await db.select().from(teams).where(eq(teams.id, teamId));
+    return team;
+  }
+
+  async createTeam(teamData: any): Promise<any> {
+    const [team] = await db
+      .insert(teams)
+      .values(teamData)
+      .returning();
+    return team;
+  }
+
+  async updateTeam(teamId: string, updates: any): Promise<any> {
+    const [team] = await db
+      .update(teams)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(teams.id, teamId))
+      .returning();
+    return team;
+  }
+
+  async deleteTeam(teamId: string): Promise<void> {
+    await db
+      .update(teams)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(teams.id, teamId));
+  }
+
+  async getTeamHierarchy(): Promise<any[]> {
+    // Get all teams with their parent relationships
+    const allTeams = await db
+      .select()
+      .from(teams)
+      .where(eq(teams.isActive, true))
+      .orderBy(teams.name);
+
+    // Build hierarchy structure
+    const teamMap = new Map<string, any>();
+    const rootTeams: any[] = [];
+
+    // First pass: create map of all teams
+    allTeams.forEach(team => {
+      teamMap.set(team.id, { ...team, children: [] });
+    });
+
+    // Second pass: build hierarchy
+    allTeams.forEach(team => {
+      if (team.parentTeamId && teamMap.has(team.parentTeamId)) {
+        teamMap.get(team.parentTeamId).children.push(teamMap.get(team.id));
+      } else {
+        rootTeams.push(teamMap.get(team.id));
+      }
+    });
+
+    return rootTeams;
+  }
+
+  async assignUserToTeam(userId: string, teamId: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ teamId, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  // Enhanced User Profile Management
+  async updateUserProfile(userId: string, updates: any, updatedByUserId: string): Promise<User> {
+    // Remove role from updates - should be handled separately
+    const { role, ...profileUpdates } = updates;
+    
+    const [user] = await db
+      .update(users)
+      .set({ ...profileUpdates, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async updateUserRole(userId: string, newRole: string, updatedByUserId: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ role: newRole as any, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async getUsersByManager(managerId: string): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(eq(users.managerId, managerId))
+      .orderBy(users.firstName, users.lastName);
+  }
+
+  async getUsersInTeam(teamId: string): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(eq(users.teamId, teamId))
+      .orderBy(users.firstName, users.lastName);
   }
 }
 

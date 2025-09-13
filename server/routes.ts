@@ -12,6 +12,8 @@ import {
   insertDevelopmentPlanSchema,
   insertMeetingSchema,
   insertRecognitionSchema,
+  insertTeamSchema,
+  updateUserProfileSchema,
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -206,6 +208,206 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching company metrics:", error);
       res.status(500).json({ message: "Failed to fetch company metrics" });
+    }
+  });
+
+  // Teams Management (Supervisor+ only)
+  app.get('/api/teams', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const teams = await storage.getAllTeams();
+      res.json(teams);
+    } catch (error) {
+      console.error("Error fetching teams:", error);
+      res.status(500).json({ message: "Failed to fetch teams" });
+    }
+  });
+
+  app.post('/api/teams', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const teamData = insertTeamSchema.parse(req.body);
+      const team = await storage.createTeam(teamData);
+      res.json(team);
+    } catch (error) {
+      console.error("Error creating team:", error);
+      res.status(500).json({ message: "Failed to create team" });
+    }
+  });
+
+  app.put('/api/teams/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const { id } = req.params;
+      const updates = insertTeamSchema.partial().parse(req.body);
+      const team = await storage.updateTeam(id, updates);
+      res.json(team);
+    } catch (error) {
+      console.error("Error updating team:", error);
+      res.status(500).json({ message: "Failed to update team" });
+    }
+  });
+
+  app.delete('/api/teams/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      await storage.deleteTeam(id);
+      res.json({ message: "Team deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting team:", error);
+      res.status(500).json({ message: "Failed to delete team" });
+    }
+  });
+
+  app.get('/api/teams/hierarchy', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const hierarchy = await storage.getTeamHierarchy();
+      res.json(hierarchy);
+    } catch (error) {
+      console.error("Error fetching team hierarchy:", error);
+      res.status(500).json({ message: "Failed to fetch team hierarchy" });
+    }
+  });
+
+  // User Profile Management
+  app.put('/api/users/:id/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      const targetUser = await storage.getUser(id);
+
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Permission check: users can edit their own profile, managers can edit direct reports
+      const canEdit = id === currentUserId || 
+                     targetUser.managerId === currentUserId ||
+                     currentUser?.role === 'leadership';
+
+      if (!canEdit) {
+        return res.status(403).json({ message: "You can only edit your own profile or your direct reports" });
+      }
+
+      const updates = updateUserProfileSchema.parse(req.body);
+      const updatedUser = await storage.updateUserProfile(id, updates, currentUserId);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      res.status(500).json({ message: "Failed to update user profile" });
+    }
+  });
+
+  app.put('/api/users/:id/role', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { role } = req.body;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      const targetUser = await storage.getUser(id);
+
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Only managers and leadership can change roles
+      const canChangeRole = targetUser.managerId === currentUserId || currentUser?.role === 'leadership';
+
+      if (!canChangeRole) {
+        return res.status(403).json({ message: "You can only change roles for your direct reports" });
+      }
+
+      // Validate role
+      if (!['operative', 'supervisor', 'leadership'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      const updatedUser = await storage.updateUserRole(id, role, currentUserId);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  app.put('/api/users/:id/team', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { teamId } = req.body;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Only supervisors and leadership can assign teams
+      if (currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const updatedUser = await storage.assignUserToTeam(id, teamId);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error assigning user to team:", error);
+      res.status(500).json({ message: "Failed to assign user to team" });
+    }
+  });
+
+  app.get('/api/users/by-manager/:managerId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { managerId } = req.params;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Users can only see their own direct reports or leadership can see all
+      if (managerId !== currentUserId && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "You can only view your own direct reports" });
+      }
+
+      const users = await storage.getUsersByManager(managerId);
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users by manager:", error);
+      res.status(500).json({ message: "Failed to fetch users by manager" });
+    }
+  });
+
+  app.get('/api/teams/:id/members', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Supervisors and leadership can view team members
+      if (currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const members = await storage.getUsersInTeam(id);
+      res.json(members);
+    } catch (error) {
+      console.error("Error fetching team members:", error);
+      res.status(500).json({ message: "Failed to fetch team members" });
     }
   });
 
