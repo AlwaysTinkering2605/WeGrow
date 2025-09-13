@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Target } from "lucide-react";
+import { Plus, Target, Edit3 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertGoalSchema } from "@shared/schema";
@@ -33,6 +33,10 @@ type GoalForm = z.infer<typeof goalSchema>;
 
 export default function Goals() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [updateProgressDialog, setUpdateProgressDialog] = useState<{ open: boolean; goal: any | null }>({ 
+    open: false, 
+    goal: null 
+  });
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: goals, isLoading } = useQuery({
@@ -93,6 +97,45 @@ export default function Goals() {
       });
     },
   });
+
+  // Progress update form schema
+  const progressSchema = z.object({
+    currentValue: z.number().min(0, "Progress must be 0 or greater")
+  });
+
+  const progressForm = useForm<{ currentValue: number }>({
+    resolver: zodResolver(progressSchema),
+    defaultValues: {
+      currentValue: 0
+    }
+  });
+
+  // Progress update mutation
+  const updateProgressMutation = useMutation({
+    mutationFn: async (data: { goalId: string; currentValue: number }) => {
+      await apiRequest("PUT", `/api/goals/${data.goalId}/progress`, { currentValue: data.currentValue });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/goals"] });
+      setUpdateProgressDialog({ open: false, goal: null });
+      toast({
+        title: "Progress updated!",
+        description: "Your goal progress has been updated successfully."
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update progress. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleUpdateProgress = (goal: any) => {
+    setUpdateProgressDialog({ open: true, goal });
+    progressForm.reset({ currentValue: goal.currentValue });
+  };
 
   if (isLoading) {
     return (
@@ -327,16 +370,27 @@ export default function Goals() {
                           {goal.description}
                         </p>
                       )}
-                      <div className="flex items-center space-x-4 mt-3 text-sm">
-                        <span className="flex items-center space-x-1">
-                          <Target className="w-4 h-4" />
-                          <span data-testid={`text-goal-progress-${goal.id}`}>
-                            {goal.currentValue} / {goal.targetValue} {goal.unit}
+                      <div className="flex items-center justify-between mt-3">
+                        <div className="flex items-center space-x-4 text-sm">
+                          <span className="flex items-center space-x-1">
+                            <Target className="w-4 h-4" />
+                            <span data-testid={`text-goal-progress-${goal.id}`}>
+                              {goal.currentValue} / {goal.targetValue} {goal.unit}
+                            </span>
                           </span>
-                        </span>
-                        <span className="text-muted-foreground">
-                          Ends: {new Date(goal.endDate).toLocaleDateString()}
-                        </span>
+                          <span className="text-muted-foreground">
+                            Ends: {new Date(goal.endDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleUpdateProgress(goal)}
+                          data-testid={`button-update-progress-${goal.id}`}
+                        >
+                          <Edit3 className="w-3 h-3 mr-1" />
+                          Update Progress
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -356,6 +410,89 @@ export default function Goals() {
           </div>
         )}
       </div>
+
+      {/* Progress Update Dialog */}
+      <Dialog 
+        open={updateProgressDialog.open} 
+        onOpenChange={(open) => setUpdateProgressDialog({ open, goal: open ? updateProgressDialog.goal : null })}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Update Progress</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {updateProgressDialog.goal?.title}
+            </p>
+          </DialogHeader>
+          {updateProgressDialog.goal && (
+            <Form {...progressForm}>
+              <form 
+                onSubmit={progressForm.handleSubmit((data) => 
+                  updateProgressMutation.mutate({ 
+                    goalId: updateProgressDialog.goal.id, 
+                    currentValue: data.currentValue 
+                  })
+                )} 
+                className="space-y-4"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Current Progress:</span>
+                    <span className="text-muted-foreground">
+                      Target: {updateProgressDialog.goal.targetValue} {updateProgressDialog.goal.unit}
+                    </span>
+                  </div>
+                  <FormField
+                    control={progressForm.control}
+                    name="currentValue"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <div className="relative">
+                            <Input 
+                              type="number" 
+                              placeholder="Enter current progress..."
+                              {...field}
+                              onChange={(e) => field.onChange(Number(e.target.value))}
+                              data-testid="input-progress-value"
+                              className="pr-20"
+                            />
+                            <span className="absolute right-3 top-2.5 text-sm text-muted-foreground">
+                              {updateProgressDialog.goal.unit}
+                            </span>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                        {progressForm.watch('currentValue') > updateProgressDialog.goal.targetValue && (
+                          <p className="text-xs text-amber-600">
+                            ⚠️ Progress exceeds target - you're doing great!
+                          </p>
+                        )}
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setUpdateProgressDialog({ open: false, goal: null })}
+                    data-testid="button-cancel-progress"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={updateProgressMutation.isPending}
+                    data-testid="button-save-progress"
+                  >
+                    {updateProgressMutation.isPending ? "Updating..." : "Update Progress"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
