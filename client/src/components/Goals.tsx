@@ -4,13 +4,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Target, Edit3 } from "lucide-react";
+import { Plus, Target, Edit3, Check, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertGoalSchema } from "@shared/schema";
@@ -33,6 +34,7 @@ type GoalForm = z.infer<typeof goalSchema>;
 
 export default function Goals() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("open");
   const [updateProgressDialog, setUpdateProgressDialog] = useState<{ open: boolean; goal: any | null }>({ 
     open: false, 
     goal: null 
@@ -137,6 +139,17 @@ export default function Goals() {
     progressForm.reset({ currentValue: goal.currentValue });
   };
 
+  const handleMarkComplete = (goal: any) => {
+    updateProgressMutation.mutate({ 
+      goalId: goal.id, 
+      currentValue: goal.targetValue 
+    });
+  };
+
+  const isGoalCompleted = (goal: any) => {
+    return goal.currentValue >= goal.targetValue;
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -151,7 +164,23 @@ export default function Goals() {
     );
   }
 
-  const activeGoals = (goals as any[])?.filter((goal: any) => goal.isActive) || [];
+  const allGoals = (goals as any[]) || [];
+  const activeGoals = allGoals.filter((goal: any) => goal.isActive);
+  const openGoals = activeGoals.filter((goal: any) => goal.currentValue < goal.targetValue);
+  const completedGoals = allGoals.filter((goal: any) => goal.currentValue >= goal.targetValue);
+
+  const getCurrentGoals = () => {
+    switch (activeTab) {
+      case "all":
+        return allGoals;
+      case "completed":
+        return completedGoals;
+      default:
+        return openGoals;
+    }
+  };
+
+  const currentGoals = getCurrentGoals();
 
   return (
     <div className="space-y-6">
@@ -353,63 +382,117 @@ export default function Goals() {
         </Dialog>
       </div>
 
-      {/* Goal Lists and Weekly Check-ins will be rendered here when components are available */}
-      <div className="grid md:grid-cols-1 gap-6">
-        {activeGoals.length > 0 ? (
-          <div className="space-y-4">
-            {activeGoals.map((goal: any) => (
-              <Card key={goal.id} data-testid={`goal-${goal.id}`}>
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-lg" data-testid={`text-goal-title-${goal.id}`}>
-                        {goal.title}
-                      </h4>
-                      {goal.description && (
-                        <p className="text-muted-foreground text-sm mt-1" data-testid={`text-goal-description-${goal.id}`}>
-                          {goal.description}
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between mt-3">
-                        <div className="flex items-center space-x-4 text-sm">
-                          <span className="flex items-center space-x-1">
-                            <Target className="w-4 h-4" />
-                            <span data-testid={`text-goal-progress-${goal.id}`}>
-                              {goal.currentValue} / {goal.targetValue} {goal.unit}
-                            </span>
-                          </span>
-                          <span className="text-muted-foreground">
-                            Ends: {new Date(goal.endDate).toLocaleDateString()}
-                          </span>
+      {/* Goals Tab System */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="open" data-testid="tab-open-goals">
+            Open Goals ({openGoals.length})
+          </TabsTrigger>
+          <TabsTrigger value="completed" data-testid="tab-completed-goals">
+            Completed Goals ({completedGoals.length})
+          </TabsTrigger>
+          <TabsTrigger value="all" data-testid="tab-all-goals">
+            All Goals ({allGoals.length})
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value={activeTab} className="space-y-4 mt-6">
+          {currentGoals.length > 0 ? (
+            <div className="space-y-4">
+              {currentGoals.map((goal: any) => (
+                <Card key={goal.id} data-testid={`goal-${goal.id}`} className={`${isGoalCompleted(goal) ? 'bg-green-50 border-green-200 dark:bg-green-950/50 dark:border-green-800' : ''}`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-semibold text-lg" data-testid={`text-goal-title-${goal.id}`}>
+                            {goal.title}
+                          </h4>
+                          {isGoalCompleted(goal) && (
+                            <div className="flex items-center space-x-1">
+                              <CheckCircle className="w-5 h-5 text-green-600" />
+                              <span className="text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded-full dark:text-green-400 dark:bg-green-900/50" data-testid={`badge-completed-${goal.id}`}>
+                                Completed
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleUpdateProgress(goal)}
-                          data-testid={`button-update-progress-${goal.id}`}
-                        >
-                          <Edit3 className="w-3 h-3 mr-1" />
-                          Update Progress
-                        </Button>
+                        {goal.description && (
+                          <p className="text-muted-foreground text-sm mt-1" data-testid={`text-goal-description-${goal.id}`}>
+                            {goal.description}
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between mt-3">
+                          <div className="flex items-center space-x-4 text-sm">
+                            <span className="flex items-center space-x-1">
+                              <Target className="w-4 h-4" />
+                              <span data-testid={`text-goal-progress-${goal.id}`}>
+                                {goal.currentValue} / {goal.targetValue} {goal.unit}
+                              </span>
+                            </span>
+                            <span className="text-muted-foreground">
+                              Ends: {goal.endDate ? new Date(goal.endDate).toLocaleDateString() : "No end date"}
+                            </span>
+                          </div>
+                          <div className="flex space-x-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleUpdateProgress(goal)}
+                              data-testid={`button-update-progress-${goal.id}`}
+                              disabled={isGoalCompleted(goal)}
+                            >
+                              <Edit3 className="w-3 h-3 mr-1" />
+                              Update Progress
+                            </Button>
+                            {!isGoalCompleted(goal) && (
+                              <Button 
+                                variant="default" 
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                                onClick={() => handleMarkComplete(goal)}
+                                data-testid={`button-mark-complete-${goal.id}`}
+                                disabled={updateProgressMutation.isPending}
+                              >
+                                <Check className="w-3 h-3 mr-1" />
+                                Mark Complete
+                              </Button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <Target className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold">No Goals Yet</h3>
-            <p className="text-muted-foreground mb-4">Create your first goal to start tracking your progress.</p>
-            <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create-first-goal">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Your First Goal
-            </Button>
-          </div>
-        )}
-      </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Target className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold">
+                {activeTab === "completed" 
+                  ? "No Completed Goals Yet" 
+                  : activeTab === "all" 
+                  ? "No Goals Yet" 
+                  : "No Open Goals"}
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                {activeTab === "completed" 
+                  ? "Complete some goals to see them here." 
+                  : activeTab === "all" 
+                  ? "Create your first goal to start tracking your progress." 
+                  : "All your goals are completed! Create new ones or check the completed tab."}
+              </p>
+              {activeTab !== "completed" && (
+                <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create-first-goal">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Your First Goal
+                </Button>
+              )}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Progress Update Dialog */}
       <Dialog 
