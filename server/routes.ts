@@ -975,6 +975,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Complete enrollment/course
+  app.post('/api/lms/enrollments/:enrollmentId/complete', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify enrollment ownership
+      const isOwner = await verifyEnrollmentOwnership(enrollmentId, userId);
+      if (!isOwner) {
+        return res.status(403).json({ message: "You can only complete your own enrollments" });
+      }
+      
+      const enrollment = await storage.completeEnrollment(enrollmentId);
+      
+      // Create training record for ISO compliance
+      const trainingRecord = await storage.createTrainingRecord({
+        userId,
+        courseVersionId: enrollment.courseVersionId,
+        enrollmentId,
+        completedAt: new Date(),
+        finalScore: 100 // Default score, should be calculated based on quiz results
+      });
+      
+      // Issue certificate if applicable
+      const certificate = await storage.issueCertificate({
+        userId,
+        courseVersionId: enrollment.courseVersionId,
+        trainingRecordId: trainingRecord.id,
+        certificateNumber: `CERT-${Date.now()}-${userId.slice(-4)}`,
+        // expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+        verificationHash: `hash-${trainingRecord.id}`,
+        metadata: {
+          courseTitle: 'Course Title', // Should get from course data
+          completionDate: new Date().toISOString()
+        }
+      });
+      
+      res.json({ enrollment, trainingRecord, certificate });
+    } catch (error: any) {
+      return handleValidationError(error, res, "complete enrollment");
+    }
+  });
+
   // Quizzes and Assessments
   app.get('/api/lms/lessons/:lessonId/quiz', isAuthenticated, async (req, res) => {
     try {

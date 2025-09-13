@@ -977,7 +977,58 @@ export class DatabaseStorage implements IStorage {
   }
 
   async submitQuizAttempt(attemptId: string, answers: any, timeSpent: number): Promise<QuizAttempt> {
-    throw new Error("Not implemented yet");
+    // Get the quiz attempt and related quiz
+    const attempt = await this.getQuizAttempt(attemptId);
+    if (!attempt) {
+      throw new Error("Quiz attempt not found");
+    }
+
+    // Get quiz details to calculate score
+    const [quiz] = await db
+      .select()
+      .from(quizzes)
+      .where(eq(quizzes.id, attempt.quizId));
+    
+    if (!quiz) {
+      throw new Error("Quiz not found");
+    }
+
+    // Get quiz questions to validate answers
+    const questions = await db
+      .select()
+      .from(quizQuestions)
+      .where(eq(quizQuestions.quizId, quiz.id));
+
+    // Calculate score
+    let correctAnswers = 0;
+    const totalQuestions = questions.length;
+    
+    questions.forEach((question, index) => {
+      const userAnswer = answers[question.id] || answers[index];
+      const correctAnswer = question.correctAnswers;
+      
+      if (JSON.stringify(userAnswer) === JSON.stringify(correctAnswer)) {
+        correctAnswers++;
+      }
+    });
+
+    const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+    const passed = score >= (quiz.passingScore || 70);
+
+    // Update the attempt
+    const [updated] = await db
+      .update(quizAttempts)
+      .set({
+        answers,
+        score,
+        passed,
+        timeSpent,
+        completedAt: new Date()
+      })
+      .where(eq(quizAttempts.id, attemptId))
+      .returning();
+
+    return updated;
   }
 
   async getQuizAttempt(attemptId: string): Promise<QuizAttempt | undefined> {
@@ -1010,15 +1061,60 @@ export class DatabaseStorage implements IStorage {
   }
 
   async completeEnrollment(enrollmentId: string): Promise<Enrollment> {
-    throw new Error("Not implemented yet");
+    const now = new Date();
+    const [updated] = await db
+      .update(enrollments)
+      .set({ 
+        status: "completed", 
+        completedAt: now, 
+        progress: 100 
+      })
+      .where(eq(enrollments.id, enrollmentId))
+      .returning();
+    return updated;
   }
 
   async updateLessonProgress(progress: InsertLessonProgress): Promise<LessonProgress> {
-    throw new Error("Not implemented yet");
+    // Check if progress record exists
+    const existing = await this.getLessonProgress(progress.enrollmentId, progress.lessonId);
+    
+    if (existing) {
+      // Update existing progress
+      const [updated] = await db
+        .update(lessonProgress)
+        .set({ 
+          ...progress, 
+          updatedAt: new Date() 
+        })
+        .where(and(
+          eq(lessonProgress.enrollmentId, progress.enrollmentId),
+          eq(lessonProgress.lessonId, progress.lessonId)
+        ))
+        .returning();
+      return updated;
+    } else {
+      // Create new progress record
+      const [created] = await db
+        .insert(lessonProgress)
+        .values({
+          ...progress,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+      return created;
+    }
   }
 
   async getLessonProgress(enrollmentId: string, lessonId: string): Promise<LessonProgress | undefined> {
-    throw new Error("Not implemented yet");
+    const [progress] = await db
+      .select()
+      .from(lessonProgress)
+      .where(and(
+        eq(lessonProgress.enrollmentId, enrollmentId),
+        eq(lessonProgress.lessonId, lessonId)
+      ));
+    return progress;
   }
 
   async getUserLessonProgress(enrollmentId: string): Promise<LessonProgress[]> {
@@ -1074,7 +1170,33 @@ export class DatabaseStorage implements IStorage {
     completedAfter?: Date; 
     completedBefore?: Date; 
   }): Promise<TrainingRecord[]> {
-    throw new Error("Not implemented yet");
+    const conditions = [];
+    
+    if (filters?.userId) {
+      conditions.push(eq(trainingRecords.userId, filters.userId));
+    }
+    if (filters?.courseId) {
+      conditions.push(eq(trainingRecords.courseVersionId, filters.courseId));
+    }
+    if (filters?.completedAfter) {
+      conditions.push(sql`${trainingRecords.completedAt} >= ${filters.completedAfter}`);
+    }
+    if (filters?.completedBefore) {
+      conditions.push(sql`${trainingRecords.completedAt} <= ${filters.completedBefore}`);
+    }
+
+    if (conditions.length > 0) {
+      return await db
+        .select()
+        .from(trainingRecords)
+        .where(and(...conditions))
+        .orderBy(desc(trainingRecords.completedAt));
+    } else {
+      return await db
+        .select()
+        .from(trainingRecords)
+        .orderBy(desc(trainingRecords.completedAt));
+    }
   }
 
   // LMS - Training Requirements & Matrix (stub implementations)
@@ -1101,7 +1223,44 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTrainingMatrix(filters?: { role?: string; teamId?: string; }): Promise<any[]> {
-    throw new Error("Not implemented yet");
+    // Build where conditions
+    const conditions = [eq(trainingRequirements.isActive, true)];
+    
+    if (filters?.role) {
+      conditions.push(eq(trainingRequirements.targetRole, filters.role as any));
+    }
+    if (filters?.teamId) {
+      conditions.push(eq(trainingRequirements.targetTeamId, filters.teamId));
+    }
+
+    // Get training requirements based on filters
+    const requirements = await db
+      .select({
+        id: trainingRequirements.id,
+        name: trainingRequirements.name,
+        description: trainingRequirements.description,
+        courseId: trainingRequirements.courseId,
+        targetRole: trainingRequirements.targetRole,
+        targetTeamId: trainingRequirements.targetTeamId,
+        renewalDays: trainingRequirements.renewalDays,
+        courseTitle: courses.title,
+        courseDescription: courses.description
+      })
+      .from(trainingRequirements)
+      .leftJoin(courses, eq(trainingRequirements.courseId, courses.id))
+      .where(and(...conditions));
+
+    // Transform to matrix format with status information
+    return requirements.map(req => ({
+      id: req.id,
+      title: req.courseTitle || req.name,
+      description: req.courseDescription || req.description,
+      courseId: req.courseId,
+      dueDate: req.renewalDays ? new Date(Date.now() + req.renewalDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : null,
+      priority: req.targetRole === 'leadership' ? 'high' : req.targetRole === 'supervisor' ? 'medium' : 'low',
+      status: 'required', // This will be updated with actual completion status in a separate query
+      renewalDays: req.renewalDays
+    }));
   }
 
   // LMS - PDP Integration (stub implementations)
