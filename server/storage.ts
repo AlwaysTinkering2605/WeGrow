@@ -297,7 +297,7 @@ export class DatabaseStorage implements IStorage {
       const existingUser = existingUserById || existingUserByEmail;
       
       if (existingUser) {
-        // User exists - only update basic profile info, preserve role and other fields
+        // User exists - update profile info including role from OIDC claims
         const [user] = await db
           .update(users)
           .set({
@@ -305,6 +305,7 @@ export class DatabaseStorage implements IStorage {
             firstName: userData.firstName,
             lastName: userData.lastName,
             profileImageUrl: userData.profileImageUrl,
+            role: userData.role, // Update role from OIDC claims
             updatedAt: new Date(),
           })
           .where(eq(users.id, existingUser.id))

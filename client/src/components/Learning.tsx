@@ -1872,7 +1872,7 @@ export default function Learning() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="">All Roles</SelectItem>
+                                <SelectItem value="all">All Roles</SelectItem>
                                 <SelectItem value="operative">Operative</SelectItem>
                                 <SelectItem value="supervisor">Supervisor</SelectItem>
                                 <SelectItem value="leadership">Leadership</SelectItem>
