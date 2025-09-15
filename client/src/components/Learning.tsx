@@ -9,9 +9,16 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { 
   BookOpen, 
   Play, 
@@ -30,8 +37,57 @@ import {
   ClipboardList,
   Calendar,
   Building,
-  FileCheck
+  FileCheck,
+  Settings,
+  Edit,
+  Trash2,
+  Copy,
+  Upload,
+  Video,
+  Trophy,
+  Target,
+  PieChart,
+  TrendingUp,
+  GraduationCap,
+  Layers,
+  PlayCircle
 } from "lucide-react";
+
+// Form Schemas for Admin Interface
+const courseSchema = z.object({
+  title: z.string().min(1, "Course title is required"),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  category: z.string().min(1, "Category is required"),
+  targetRole: z.string().optional(),
+  estimatedHours: z.number().min(0.5).max(100),
+  difficulty: z.enum(["Beginner", "Intermediate", "Advanced"]),
+  vimeoVideoId: z.string().optional(),
+  isPublished: z.boolean().default(false),
+});
+
+const lessonSchema = z.object({
+  title: z.string().min(1, "Lesson title is required"),
+  description: z.string().optional(),
+  vimeoVideoId: z.string().optional(),
+  order: z.number().min(1),
+  estimatedMinutes: z.number().min(1).max(300),
+});
+
+const quizSchema = z.object({
+  title: z.string().min(1, "Quiz title is required"),
+  description: z.string().optional(),
+  passingScore: z.number().min(50).max(100).default(80),
+  maxAttempts: z.number().min(1).max(10).default(3),
+  timeLimit: z.number().min(5).max(120).optional(),
+});
+
+const badgeSchema = z.object({
+  name: z.string().min(1, "Badge name is required"),
+  description: z.string().min(10, "Description is required"),
+  criteria: z.string().min(10, "Achievement criteria required"),
+  icon: z.string().optional(),
+  color: z.string().default("#3B82F6"),
+});
 
 // Vimeo Player Component with Progress Tracking
 function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComplete }: {
@@ -148,6 +204,63 @@ export default function Learning() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedRole, setSelectedRole] = useState("all");
+
+  // Admin interface state
+  const [isCreateCourseOpen, setIsCreateCourseOpen] = useState(false);
+  const [isCreateLessonOpen, setIsCreateLessonOpen] = useState(false);
+  const [isCreateQuizOpen, setIsCreateQuizOpen] = useState(false);
+  const [isCreateBadgeOpen, setIsCreateBadgeOpen] = useState(false);
+  const [selectedCourseForEdit, setSelectedCourseForEdit] = useState<any>(null);
+  const [adminTab, setAdminTab] = useState("courses");
+  const [isAdminMode, setIsAdminMode] = useState(false);
+
+  // Form instances for admin operations
+  const createCourseForm = useForm({
+    resolver: zodResolver(courseSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      category: "",
+      targetRole: "",
+      estimatedHours: 1,
+      difficulty: "Beginner" as const,
+      vimeoVideoId: "",
+      isPublished: false,
+    },
+  });
+
+  const createLessonForm = useForm({
+    resolver: zodResolver(lessonSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      vimeoVideoId: "",
+      order: 1,
+      estimatedMinutes: 30,
+    },
+  });
+
+  const createQuizForm = useForm({
+    resolver: zodResolver(quizSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      passingScore: 80,
+      maxAttempts: 3,
+      timeLimit: 60,
+    },
+  });
+
+  const createBadgeForm = useForm({
+    resolver: zodResolver(badgeSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      criteria: "",
+      icon: "",
+      color: "#3B82F6",
+    },
+  });
 
   // Fetch LMS data using React Query with proper typing
   const { data: enrollments, isLoading: enrollmentsLoading, error: enrollmentsError, refetch: refetchEnrollments } = useQuery<any[]>({
@@ -282,6 +395,158 @@ export default function Learning() {
         variant: "destructive",
       });
     },
+  });
+
+  // ADMIN MUTATIONS - Course Management
+  const createCourseMutation = useMutation({
+    mutationFn: async (courseData: z.infer<typeof courseSchema>) => {
+      const response = await apiRequest("POST", "/api/lms/admin/courses", courseData);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Course Created",
+        description: "New course has been created successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/courses"] });
+      setIsCreateCourseOpen(false);
+      createCourseForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Creation Failed",
+        description: error.message || "Failed to create course. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateCourseMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<z.infer<typeof courseSchema>> }) => {
+      const response = await apiRequest("PATCH", `/api/lms/admin/courses/${id}`, data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Course Updated",
+        description: "Course has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/courses"] });
+      setSelectedCourseForEdit(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update course. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteCourseMutation = useMutation({
+    mutationFn: async (courseId: string) => {
+      const response = await apiRequest("DELETE", `/api/lms/admin/courses/${courseId}`, {});
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Course Deleted",
+        description: "Course has been deleted successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/courses"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Deletion Failed",
+        description: error.message || "Failed to delete course. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // ADMIN MUTATIONS - Lesson Management
+  const createLessonMutation = useMutation({
+    mutationFn: async ({ courseId, lessonData }: { courseId: string; lessonData: z.infer<typeof lessonSchema> }) => {
+      const response = await apiRequest("POST", `/api/lms/admin/courses/${courseId}/lessons`, lessonData);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Lesson Created",
+        description: "New lesson has been added successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/courses"] });
+      setIsCreateLessonOpen(false);
+      createLessonForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Creation Failed",
+        description: error.message || "Failed to create lesson. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // ADMIN MUTATIONS - Quiz Management
+  const createQuizMutation = useMutation({
+    mutationFn: async ({ courseId, quizData }: { courseId: string; quizData: z.infer<typeof quizSchema> }) => {
+      const response = await apiRequest("POST", `/api/lms/admin/courses/${courseId}/quizzes`, quizData);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Quiz Created",
+        description: "New quiz has been created successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/courses"] });
+      setIsCreateQuizOpen(false);
+      createQuizForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Creation Failed",
+        description: error.message || "Failed to create quiz. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // ADMIN MUTATIONS - Badge Management
+  const createBadgeMutation = useMutation({
+    mutationFn: async (badgeData: z.infer<typeof badgeSchema>) => {
+      const response = await apiRequest("POST", "/api/lms/admin/badges", badgeData);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Badge Created",
+        description: "New badge has been created successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/badges"] });
+      setIsCreateBadgeOpen(false);
+      createBadgeForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Creation Failed",
+        description: error.message || "Failed to create badge. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Admin data queries
+  const { data: adminCourses, isLoading: adminCoursesLoading } = useQuery<any[]>({
+    queryKey: ["/api/lms/admin/courses"],
+    enabled: !!(user?.role === 'supervisor' || user?.role === 'leadership'),
+    retry: false,
+  });
+
+  const { data: adminAnalytics, isLoading: adminAnalyticsLoading } = useQuery<any>({
+    queryKey: ["/api/lms/admin/analytics"],
+    enabled: !!(user?.role === 'supervisor' || user?.role === 'leadership'),
+    retry: false,
   });
 
   // Calculate learning metrics from real data with proper fallbacks
@@ -621,62 +886,908 @@ export default function Learning() {
           <p className="text-muted-foreground">Continue your professional development</p>
         </div>
         {(user?.role === 'supervisor' || user?.role === 'leadership') && (
-          <Button data-testid="button-create-course">
-            <Plus className="w-4 h-4 mr-2" />
-            Create Course
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant={isAdminMode ? "outline" : "default"}
+              onClick={() => setIsAdminMode(!isAdminMode)}
+              data-testid="button-toggle-admin"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              {isAdminMode ? 'Exit Admin' : 'Admin Panel'}
+            </Button>
+            <Dialog open={isCreateCourseOpen} onOpenChange={setIsCreateCourseOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-create-course">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Course
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create New Course</DialogTitle>
+                  <DialogDescription>
+                    Create a comprehensive learning course with video content, assessments, and certification.
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...createCourseForm}>
+                  <form 
+                    onSubmit={createCourseForm.handleSubmit((data) => {
+                      createCourseMutation.mutate(data);
+                    })}
+                    className="space-y-6"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={createCourseForm.control}
+                        name="title"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Course Title</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., ISO 9001 Quality Standards" {...field} data-testid="input-course-title" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createCourseForm.control}
+                        name="category"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Category</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-course-category">
+                                  <SelectValue placeholder="Select category" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Safety">Safety</SelectItem>
+                                <SelectItem value="Compliance">Compliance</SelectItem>
+                                <SelectItem value="Soft Skills">Soft Skills</SelectItem>
+                                <SelectItem value="Technical">Technical</SelectItem>
+                                <SelectItem value="Leadership">Leadership</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={createCourseForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Comprehensive description of the course content and learning objectives..."
+                              className="min-h-[100px]"
+                              {...field}
+                              data-testid="textarea-course-description"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <FormField
+                        control={createCourseForm.control}
+                        name="targetRole"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Target Role</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-target-role">
+                                  <SelectValue placeholder="Select role" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="">All Roles</SelectItem>
+                                <SelectItem value="operative">Operative</SelectItem>
+                                <SelectItem value="supervisor">Supervisor</SelectItem>
+                                <SelectItem value="leadership">Leadership</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createCourseForm.control}
+                        name="estimatedHours"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Estimated Hours</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                min="0.5" 
+                                max="100" 
+                                step="0.5"
+                                placeholder="2.5"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                data-testid="input-estimated-hours"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={createCourseForm.control}
+                        name="difficulty"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Difficulty</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-difficulty">
+                                  <SelectValue placeholder="Select difficulty" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Beginner">Beginner</SelectItem>
+                                <SelectItem value="Intermediate">Intermediate</SelectItem>
+                                <SelectItem value="Advanced">Advanced</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={createCourseForm.control}
+                      name="vimeoVideoId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Vimeo Video ID (Optional)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="e.g., 123456789"
+                              {...field}
+                              data-testid="input-vimeo-id"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Enter the Vimeo video ID for the main course video. You can add more lessons later.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex justify-end space-x-2">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => setIsCreateCourseOpen(false)}
+                        data-testid="button-cancel-course"
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        type="submit" 
+                        disabled={createCourseMutation.isPending}
+                        data-testid="button-submit-course"
+                      >
+                        {createCourseMutation.isPending ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create Course
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
         )}
       </div>
 
       <div className="space-y-6">
-        <div className="grid w-full grid-cols-4 bg-muted p-1 rounded-lg">
-          <Link
-            href="/learning"
-            className={`px-3 py-2 text-sm font-medium text-center rounded-md transition-colors ${
-              activeTab === "dashboard"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            data-testid="tab-dashboard"
-          >
-            Dashboard
-          </Link>
-          <Link
-            href="/learning/courses"
-            className={`px-3 py-2 text-sm font-medium text-center rounded-md transition-colors ${
-              activeTab === "courses"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            data-testid="tab-courses"
-          >
-            Courses
-          </Link>
-          <Link
-            href="/learning/certificates"
-            className={`px-3 py-2 text-sm font-medium text-center rounded-md transition-colors ${
-              activeTab === "certificates"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            data-testid="tab-certificates"
-          >
-            Certificates
-          </Link>
-          <Link
-            href="/learning/matrix"
-            className={`px-3 py-2 text-sm font-medium text-center rounded-md transition-colors ${
-              activeTab === "matrix"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            data-testid="tab-matrix"
-          >
-            Training Matrix
-          </Link>
-        </div>
+        {/* Main Navigation Tabs */}
+        {!isAdminMode ? (
+          <div className="grid w-full grid-cols-4 bg-muted p-1 rounded-lg">
+            <Link
+              href="/learning"
+              className={`px-3 py-2 text-sm font-medium text-center rounded-md transition-colors ${
+                activeTab === "dashboard"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid="tab-dashboard"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/learning/courses"
+              className={`px-3 py-2 text-sm font-medium text-center rounded-md transition-colors ${
+                activeTab === "courses"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid="tab-courses"
+            >
+              Courses
+            </Link>
+            <Link
+              href="/learning/certificates"
+              className={`px-3 py-2 text-sm font-medium text-center rounded-md transition-colors ${
+                activeTab === "certificates"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid="tab-certificates"
+            >
+              Certificates
+            </Link>
+            <Link
+              href="/learning/matrix"
+              className={`px-3 py-2 text-sm font-medium text-center rounded-md transition-colors ${
+                activeTab === "matrix"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid="tab-matrix"
+            >
+              Training Matrix
+            </Link>
+          </div>
+        ) : (
+          /* Admin Navigation Tabs */
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Settings className="w-5 h-5 text-blue-600" />
+                  <h2 className="text-lg font-semibold text-blue-900 dark:text-blue-100">Admin Control Panel</h2>
+                </div>
+                <Badge variant="secondary">
+                  {user?.role === 'leadership' ? 'Leadership' : 'Supervisor'}
+                </Badge>
+              </div>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mt-2">
+                Manage courses, content, assessments, and learning analytics for your organization.
+              </p>
+            </div>
+            
+            <Tabs value={adminTab} onValueChange={setAdminTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="courses" data-testid="admin-tab-courses">
+                  <GraduationCap className="w-4 h-4 mr-2" />
+                  Courses
+                </TabsTrigger>
+                <TabsTrigger value="content" data-testid="admin-tab-content">
+                  <Layers className="w-4 h-4 mr-2" />
+                  Content
+                </TabsTrigger>
+                <TabsTrigger value="assessments" data-testid="admin-tab-assessments">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Assessments
+                </TabsTrigger>
+                <TabsTrigger value="badges" data-testid="admin-tab-badges">
+                  <Trophy className="w-4 h-4 mr-2" />
+                  Badges
+                </TabsTrigger>
+                <TabsTrigger value="analytics" data-testid="admin-tab-analytics">
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Analytics
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
 
-        {activeTab === "dashboard" && (<div className="space-y-6">
+        {/* ADMIN INTERFACE CONTENT */}
+        {isAdminMode && (
+          <div className="space-y-6">
+            <TabsContent value="courses" className="space-y-6">
+              {/* Course Management Interface */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card data-testid="card-total-courses">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Courses</CardTitle>
+                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{adminCourses?.length || 0}</div>
+                    <p className="text-xs text-muted-foreground">Published courses</p>
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-active-learners">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Active Learners</CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{adminAnalytics?.activeLearners || 0}</div>
+                    <p className="text-xs text-muted-foreground">This month</p>
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-completion-rate">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Avg. Completion</CardTitle>
+                    <Target className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{adminAnalytics?.avgCompletion || 0}%</div>
+                    <p className="text-xs text-muted-foreground">Course completion</p>
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-certificates-issued">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Certificates</CardTitle>
+                    <Award className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{adminAnalytics?.certificatesIssued || 0}</div>
+                    <p className="text-xs text-muted-foreground">This month</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Course Management Table */}
+              <Card data-testid="card-course-management">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Course Management</CardTitle>
+                      <CardDescription>Create, edit, and manage your learning courses</CardDescription>
+                    </div>
+                    <Button onClick={() => setIsCreateCourseOpen(true)} data-testid="button-create-new-course">
+                      <Plus className="w-4 h-4 mr-2" />
+                      New Course
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {adminCoursesLoading ? (
+                    <div className="space-y-4">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="flex items-center justify-between p-4 border rounded-lg animate-pulse">
+                          <div className="flex items-center space-x-4">
+                            <Skeleton className="w-12 h-12 rounded" />
+                            <div>
+                              <Skeleton className="h-5 w-48 mb-2" />
+                              <Skeleton className="h-4 w-32" />
+                            </div>
+                          </div>
+                          <Skeleton className="h-9 w-24" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : adminCourses && adminCourses.length > 0 ? (
+                    <div className="space-y-4">
+                      {adminCourses.map((course: any) => (
+                        <div key={course.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors" data-testid={`admin-course-${course.id}`}>
+                          <div className="flex items-center space-x-4">
+                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                              <GraduationCap className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold">{course.title}</h3>
+                              <div className="flex items-center space-x-4 mt-1">
+                                <span className="text-sm text-muted-foreground">
+                                  {course.category} • {course.estimatedHours}h • {course.enrollmentCount || 0} enrolled
+                                </span>
+                                <Badge variant={course.isPublished ? "default" : "secondary"}>
+                                  {course.isPublished ? "Published" : "Draft"}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setSelectedCourseForEdit(course)}
+                              data-testid={`button-edit-course-${course.id}`}
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                navigator.clipboard.writeText(course.id);
+                                toast({ title: "Course ID copied to clipboard" });
+                              }}
+                              data-testid={`button-copy-course-${course.id}`}
+                            >
+                              <Copy className="w-4 h-4 mr-2" />
+                              Copy ID
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                if (confirm('Are you sure you want to delete this course?')) {
+                                  deleteCourseMutation.mutate(course.id);
+                                }
+                              }}
+                              data-testid={`button-delete-course-${course.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <GraduationCap className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">No courses created yet</h3>
+                      <p className="text-muted-foreground mb-4">Start building your learning content by creating your first course.</p>
+                      <Button onClick={() => setIsCreateCourseOpen(true)} data-testid="button-create-first-course">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Your First Course
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="content" className="space-y-6">
+              {/* Content Management Interface */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card data-testid="card-lesson-management">
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <PlayCircle className="w-5 h-5 mr-2" />
+                      Lesson Management
+                    </CardTitle>
+                    <CardDescription>Add and organize video lessons within your courses</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Dialog open={isCreateLessonOpen} onOpenChange={setIsCreateLessonOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="w-full" data-testid="button-create-lesson">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add New Lesson
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Create New Lesson</DialogTitle>
+                          <DialogDescription>Add a video lesson to your course curriculum</DialogDescription>
+                        </DialogHeader>
+                        <Form {...createLessonForm}>
+                          <form onSubmit={createLessonForm.handleSubmit((data) => {
+                            // This would need to be connected to a selected course
+                            createLessonMutation.mutate({ courseId: "selected-course-id", lessonData: data });
+                          })} className="space-y-4">
+                            <FormField
+                              control={createLessonForm.control}
+                              name="title"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Lesson Title</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="e.g., Introduction to Quality Standards" {...field} data-testid="input-lesson-title" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createLessonForm.control}
+                              name="vimeoVideoId"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Vimeo Video ID</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="123456789" {...field} data-testid="input-lesson-vimeo" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="grid grid-cols-2 gap-4">
+                              <FormField
+                                control={createLessonForm.control}
+                                name="order"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Lesson Order</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        type="number" 
+                                        min="1"
+                                        {...field}
+                                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                        data-testid="input-lesson-order"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={createLessonForm.control}
+                                name="estimatedMinutes"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Duration (minutes)</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        type="number" 
+                                        min="1"
+                                        {...field}
+                                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                        data-testid="input-lesson-duration"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <div className="flex justify-end space-x-2">
+                              <Button type="button" variant="outline" onClick={() => setIsCreateLessonOpen(false)}>
+                                Cancel
+                              </Button>
+                              <Button type="submit" disabled={createLessonMutation.isPending} data-testid="button-submit-lesson">
+                                {createLessonMutation.isPending ? (
+                                  <>
+                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                    Creating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Create Lesson
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </form>
+                        </Form>
+                      </DialogContent>
+                    </Dialog>
+                    <div className="text-sm text-muted-foreground">
+                      Organize video content, track progress, and manage course curriculum
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-resource-management">
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Upload className="w-5 h-5 mr-2" />
+                      Resource Management
+                    </CardTitle>
+                    <CardDescription>Upload and manage course materials and downloads</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Button className="w-full" data-testid="button-upload-resource">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Resources
+                    </Button>
+                    <div className="text-sm text-muted-foreground">
+                      PDFs, documents, slides, and supplementary materials
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="assessments" className="space-y-6">
+              {/* Assessment Management Interface */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card data-testid="card-quiz-management">
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <FileText className="w-5 h-5 mr-2" />
+                      Quiz & Assessment Builder
+                    </CardTitle>
+                    <CardDescription>Create comprehensive assessments and quizzes</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Dialog open={isCreateQuizOpen} onOpenChange={setIsCreateQuizOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="w-full" data-testid="button-create-quiz">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Create New Quiz
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Create Assessment Quiz</DialogTitle>
+                          <DialogDescription>Build a comprehensive quiz to test learner knowledge</DialogDescription>
+                        </DialogHeader>
+                        <Form {...createQuizForm}>
+                          <form onSubmit={createQuizForm.handleSubmit((data) => {
+                            createQuizMutation.mutate({ courseId: "selected-course-id", quizData: data });
+                          })} className="space-y-4">
+                            <FormField
+                              control={createQuizForm.control}
+                              name="title"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Quiz Title</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="e.g., ISO 9001 Knowledge Assessment" {...field} data-testid="input-quiz-title" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="grid grid-cols-2 gap-4">
+                              <FormField
+                                control={createQuizForm.control}
+                                name="passingScore"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Passing Score (%)</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        type="number" 
+                                        min="50" 
+                                        max="100"
+                                        {...field}
+                                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                        data-testid="input-passing-score"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={createQuizForm.control}
+                                name="maxAttempts"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Max Attempts</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        type="number" 
+                                        min="1" 
+                                        max="10"
+                                        {...field}
+                                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                        data-testid="input-max-attempts"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <div className="flex justify-end space-x-2">
+                              <Button type="button" variant="outline" onClick={() => setIsCreateQuizOpen(false)}>
+                                Cancel
+                              </Button>
+                              <Button type="submit" disabled={createQuizMutation.isPending} data-testid="button-submit-quiz">
+                                {createQuizMutation.isPending ? (
+                                  <>
+                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                    Creating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Create Quiz
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </form>
+                        </Form>
+                      </DialogContent>
+                    </Dialog>
+                    <div className="text-sm text-muted-foreground">
+                      Build quizzes with multiple choice, true/false, and essay questions
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-certification-management">
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Award className="w-5 h-5 mr-2" />
+                      Certification Management
+                    </CardTitle>
+                    <CardDescription>Configure certificates and completion criteria</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Button className="w-full" data-testid="button-configure-certificates">
+                      <Award className="w-4 h-4 mr-2" />
+                      Configure Certificates
+                    </Button>
+                    <div className="text-sm text-muted-foreground">
+                      Set automatic certificate issuance and design templates
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="badges" className="space-y-6">
+              {/* Badge Management Interface */}
+              <Card data-testid="card-badge-management">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center">
+                        <Trophy className="w-5 h-5 mr-2" />
+                        Badge Management
+                      </CardTitle>
+                      <CardDescription>Create achievement badges and set earning criteria</CardDescription>
+                    </div>
+                    <Dialog open={isCreateBadgeOpen} onOpenChange={setIsCreateBadgeOpen}>
+                      <DialogTrigger asChild>
+                        <Button data-testid="button-create-badge">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Create Badge
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Create Achievement Badge</DialogTitle>
+                          <DialogDescription>Design a badge to recognize learner achievements</DialogDescription>
+                        </DialogHeader>
+                        <Form {...createBadgeForm}>
+                          <form onSubmit={createBadgeForm.handleSubmit((data) => {
+                            createBadgeMutation.mutate(data);
+                          })} className="space-y-4">
+                            <FormField
+                              control={createBadgeForm.control}
+                              name="name"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Badge Name</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="e.g., Quality Expert" {...field} data-testid="input-badge-name" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createBadgeForm.control}
+                              name="description"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Description</FormLabel>
+                                  <FormControl>
+                                    <Textarea 
+                                      placeholder="Describe what this badge represents..."
+                                      {...field}
+                                      data-testid="textarea-badge-description"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createBadgeForm.control}
+                              name="criteria"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Achievement Criteria</FormLabel>
+                                  <FormControl>
+                                    <Textarea 
+                                      placeholder="Specify what learners need to do to earn this badge..."
+                                      {...field}
+                                      data-testid="textarea-badge-criteria"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="flex justify-end space-x-2">
+                              <Button type="button" variant="outline" onClick={() => setIsCreateBadgeOpen(false)}>
+                                Cancel
+                              </Button>
+                              <Button type="submit" disabled={createBadgeMutation.isPending} data-testid="button-submit-badge">
+                                {createBadgeMutation.isPending ? (
+                                  <>
+                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                    Creating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Create Badge
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </form>
+                        </Form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <Trophy className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No badges created yet</h3>
+                    <p className="text-muted-foreground">Create achievement badges to motivate and recognize learner accomplishments.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="analytics" className="space-y-6">
+              {/* Analytics Dashboard */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card data-testid="card-learner-progress">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Learner Progress</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{adminAnalytics?.learnerProgress || 0}%</div>
+                    <p className="text-xs text-muted-foreground">Average course progress</p>
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-engagement-rate">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Engagement Rate</CardTitle>
+                    <PieChart className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{adminAnalytics?.engagementRate || 0}%</div>
+                    <p className="text-xs text-muted-foreground">Weekly active users</p>
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-training-hours">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Training Hours</CardTitle>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{adminAnalytics?.trainingHours || 0}</div>
+                    <p className="text-xs text-muted-foreground">Hours completed this month</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card data-testid="card-detailed-analytics">
+                <CardHeader>
+                  <CardTitle>Learning Analytics Dashboard</CardTitle>
+                  <CardDescription>Comprehensive insights into learning performance and engagement</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {adminAnalyticsLoading ? (
+                    <div className="text-center py-8">
+                      <RefreshCw className="w-8 h-8 mx-auto mb-4 animate-spin" />
+                      <p>Loading analytics data...</p>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">Analytics Dashboard</h3>
+                      <p className="text-muted-foreground">Detailed learning analytics and reporting will be displayed here.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </div>
+        )}
+
+        {!isAdminMode && activeTab === "dashboard" && (<div className="space-y-6">
           {/* Learning Progress Overview */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card data-testid="card-enrolled-courses" className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/learning/courses'}>
