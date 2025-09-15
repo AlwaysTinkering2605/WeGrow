@@ -1229,6 +1229,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Lesson Management
+  app.post('/api/lms/admin/courses/:courseId/lessons', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { courseId } = req.params;
+      const lessonData = insertLessonSchema.parse({ ...req.body, courseId });
+      const lesson = await storage.createLesson(lessonData);
+      res.json(lesson);
+    } catch (error: any) {
+      return handleValidationError(error, res, "create lesson");
+    }
+  });
+
+  // Admin Quiz Management
+  app.post('/api/lms/admin/courses/:courseId/quizzes', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { courseId } = req.params;
+      const quizData = insertQuizSchema.parse({ ...req.body, courseId });
+      const quiz = await storage.createQuiz(quizData);
+      res.json(quiz);
+    } catch (error: any) {
+      return handleValidationError(error, res, "create quiz");
+    }
+  });
+
+  // Admin Badge Management
+  app.post('/api/lms/admin/badges', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const badgeData = insertBadgeSchema.parse(req.body);
+      const badge = await storage.createBadge(badgeData);
+      res.json(badge);
+    } catch (error: any) {
+      return handleValidationError(error, res, "create badge");
+    }
+  });
+
   app.delete('/api/lms/admin/courses/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
     try {
       const { id } = req.params;
