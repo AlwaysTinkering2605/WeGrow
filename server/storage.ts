@@ -189,12 +189,14 @@ export interface IStorage {
 
   // LMS - Course Content
   getCourseModules(courseVersionId: string): Promise<CourseModule[]>;
+  getDefaultCourseModule(courseVersionId: string): Promise<CourseModule | undefined>;
   createCourseModule(module: InsertCourseModule): Promise<CourseModule>;
   updateCourseModule(moduleId: string, updates: Partial<InsertCourseModule>): Promise<CourseModule>;
   deleteCourseModule(moduleId: string): Promise<void>;
   
   getLessons(moduleId: string): Promise<Lesson[]>;
   getLesson(lessonId: string): Promise<Lesson | undefined>;
+  getDefaultLesson(moduleId: string): Promise<Lesson | undefined>;
   createLesson(lesson: InsertLesson): Promise<Lesson>;
   updateLesson(lessonId: string, updates: Partial<InsertLesson>): Promise<Lesson>;
   deleteLesson(lessonId: string): Promise<void>;
@@ -943,6 +945,14 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(courseModules).where(eq(courseModules.courseVersionId, courseVersionId));
   }
 
+  async getDefaultCourseModule(courseVersionId: string): Promise<CourseModule | undefined> {
+    const [module] = await db.select().from(courseModules)
+      .where(eq(courseModules.courseVersionId, courseVersionId))
+      .orderBy(courseModules.orderIndex)
+      .limit(1);
+    return module;
+  }
+
   async createCourseModule(module: InsertCourseModule): Promise<CourseModule> {
     const [created] = await db.insert(courseModules).values(module).returning();
     return created;
@@ -967,6 +977,14 @@ export class DatabaseStorage implements IStorage {
 
   async getLesson(lessonId: string): Promise<Lesson | undefined> {
     const [lesson] = await db.select().from(lessons).where(eq(lessons.id, lessonId));
+    return lesson;
+  }
+
+  async getDefaultLesson(moduleId: string): Promise<Lesson | undefined> {
+    const [lesson] = await db.select().from(lessons)
+      .where(eq(lessons.moduleId, moduleId))
+      .orderBy(lessons.orderIndex)
+      .limit(1);
     return lesson;
   }
 

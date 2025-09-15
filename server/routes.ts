@@ -1233,10 +1233,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/lms/admin/courses/:courseId/lessons', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
     try {
       const { courseId } = req.params;
-      const lessonData = insertLessonSchema.parse({ ...req.body, courseId });
+      
+      // First get or create a default module for this course
+      let defaultModule = await storage.getDefaultCourseModule(courseId);
+      if (!defaultModule) {
+        defaultModule = await storage.createCourseModule({
+          courseVersionId: courseId, // For simplicity, using courseId as course version
+          title: "Main Content",
+          description: "Main course content and lessons",
+          orderIndex: 1
+        });
+      }
+      
+      // Transform frontend lesson data to match database schema
+      const lessonData = {
+        moduleId: defaultModule.id,
+        title: req.body.title,
+        description: req.body.description || "",
+        type: "video" as const, // Default to video type
+        orderIndex: req.body.order || 1,
+        vimeoVideoId: req.body.vimeoVideoId,
+        estimatedDuration: req.body.estimatedMinutes ? req.body.estimatedMinutes * 60 : 1800, // Convert minutes to seconds
+        isRequired: true
+      };
+      
       const lesson = await storage.createLesson(lessonData);
       res.json(lesson);
     } catch (error: any) {
+      console.error("Error creating lesson:", error);
       return handleValidationError(error, res, "create lesson");
     }
   });
@@ -1245,10 +1269,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/lms/admin/courses/:courseId/quizzes', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
     try {
       const { courseId } = req.params;
-      const quizData = insertQuizSchema.parse({ ...req.body, courseId });
+      
+      // Get or create a default module for this course
+      let defaultModule = await storage.getDefaultCourseModule(courseId);
+      if (!defaultModule) {
+        defaultModule = await storage.createCourseModule({
+          courseVersionId: courseId,
+          title: "Main Content",
+          description: "Main course content and lessons",
+          orderIndex: 1
+        });
+      }
+      
+      // Get or create a default lesson for the quiz
+      let defaultLesson = await storage.getDefaultLesson(defaultModule.id);
+      if (!defaultLesson) {
+        defaultLesson = await storage.createLesson({
+          moduleId: defaultModule.id,
+          title: "Assessment Lesson",
+          description: "Lesson for course assessments",
+          type: "quiz" as const,
+          orderIndex: 999, // Put quiz lessons at the end
+          estimatedDuration: 1800, // 30 minutes default
+          isRequired: true
+        });
+      }
+      
+      // Transform frontend quiz data to match database schema
+      const quizData = {
+        lessonId: defaultLesson.id,
+        title: req.body.title,
+        description: req.body.description || "",
+        passingScore: req.body.passingScore || 80,
+        timeLimit: req.body.timeLimit || 60,
+        maxAttempts: req.body.maxAttempts || 3,
+        randomizeQuestions: false
+      };
+      
       const quiz = await storage.createQuiz(quizData);
       res.json(quiz);
     } catch (error: any) {
+      console.error("Error creating quiz:", error);
       return handleValidationError(error, res, "create quiz");
     }
   });
