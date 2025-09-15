@@ -60,7 +60,7 @@ const courseSchema = z.object({
   description: z.string().min(10, "Description must be at least 10 characters"),
   category: z.string().min(1, "Category is required"),
   targetRole: z.string().optional(),
-  estimatedHours: z.number().min(0.5).max(100),
+  estimatedHours: z.coerce.number().min(0.5).max(100),
   difficulty: z.enum(["Beginner", "Intermediate", "Advanced"]),
   vimeoVideoId: z.string().optional(),
   isPublished: z.boolean().default(false),
@@ -70,25 +70,25 @@ const lessonSchema = z.object({
   title: z.string().min(1, "Lesson title is required"),
   description: z.string().optional(),
   vimeoVideoId: z.string().optional(),
-  order: z.number().min(1),
-  estimatedMinutes: z.number().min(1).max(300),
+  order: z.coerce.number().min(1),
+  estimatedMinutes: z.coerce.number().min(1).max(300),
 });
 
 const quizSchema = z.object({
   title: z.string().min(1, "Quiz title is required"),
   description: z.string().optional(),
-  passingScore: z.number().min(50).max(100).default(80),
-  maxAttempts: z.number().min(1).max(10).default(3),
-  timeLimit: z.number().min(5).max(120).optional(),
+  passingScore: z.coerce.number().min(50).max(100).default(80),
+  maxAttempts: z.coerce.number().min(1).max(10).default(3),
+  timeLimit: z.coerce.number().min(5).max(120).optional(),
 });
 
 const quizQuestionSchema = z.object({
   type: z.enum(["multiple_choice", "true_false", "multi_select"]),
   questionText: z.string().min(1, "Question text is required"),
   options: z.array(z.string()).min(2, "At least 2 options required").optional(),
-  correctAnswers: z.array(z.number()).min(1, "At least 1 correct answer required"),
+  correctAnswers: z.array(z.coerce.number()).min(1, "At least 1 correct answer required"),
   explanation: z.string().optional(),
-  orderIndex: z.number().min(1).default(1),
+  orderIndex: z.coerce.number().min(1).default(1),
 });
 
 const badgeSchema = z.object({
