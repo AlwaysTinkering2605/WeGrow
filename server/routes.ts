@@ -1256,6 +1256,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get lessons for a specific course (admin endpoint)
+  app.get('/api/lms/courses/:courseId/lessons', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { courseId } = req.params;
+      const lessons = await storage.getLessonsByCourse(courseId);
+      res.json(lessons);
+    } catch (error) {
+      console.error("Error fetching lessons for course:", error);
+      res.status(500).json({ message: "Failed to fetch lessons for course" });
+    }
+  });
+
+  // Get quizzes for a specific lesson (admin endpoint)
+  app.get('/api/lms/lessons/:lessonId/quizzes', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { lessonId } = req.params;
+      const quizzes = await storage.getQuizzesByLesson(lessonId);
+      res.json(quizzes);
+    } catch (error) {
+      console.error("Error fetching quizzes for lesson:", error);
+      res.status(500).json({ message: "Failed to fetch quizzes for lesson" });
+    }
+  });
+
   app.post('/api/lms/admin/courses', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

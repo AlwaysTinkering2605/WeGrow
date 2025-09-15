@@ -742,6 +742,11 @@ export default function Learning() {
   // Fetch lessons for selected course for quiz creation
   const { data: courseLessons, isLoading: courseLessonsLoading } = useQuery<any[]>({
     queryKey: ["/api/lms/courses", selectedCourseForContent, "lessons"],
+    queryFn: async () => {
+      if (!selectedCourseForContent) return [];
+      const response = await apiRequest("GET", `/api/lms/courses/${selectedCourseForContent}/lessons`);
+      return await response.json();
+    },
     enabled: !!(selectedCourseForContent && (user?.role === 'supervisor' || user?.role === 'leadership')),
     retry: false,
   });

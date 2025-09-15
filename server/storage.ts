@@ -265,6 +265,8 @@ export interface IStorage {
 
   // LMS - Admin Management
   getAdminCourses(): Promise<Course[]>;
+  getLessonsByCourse(courseId: string): Promise<Lesson[]>;
+  getQuizzesByLesson(lessonId: string): Promise<Quiz[]>;
   deleteCourse(courseId: string): Promise<void>;
   getAdminAnalytics(): Promise<{
     activeLearners: number;
@@ -1601,6 +1603,45 @@ export class DatabaseStorage implements IStorage {
     }).from(courses).orderBy(desc(courses.createdAt));
     
     return courseRows as Course[];
+  }
+
+  async getLessonsByCourse(courseId: string): Promise<Lesson[]> {
+    // Get the current version of the course
+    const [currentVersion] = await db.select()
+      .from(courseVersions)
+      .where(eq(courseVersions.courseId, courseId))
+      .orderBy(desc(courseVersions.publishedAt))
+      .limit(1);
+
+    if (!currentVersion) {
+      return [];
+    }
+
+    // Get the default module for this course version
+    const [defaultModule] = await db.select()
+      .from(courseModules)
+      .where(eq(courseModules.courseVersionId, currentVersion.id))
+      .limit(1);
+
+    if (!defaultModule) {
+      return [];
+    }
+
+    // Get all lessons for the default module
+    const lessonRows = await db.select()
+      .from(lessons)
+      .where(eq(lessons.moduleId, defaultModule.id))
+      .orderBy(lessons.orderIndex);
+
+    return lessonRows;
+  }
+
+  async getQuizzesByLesson(lessonId: string): Promise<Quiz[]> {
+    const quizRows = await db.select()
+      .from(quizzes)
+      .where(eq(quizzes.lessonId, lessonId));
+
+    return quizRows;
   }
 
   async deleteCourse(courseId: string): Promise<void> {
