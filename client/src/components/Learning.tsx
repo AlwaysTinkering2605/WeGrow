@@ -409,6 +409,7 @@ export default function Learning() {
         description: "New course has been created successfully.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/lms/courses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/admin/courses"] });
       setIsCreateCourseOpen(false);
       createCourseForm.reset();
     },
@@ -987,7 +988,7 @@ export default function Learning() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="">All Roles</SelectItem>
+                                <SelectItem value="all">All Roles</SelectItem>
                                 <SelectItem value="operative">Operative</SelectItem>
                                 <SelectItem value="supervisor">Supervisor</SelectItem>
                                 <SelectItem value="leadership">Leadership</SelectItem>
@@ -1187,14 +1188,10 @@ export default function Learning() {
                   Analytics
                 </TabsTrigger>
               </TabsList>
-            </Tabs>
-          </div>
-        )}
-
-        {/* ADMIN INTERFACE CONTENT */}
-        {isAdminMode && (
-          <div className="space-y-6">
-            <TabsContent value="courses" className="space-y-6">
+              
+              {/* ADMIN INTERFACE CONTENT */}
+              <div className="space-y-6">
+                <TabsContent value="courses" className="space-y-6">
               {/* Course Management Interface */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <Card data-testid="card-total-courses">
@@ -1784,6 +1781,8 @@ export default function Learning() {
                 </CardContent>
               </Card>
             </TabsContent>
+              </div>
+            </Tabs>
           </div>
         )}
 

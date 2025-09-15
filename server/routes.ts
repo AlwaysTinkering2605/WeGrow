@@ -1218,6 +1218,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/lms/admin/courses', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const courseData = insertCourseSchema.parse({ ...req.body, createdBy: userId });
+      const course = await storage.createCourse(courseData);
+      res.json(course);
+    } catch (error: any) {
+      return handleValidationError(error, res, "create course");
+    }
+  });
+
   app.delete('/api/lms/admin/courses/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
     try {
       const { id } = req.params;

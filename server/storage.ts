@@ -274,32 +274,65 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    // First check if user already exists
-    const existingUser = await this.getUser(userData.id!);
-    
-    if (existingUser) {
-      // User exists - only update basic profile info, preserve role and other fields
-      const [user] = await db
-        .update(users)
-        .set({
-          email: userData.email,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          profileImageUrl: userData.profileImageUrl,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, userData.id!))
-        .returning();
-      return user;
-    } else {
-      // New user - create with all provided data
-      const [user] = await db
-        .insert(users)
-        .values({
-          ...userData,
-        })
-        .returning();
-      return user;
+    try {
+      // Check if user already exists by ID or email
+      const existingUserById = userData.id ? await this.getUser(userData.id) : undefined;
+      const [existingUserByEmail] = userData.email 
+        ? await db.select().from(users).where(eq(users.email, userData.email))
+        : [undefined];
+      
+      const existingUser = existingUserById || existingUserByEmail;
+      
+      if (existingUser) {
+        // User exists - only update basic profile info, preserve role and other fields
+        const [user] = await db
+          .update(users)
+          .set({
+            email: userData.email,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            profileImageUrl: userData.profileImageUrl,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, existingUser.id))
+          .returning();
+        return user;
+      } else {
+        // New user - create with all provided data
+        const [user] = await db
+          .insert(users)
+          .values({
+            ...userData,
+          })
+          .returning();
+        return user;
+      }
+    } catch (error: any) {
+      // Handle unique constraint violations gracefully
+      if (error.code === '23505') { // PostgreSQL unique violation
+        console.warn('Unique constraint violation in upsertUser, attempting to find existing user:', error.message);
+        
+        // Try to find the existing user and update it
+        if (userData.email) {
+          const [existingUser] = await db.select().from(users).where(eq(users.email, userData.email));
+          if (existingUser) {
+            const [user] = await db
+              .update(users)
+              .set({
+                firstName: userData.firstName,
+                lastName: userData.lastName,
+                profileImageUrl: userData.profileImageUrl,
+                updatedAt: new Date(),
+              })
+              .where(eq(users.id, existingUser.id))
+              .returning();
+            return user;
+          }
+        }
+      }
+      
+      // Re-throw if we can't handle it
+      throw error;
     }
   }
 
@@ -1310,7 +1343,7 @@ export class DatabaseStorage implements IStorage {
         SELECT COUNT(*)::int 
         FROM ${enrollments} e
         INNER JOIN ${courseVersions} cv ON e.course_version_id = cv.id
-        WHERE cv.course_id = ${courses.id}
+        WHERE cv.course_id = courses.id
       )`.as('enrollmentCount')
     }).from(courses).orderBy(desc(courses.createdAt));
     
