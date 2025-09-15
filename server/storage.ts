@@ -251,6 +251,19 @@ export interface IStorage {
   linkCourseToPDP(link: InsertPdpCourseLink): Promise<PdpCourseLink>;
   getPDPCourseLinks(developmentPlanId: string): Promise<PdpCourseLink[]>;
   unlinkCourseFromPDP(linkId: string): Promise<void>;
+
+  // LMS - Admin Management
+  getAdminCourses(): Promise<Course[]>;
+  deleteCourse(courseId: string): Promise<void>;
+  getAdminAnalytics(): Promise<{
+    activeLearners: number;
+    avgCompletion: number;
+    certificatesIssued: number;
+    learnerProgress: number;
+    engagementRate: number;
+    trainingHours: number;
+  }>;
+  duplicateCourse(courseId: string, newTitle: string): Promise<Course>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1275,6 +1288,297 @@ export class DatabaseStorage implements IStorage {
 
   async unlinkCourseFromPDP(linkId: string): Promise<void> {
     await db.delete(pdpCourseLinks).where(eq(pdpCourseLinks.id, linkId));
+  }
+
+  // LMS - Admin Management Implementation
+  async getAdminCourses(): Promise<Course[]> {
+    const courseRows = await db.select({
+      id: courses.id,
+      title: courses.title,
+      description: courses.description,
+      category: courses.category,
+      level: courses.level,
+      estimatedDuration: courses.estimatedDuration,
+      tags: courses.tags,
+      thumbnailUrl: courses.thumbnailUrl,
+      currentVersionId: courses.currentVersionId,
+      isPublished: courses.isPublished,
+      createdAt: courses.createdAt,
+      updatedAt: courses.updatedAt,
+      createdBy: courses.createdBy,
+      enrollmentCount: sql<number>`(
+        SELECT COUNT(*)::int 
+        FROM ${enrollments} e
+        INNER JOIN ${courseVersions} cv ON e.course_version_id = cv.id
+        WHERE cv.course_id = ${courses.id}
+      )`.as('enrollmentCount')
+    }).from(courses).orderBy(desc(courses.createdAt));
+    
+    return courseRows as Course[];
+  }
+
+  async deleteCourse(courseId: string): Promise<void> {
+    return await db.transaction(async (tx) => {
+      try {
+        // Delete in proper order to maintain referential integrity
+        // First get all course version IDs for this course
+        const versionIds = await tx.select({ id: courseVersions.id })
+          .from(courseVersions)
+          .where(eq(courseVersions.courseId, courseId));
+        
+        const versionIdList = versionIds.map(v => v.id);
+        
+        if (versionIdList.length > 0) {
+          // Delete lesson progress for lessons in course modules of these versions
+          await tx.delete(lessonProgress).where(
+            sql`${lessonProgress.lessonId} IN (
+              SELECT ${lessons.id} 
+              FROM ${lessons} 
+              INNER JOIN ${courseModules} ON ${lessons.moduleId} = ${courseModules.id}
+              WHERE ${courseModules.courseVersionId} IN (${sql.join(versionIdList.map(id => sql`${id}`), sql`, `)})
+            )`
+          );
+          
+          // Delete quiz attempts
+          await tx.delete(quizAttempts).where(
+            sql`${quizAttempts.quizId} IN (
+              SELECT ${quizzes.id} 
+              FROM ${quizzes} 
+              INNER JOIN ${lessons} ON ${quizzes.lessonId} = ${lessons.id}
+              INNER JOIN ${courseModules} ON ${lessons.moduleId} = ${courseModules.id}
+              WHERE ${courseModules.courseVersionId} IN (${sql.join(versionIdList.map(id => sql`${id}`), sql`, `)})
+            )`
+          );
+          
+          // Delete quiz questions
+          await tx.delete(quizQuestions).where(
+            sql`${quizQuestions.quizId} IN (
+              SELECT ${quizzes.id} 
+              FROM ${quizzes} 
+              INNER JOIN ${lessons} ON ${quizzes.lessonId} = ${lessons.id}
+              INNER JOIN ${courseModules} ON ${lessons.moduleId} = ${courseModules.id}
+              WHERE ${courseModules.courseVersionId} IN (${sql.join(versionIdList.map(id => sql`${id}`), sql`, `)})
+            )`
+          );
+          
+          // Delete quizzes
+          await tx.delete(quizzes).where(
+            sql`${quizzes.lessonId} IN (
+              SELECT ${lessons.id} 
+              FROM ${lessons} 
+              INNER JOIN ${courseModules} ON ${lessons.moduleId} = ${courseModules.id}
+              WHERE ${courseModules.courseVersionId} IN (${sql.join(versionIdList.map(id => sql`${id}`), sql`, `)})
+            )`
+          );
+          
+          // Delete lessons
+          await tx.delete(lessons).where(
+            sql`${lessons.moduleId} IN (
+              SELECT ${courseModules.id} 
+              FROM ${courseModules} 
+              WHERE ${courseModules.courseVersionId} IN (${sql.join(versionIdList.map(id => sql`${id}`), sql`, `)})
+            )`
+          );
+          
+          // Delete course modules
+          await tx.delete(courseModules).where(
+            sql`${courseModules.courseVersionId} IN (${sql.join(versionIdList.map(id => sql`${id}`), sql`, `)})`
+          );
+          
+          // Delete certificates
+          await tx.delete(certificates).where(
+            sql`${certificates.courseVersionId} IN (${sql.join(versionIdList.map(id => sql`${id}`), sql`, `)})`
+          );
+          
+          // Delete training records
+          await tx.delete(trainingRecords).where(
+            sql`${trainingRecords.courseVersionId} IN (${sql.join(versionIdList.map(id => sql`${id}`), sql`, `)})`
+          );
+          
+          // Delete enrollments
+          await tx.delete(enrollments).where(
+            sql`${enrollments.courseVersionId} IN (${sql.join(versionIdList.map(id => sql`${id}`), sql`, `)})`
+          );
+        }
+        
+        // Delete course versions
+        await tx.delete(courseVersions).where(eq(courseVersions.courseId, courseId));
+        // Delete the course itself
+        await tx.delete(courses).where(eq(courses.id, courseId));
+      } catch (error) {
+        // Transaction will automatically rollback on error
+        throw new Error(`Failed to delete course: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    });
+  }
+
+  async getAdminAnalytics(): Promise<{
+    activeLearners: number;
+    avgCompletion: number;
+    certificatesIssued: number;
+    learnerProgress: number;
+    engagementRate: number;
+    trainingHours: number;
+  }> {
+    const now = new Date();
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    // Get active learners this month
+    const [activeLearnersResult] = await db.select({
+      count: sql<number>`COUNT(DISTINCT ${enrollments.userId})::int`
+    }).from(enrollments)
+    .where(sql`${enrollments.enrolledAt} >= ${thisMonthStart}`);
+    
+    // Get average completion rate
+    const [avgCompletionResult] = await db.select({
+      avg: sql<number>`COALESCE(AVG(${enrollments.progress}), 0)::int`
+    }).from(enrollments);
+    
+    // Get certificates issued this month
+    const [certificatesIssuedResult] = await db.select({
+      count: sql<number>`COUNT(*)::int`
+    }).from(certificates)
+    .where(sql`${certificates.issuedAt} >= ${thisMonthStart}`);
+    
+    // Get overall learner progress
+    const [learnerProgressResult] = await db.select({
+      avg: sql<number>`COALESCE(AVG(${enrollments.progress}), 0)::int`
+    }).from(enrollments)
+    .where(sql`${enrollments.progress} > 0`);
+    
+    // Get engagement rate (active users this week vs total enrolled)
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const [activeThisWeekResult] = await db.select({
+      count: sql<number>`COUNT(DISTINCT ${enrollments.userId})::int`
+    }).from(lessonProgress)
+    .innerJoin(enrollments, sql`${lessonProgress.enrollmentId} = ${enrollments.id}`)
+    .where(sql`${lessonProgress.completedAt} >= ${weekAgo}`);
+    
+    const [totalEnrolledResult] = await db.select({
+      count: sql<number>`COUNT(DISTINCT ${enrollments.userId})::int`
+    }).from(enrollments);
+    
+    const engagementRate = totalEnrolledResult.count > 0 
+      ? Math.round((activeThisWeekResult.count / totalEnrolledResult.count) * 100)
+      : 0;
+    
+    // Get training hours this month - calculate from course duration and completed enrollments
+    const [trainingHoursResult] = await db.select({
+      total: sql<number>`COALESCE(SUM(${courses.estimatedDuration}), 0)::int`
+    }).from(trainingRecords)
+    .innerJoin(courseVersions, sql`${trainingRecords.courseVersionId} = ${courseVersions.id}`)
+    .innerJoin(courses, sql`${courseVersions.courseId} = ${courses.id}`)
+    .where(sql`${trainingRecords.completedAt} >= ${thisMonthStart}`);
+    
+    // Convert minutes to hours
+    const trainingHours = Math.round((trainingHoursResult.total || 0) / 60);
+    
+    return {
+      activeLearners: activeLearnersResult.count || 0,
+      avgCompletion: Math.round(avgCompletionResult.avg || 0),
+      certificatesIssued: certificatesIssuedResult.count || 0,
+      learnerProgress: Math.round(learnerProgressResult.avg || 0),
+      engagementRate,
+      trainingHours,
+    };
+  }
+
+  async duplicateCourse(courseId: string, newTitle: string): Promise<Course> {
+    return await db.transaction(async (tx) => {
+      try {
+        const originalCourse = await this.getCourse(courseId);
+        if (!originalCourse) {
+          throw new Error('Course not found');
+        }
+        
+        // Create new course with correct field names
+        const newCourse = await this.createCourse({
+          title: newTitle,
+          description: originalCourse.description + ' (Copy)',
+          category: originalCourse.category,
+          level: originalCourse.level,
+          estimatedDuration: originalCourse.estimatedDuration,
+          tags: originalCourse.tags,
+          thumbnailUrl: originalCourse.thumbnailUrl,
+          isPublished: false, // Always create as draft
+          createdBy: originalCourse.createdBy,
+        });
+        
+        // Get the current version of the original course
+        const currentVersion = await this.getCurrentCourseVersion(courseId);
+        if (!currentVersion) {
+          return newCourse; // No content to copy
+        }
+        
+        // Create a new version for the new course
+        const newVersion = await this.publishCourseVersion(newCourse.id, "1.0", "Initial version", originalCourse.createdBy);
+        
+        // Get original course modules from the current version
+        const originalModules = await tx.select().from(courseModules).where(eq(courseModules.courseVersionId, currentVersion.id));
+        
+        for (const originalModule of originalModules) {
+          // Create new module with correct field names
+          const newModule = await this.createCourseModule({
+            courseVersionId: newVersion.id,
+            title: originalModule.title,
+            description: originalModule.description,
+            orderIndex: originalModule.orderIndex,
+          });
+          
+          // Get original lessons
+          const originalLessons = await tx.select().from(lessons).where(eq(lessons.moduleId, originalModule.id));
+          
+          for (const originalLesson of originalLessons) {
+            // Create new lesson with correct field names
+            const newLesson = await this.createLesson({
+              moduleId: newModule.id,
+              title: originalLesson.title,
+              description: originalLesson.description,
+              type: originalLesson.type,
+              orderIndex: originalLesson.orderIndex,
+              vimeoVideoId: originalLesson.vimeoVideoId,
+              estimatedDuration: originalLesson.estimatedDuration,
+              resourceUrl: originalLesson.resourceUrl,
+              isRequired: originalLesson.isRequired,
+            });
+            
+            // Copy quiz if exists
+            const originalQuiz = await tx.select().from(quizzes).where(eq(quizzes.lessonId, originalLesson.id));
+            if (originalQuiz.length > 0) {
+              const quiz = originalQuiz[0];
+              const newQuiz = await this.createQuiz({
+                lessonId: newLesson.id,
+                title: quiz.title,
+                description: quiz.description,
+                passingScore: quiz.passingScore,
+                timeLimit: quiz.timeLimit,
+                maxAttempts: quiz.maxAttempts,
+                randomizeQuestions: quiz.randomizeQuestions,
+              });
+              
+              // Copy quiz questions with correct field names
+              const originalQuestions = await tx.select().from(quizQuestions).where(eq(quizQuestions.quizId, quiz.id));
+              for (const question of originalQuestions) {
+                await this.createQuizQuestion({
+                  quizId: newQuiz.id,
+                  type: question.type,
+                  questionText: question.questionText,
+                  options: question.options as any,
+                  correctAnswers: question.correctAnswers as any,
+                  explanation: question.explanation,
+                  orderIndex: question.orderIndex,
+                });
+              }
+            }
+          }
+        }
+        
+        return newCourse;
+      } catch (error) {
+        // Transaction will automatically rollback on error
+        throw new Error(`Failed to duplicate course: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    });
   }
 }
 

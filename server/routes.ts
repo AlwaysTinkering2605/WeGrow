@@ -1192,6 +1192,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/lms/pdp-links/:linkId', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { linkId } = req.params;
+      await storage.unlinkCourseFromPDP(linkId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error unlinking course from development plan:", error);
+      res.status(500).json({ message: "Failed to unlink course from development plan" });
+    }
+  });
+
+  // ======================
+  // LMS Admin API Routes
+  // ======================
+
+  // Admin Course Management
+  app.get('/api/lms/admin/courses', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const courses = await storage.getAdminCourses();
+      res.json(courses);
+    } catch (error) {
+      console.error("Error fetching admin courses:", error);
+      res.status(500).json({ message: "Failed to fetch admin courses" });
+    }
+  });
+
+  app.delete('/api/lms/admin/courses/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteCourse(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting course:", error);
+      res.status(500).json({ message: "Failed to delete course" });
+    }
+  });
+
+  app.post('/api/lms/admin/courses/:id/duplicate', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { title } = req.body;
+      
+      if (!title) {
+        return res.status(400).json({ message: "New course title is required" });
+      }
+      
+      const duplicatedCourse = await storage.duplicateCourse(id, title);
+      res.json(duplicatedCourse);
+    } catch (error) {
+      console.error("Error duplicating course:", error);
+      res.status(500).json({ message: "Failed to duplicate course" });
+    }
+  });
+
+  // Admin Analytics Dashboard
+  app.get('/api/lms/admin/analytics', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const analytics = await storage.getAdminAnalytics();
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching admin analytics:", error);
+      res.status(500).json({ message: "Failed to fetch admin analytics" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
