@@ -50,7 +50,8 @@ import {
   TrendingUp,
   GraduationCap,
   Layers,
-  PlayCircle
+  PlayCircle,
+  Circle
 } from "lucide-react";
 
 // Form Schemas for Admin Interface
@@ -79,6 +80,15 @@ const quizSchema = z.object({
   passingScore: z.number().min(50).max(100).default(80),
   maxAttempts: z.number().min(1).max(10).default(3),
   timeLimit: z.number().min(5).max(120).optional(),
+});
+
+const quizQuestionSchema = z.object({
+  type: z.enum(["multiple_choice", "true_false", "multi_select"]),
+  questionText: z.string().min(1, "Question text is required"),
+  options: z.array(z.string()).min(2, "At least 2 options required").optional(),
+  correctAnswers: z.array(z.number()).min(1, "At least 1 correct answer required"),
+  explanation: z.string().optional(),
+  orderIndex: z.number().min(1).default(1),
 });
 
 const badgeSchema = z.object({
@@ -205,15 +215,34 @@ export default function Learning() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedRole, setSelectedRole] = useState("all");
 
+  // Course player state
+  const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
+  const [currentLesson, setCurrentLesson] = useState<any>(null);
+  
+  // Quiz taking state
+  const [isQuizActive, setIsQuizActive] = useState(false);
+  const [currentQuiz, setCurrentQuiz] = useState<any>(null);
+  const [quizQuestionsForTaking, setQuizQuestionsForTaking] = useState<any[]>([]);
+  const [userAnswers, setUserAnswers] = useState<{ [key: string]: any }>({});
+  const [currentAttempt, setCurrentAttempt] = useState<any>(null);
+  const [quizStartTime, setQuizStartTime] = useState<Date | null>(null);
+
   // Admin interface state
   const [isCreateCourseOpen, setIsCreateCourseOpen] = useState(false);
   const [isCreateLessonOpen, setIsCreateLessonOpen] = useState(false);
   const [isCreateQuizOpen, setIsCreateQuizOpen] = useState(false);
   const [isCreateBadgeOpen, setIsCreateBadgeOpen] = useState(false);
+  const [isManageQuestionsOpen, setIsManageQuestionsOpen] = useState(false);
   const [selectedCourseForEdit, setSelectedCourseForEdit] = useState<any>(null);
   const [selectedCourseForContent, setSelectedCourseForContent] = useState<string>("");
+  const [selectedLessonForQuiz, setSelectedLessonForQuiz] = useState<string>("");
+  const [selectedQuizForQuestions, setSelectedQuizForQuestions] = useState<string>("");
   const [adminTab, setAdminTab] = useState("courses");
   const [isAdminMode, setIsAdminMode] = useState(false);
+
+  // Quiz question management state
+  const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
+  const [editingQuestionIndex, setEditingQuestionIndex] = useState<number>(-1);
 
   // Form instances for admin operations
   const createCourseForm = useForm({
@@ -229,6 +258,36 @@ export default function Learning() {
       isPublished: false,
     },
   });
+
+  const updateCourseForm = useForm({
+    resolver: zodResolver(courseSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      category: "",
+      targetRole: "",
+      estimatedHours: 1,
+      difficulty: "Beginner" as const,
+      vimeoVideoId: "",
+      isPublished: false,
+    },
+  });
+
+  // Effect to populate edit form when selectedCourseForEdit changes
+  useEffect(() => {
+    if (selectedCourseForEdit) {
+      updateCourseForm.reset({
+        title: selectedCourseForEdit.title || "",
+        description: selectedCourseForEdit.description || "",
+        category: selectedCourseForEdit.category || "",
+        targetRole: selectedCourseForEdit.targetRole || "",
+        estimatedHours: selectedCourseForEdit.estimatedHours || 1,
+        difficulty: selectedCourseForEdit.difficulty || "Beginner",
+        vimeoVideoId: selectedCourseForEdit.vimeoVideoId || "",
+        isPublished: selectedCourseForEdit.isPublished || false,
+      });
+    }
+  }, [selectedCourseForEdit, updateCourseForm]);
 
   const createLessonForm = useForm({
     resolver: zodResolver(lessonSchema),
@@ -263,6 +322,18 @@ export default function Learning() {
     },
   });
 
+  const createQuestionForm = useForm({
+    resolver: zodResolver(quizQuestionSchema),
+    defaultValues: {
+      type: "multiple_choice" as const,
+      questionText: "",
+      options: ["", ""],
+      correctAnswers: [],
+      explanation: "",
+      orderIndex: 1,
+    },
+  });
+
   // Fetch LMS data using React Query with proper typing
   const { data: enrollments, isLoading: enrollmentsLoading, error: enrollmentsError, refetch: refetchEnrollments } = useQuery<any[]>({
     queryKey: ["/api/lms/enrollments/me"],
@@ -276,6 +347,12 @@ export default function Learning() {
 
   const { data: badges, isLoading: badgesLoading, error: badgesError, refetch: refetchBadges } = useQuery<any[]>({
     queryKey: ["/api/lms/badges/me"],
+    retry: false,
+  });
+
+  // Fetch all available badges for admin interface
+  const { data: availableBadges, isLoading: availableBadgesLoading, refetch: refetchAvailableBadges } = useQuery<any[]>({
+    queryKey: ["/api/lms/badges"],
     retry: false,
   });
 
@@ -478,8 +555,14 @@ export default function Learning() {
         description: "New lesson has been added successfully.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/lms/courses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/admin/courses"] });
+      // Also invalidate specific course detail if we're viewing one
+      if (selectedCourseForContent) {
+        queryClient.invalidateQueries({ queryKey: ["/api/lms/courses", selectedCourseForContent] });
+      }
       setIsCreateLessonOpen(false);
       createLessonForm.reset();
+      setSelectedCourseForContent("");
     },
     onError: (error: any) => {
       toast({
@@ -492,8 +575,8 @@ export default function Learning() {
 
   // ADMIN MUTATIONS - Quiz Management
   const createQuizMutation = useMutation({
-    mutationFn: async ({ courseId, quizData }: { courseId: string; quizData: z.infer<typeof quizSchema> }) => {
-      const response = await apiRequest("POST", `/api/lms/admin/courses/${courseId}/quizzes`, quizData);
+    mutationFn: async ({ lessonId, quizData }: { lessonId: string; quizData: z.infer<typeof quizSchema> }) => {
+      const response = await apiRequest("POST", `/api/lms/admin/lessons/${lessonId}/quiz`, quizData);
       return await response.json();
     },
     onSuccess: () => {
@@ -502,8 +585,14 @@ export default function Learning() {
         description: "New quiz has been created successfully.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/lms/courses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/admin/courses"] });
+      // Also invalidate specific course detail if we're viewing one
+      if (selectedCourseForContent) {
+        queryClient.invalidateQueries({ queryKey: ["/api/lms/courses", selectedCourseForContent] });
+      }
       setIsCreateQuizOpen(false);
       createQuizForm.reset();
+      setSelectedLessonForQuiz("");
     },
     onError: (error: any) => {
       toast({
@@ -511,6 +600,105 @@ export default function Learning() {
         description: error.message || "Failed to create quiz. Please try again.",
         variant: "destructive",
       });
+    },
+  });
+
+  // ADMIN MUTATIONS - Quiz Question Management
+  const saveQuizQuestionsMutation = useMutation({
+    mutationFn: async ({ quizId, questions }: { quizId: string; questions: any[] }) => {
+      const response = await apiRequest("POST", `/api/lms/admin/quizzes/${quizId}/questions`, { questions });
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Questions Saved",
+        description: "Quiz questions have been saved successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/admin/quizzes"] });
+      setIsManageQuestionsOpen(false);
+      setQuizQuestions([]);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Save Failed",
+        description: error.message || "Failed to save quiz questions. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Quiz attempt mutations for learners
+  const startQuizAttemptMutation = useMutation({
+    mutationFn: async ({ quizId, enrollmentId }: { quizId: string; enrollmentId?: string }) => {
+      // First get user's existing attempts to determine attempt number
+      const attemptsResponse = await apiRequest("GET", `/api/lms/quizzes/${quizId}/attempts/me`);
+      const attempts = await attemptsResponse.json();
+      const attemptNumber = (attempts?.length || 0) + 1;
+      
+      const response = await apiRequest("POST", `/api/lms/quizzes/${quizId}/attempts`, {
+        enrollmentId,
+        attemptNumber
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Quiz Started",
+        description: "Your quiz attempt has been started. Good luck!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Start Failed",
+        description: error.message || "Failed to start quiz. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const submitQuizAttemptMutation = useMutation({
+    mutationFn: async ({ attemptId, answers, timeSpent }: { attemptId: string; answers: any; timeSpent: number }) => {
+      const response = await apiRequest("POST", `/api/lms/quiz-attempts/${attemptId}/submit`, {
+        answers,
+        timeSpent
+      });
+      return await response.json();
+    },
+    onSuccess: (result) => {
+      toast({
+        title: "Quiz Submitted",
+        description: `Quiz completed! Score: ${result.score}% ${result.passed ? '✅ Passed' : '❌ Failed'}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Submit Failed",
+        description: error.message || "Failed to submit quiz. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // LESSON PROGRESS MUTATION
+  const updateLessonProgressMutation = useMutation({
+    mutationFn: async ({ enrollmentId, lessonId, progress }: { enrollmentId: string; lessonId: string; progress: number }) => {
+      const response = await apiRequest("POST", "/api/lms/lesson-progress", {
+        enrollmentId,
+        lessonId,
+        userId: user?.id,
+        progressPercentage: progress,
+        status: progress >= 100 ? "completed" : "in_progress",
+        timeSpent: 0 // Will be calculated separately for video
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      // Invalidate enrollment queries to refresh progress
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments"] });
+    },
+    onError: (error: any) => {
+      console.error("Failed to update lesson progress:", error);
     },
   });
 
@@ -551,6 +739,13 @@ export default function Learning() {
     retry: false,
   });
 
+  // Fetch lessons for selected course for quiz creation
+  const { data: courseLessons, isLoading: courseLessonsLoading } = useQuery<any[]>({
+    queryKey: ["/api/lms/courses", selectedCourseForContent, "lessons"],
+    enabled: !!(selectedCourseForContent && (user?.role === 'supervisor' || user?.role === 'leadership')),
+    retry: false,
+  });
+
   // Calculate learning metrics from real data with proper fallbacks
   const enrolledCourses = Array.isArray(enrollments) ? enrollments : [];
   const recentCertificates = Array.isArray(certificates) ? certificates : [];
@@ -585,6 +780,177 @@ export default function Learning() {
   // Check if user is already enrolled in a course
   const isEnrolledInCourse = (courseId: string) => {
     return enrolledCourses.some((enrollment: any) => enrollment.courseId === courseId);
+  };
+
+  // Quiz question management helper functions
+  const addQuestion = () => {
+    const newQuestion = {
+      type: "multiple_choice",
+      questionText: "",
+      options: ["", ""],
+      correctAnswers: [],
+      explanation: "",
+      orderIndex: quizQuestions.length + 1,
+    };
+    setQuizQuestions([...quizQuestions, newQuestion]);
+    setEditingQuestionIndex(quizQuestions.length);
+  };
+
+  const updateQuestion = (index: number, updates: any) => {
+    const updatedQuestions = [...quizQuestions];
+    updatedQuestions[index] = { ...updatedQuestions[index], ...updates };
+    setQuizQuestions(updatedQuestions);
+  };
+
+  const removeQuestion = (index: number) => {
+    const updatedQuestions = quizQuestions.filter((_, i) => i !== index);
+    setQuizQuestions(updatedQuestions);
+    if (editingQuestionIndex === index) {
+      setEditingQuestionIndex(-1);
+    }
+  };
+
+  const addOption = (questionIndex: number) => {
+    const updatedQuestions = [...quizQuestions];
+    updatedQuestions[questionIndex].options = [...(updatedQuestions[questionIndex].options || []), ""];
+    setQuizQuestions(updatedQuestions);
+  };
+
+  const updateOption = (questionIndex: number, optionIndex: number, value: string) => {
+    const updatedQuestions = [...quizQuestions];
+    updatedQuestions[questionIndex].options[optionIndex] = value;
+    setQuizQuestions(updatedQuestions);
+  };
+
+  const removeOption = (questionIndex: number, optionIndex: number) => {
+    const updatedQuestions = [...quizQuestions];
+    updatedQuestions[questionIndex].options = updatedQuestions[questionIndex].options.filter(
+      (_: any, i: number) => i !== optionIndex
+    );
+    // Remove this option from correct answers if it was selected
+    updatedQuestions[questionIndex].correctAnswers = updatedQuestions[questionIndex].correctAnswers.filter(
+      (answerIndex: number) => answerIndex !== optionIndex
+    ).map((answerIndex: number) => answerIndex > optionIndex ? answerIndex - 1 : answerIndex);
+    setQuizQuestions(updatedQuestions);
+  };
+
+  const toggleCorrectAnswer = (questionIndex: number, optionIndex: number) => {
+    const updatedQuestions = [...quizQuestions];
+    const correctAnswers = updatedQuestions[questionIndex].correctAnswers || [];
+    const isCorrect = correctAnswers.includes(optionIndex);
+    
+    if (updatedQuestions[questionIndex].type === "multiple_choice") {
+      // Single correct answer for multiple choice
+      updatedQuestions[questionIndex].correctAnswers = isCorrect ? [] : [optionIndex];
+    } else {
+      // Multiple correct answers for multi-select
+      if (isCorrect) {
+        updatedQuestions[questionIndex].correctAnswers = correctAnswers.filter(
+          (index: number) => index !== optionIndex
+        );
+      } else {
+        updatedQuestions[questionIndex].correctAnswers = [...correctAnswers, optionIndex];
+      }
+    }
+    setQuizQuestions(updatedQuestions);
+  };
+
+  // Quiz taking helper functions
+  const startQuiz = async (quiz: any, enrollmentId: string) => {
+    try {
+      // Start quiz attempt
+      const attemptResult = await startQuizAttemptMutation.mutateAsync({ 
+        quizId: quiz.id, 
+        enrollmentId 
+      });
+      
+      // Fetch quiz questions
+      const questionsResponse = await apiRequest("GET", `/api/lms/quizzes/${quiz.id}/questions`);
+      const questions = await questionsResponse.json();
+      
+      // Set up quiz state
+      setCurrentQuiz(quiz);
+      setQuizQuestionsForTaking(questions);
+      setCurrentAttempt(attemptResult);
+      setUserAnswers({});
+      setQuizStartTime(new Date());
+      setIsQuizActive(true);
+      
+    } catch (error) {
+      console.error("Failed to start quiz:", error);
+    }
+  };
+
+  const submitQuiz = async () => {
+    if (!currentAttempt || !quizStartTime) return;
+    
+    const timeSpent = Math.floor((new Date().getTime() - quizStartTime.getTime()) / 1000);
+    
+    try {
+      const result = await submitQuizAttemptMutation.mutateAsync({
+        attemptId: currentAttempt.id,
+        answers: userAnswers,
+        timeSpent
+      });
+      
+      // Reset quiz state
+      setIsQuizActive(false);
+      setCurrentQuiz(null);
+      setQuizQuestionsForTaking([]);
+      setUserAnswers({});
+      setCurrentAttempt(null);
+      setQuizStartTime(null);
+      
+      return result;
+    } catch (error) {
+      console.error("Failed to submit quiz:", error);
+    }
+  };
+
+  const updateQuizAnswer = (questionId: string, answer: any) => {
+    setUserAnswers(prev => ({
+      ...prev,
+      [questionId]: answer
+    }));
+  };
+
+  // Lesson navigation logic for course player
+  const availableLessons = courseDetails?.lessons || [];
+  
+  // Set current lesson when course data loads
+  useEffect(() => {
+    if (availableLessons.length > 0 && !currentLesson) {
+      // Find first incomplete lesson or default to first lesson
+      const incompleteLesson = availableLessons.find((lesson: any) => 
+        lesson.progress?.status !== 'completed'
+      );
+      const lessonToSet = incompleteLesson || availableLessons[0];
+      const lessonIndex = availableLessons.findIndex((l: any) => l.id === lessonToSet.id);
+      setCurrentLessonIndex(lessonIndex);
+      setCurrentLesson(lessonToSet);
+    }
+  }, [courseDetails, availableLessons.length]);
+
+  // Lesson navigation functions
+  const goToLesson = (lessonIndex: number) => {
+    if (lessonIndex >= 0 && lessonIndex < availableLessons.length) {
+      setCurrentLessonIndex(lessonIndex);
+      setCurrentLesson(availableLessons[lessonIndex]);
+    }
+  };
+
+  const goToNextLesson = () => {
+    const nextIndex = currentLessonIndex + 1;
+    if (nextIndex < availableLessons.length) {
+      goToLesson(nextIndex);
+    }
+  };
+
+  const goToPreviousLesson = () => {
+    const prevIndex = currentLessonIndex - 1;
+    if (prevIndex >= 0) {
+      goToLesson(prevIndex);
+    }
   };
 
   // Loading state for the main dashboard
@@ -657,38 +1023,68 @@ export default function Learning() {
               {/* Video Player */}
               <div className="lg:col-span-2 space-y-4">
                 <Card data-testid="card-video-player">
-                  <CardContent className="p-0">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">
+                          {currentLesson?.title || 'Select a Lesson'}
+                        </CardTitle>
+                        {currentLesson && (
+                          <CardDescription>
+                            Lesson {currentLessonIndex + 1} of {availableLessons.length} 
+                            {currentLesson.moduleTitle && ` • ${currentLesson.moduleTitle}`}
+                          </CardDescription>
+                        )}
+                      </div>
+                      {currentLesson?.quiz?.quiz && (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">
+                            <ClipboardList className="w-3 h-3 mr-1" />
+                            Quiz Available
+                          </Badge>
+                          {currentLesson.quiz.latestAttempt && (
+                            <Badge variant={currentLesson.quiz.latestAttempt.passed ? 'default' : 'destructive'}>
+                              {currentLesson.quiz.latestAttempt.passed ? 'Quiz Passed' : 'Quiz Failed'}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
                     <div className="aspect-video bg-black rounded-lg overflow-hidden relative">
                       {/* Enhanced Vimeo Video Integration */}
-                      {courseDetails?.vimeoVideoId ? (
+                      {currentLesson?.vimeoVideoId ? (
                         <VimeoPlayer
-                          videoId={courseDetails.vimeoVideoId}
-                          enrollmentId={enrolledCourses.find(e => e.courseId === courseId)?.id || ''}
-                          lessonId={'current-lesson'} // This should be the actual lesson ID
+                          videoId={currentLesson.vimeoVideoId}
+                          enrollmentId={courseDetails?.enrollment?.id || ''}
+                          lessonId={currentLesson.id}
                           onProgressUpdate={(progress, timePosition) => {
                             // Throttle progress updates to avoid too many API calls
-                            const enrollmentId = enrolledCourses.find(e => e.courseId === courseId)?.id;
-                            if (enrollmentId && progress > 0) {
-                              updateProgressMutation.mutate({
+                            const enrollmentId = courseDetails?.enrollment?.id;
+                            if (enrollmentId && progress > 0 && currentLesson?.id) {
+                              updateLessonProgressMutation.mutate({
                                 enrollmentId,
-                                lessonId: 'current-lesson',
-                                progressPercentage: progress,
-                                lastPosition: Math.floor(timePosition),
-                                timeSpent: Math.floor(timePosition)
+                                lessonId: currentLesson.id,
+                                progress: progress
                               });
                             }
                           }}
                           onComplete={() => {
-                            // Mark lesson as completed when video ends
-                            const enrollmentId = enrolledCourses.find(e => e.courseId === courseId)?.id;
-                            if (enrollmentId) {
-                              updateProgressMutation.mutate({
-                                enrollmentId,
-                                lessonId: 'current-lesson',
-                                progressPercentage: 100,
-                                lastPosition: 0,
-                                status: 'completed'
-                              });
+                            // Mark lesson as completed when video ends (only if no quiz, or if quiz already passed)
+                            const enrollmentId = courseDetails?.enrollment?.id;
+                            if (enrollmentId && currentLesson?.id) {
+                              const hasQuiz = !!currentLesson.quiz?.quiz;
+                              const quizPassed = currentLesson.quiz?.latestAttempt?.passed;
+                              
+                              // Only complete lesson if no quiz or quiz already passed
+                              if (!hasQuiz || quizPassed) {
+                                updateLessonProgressMutation.mutate({
+                                  enrollmentId,
+                                  lessonId: currentLesson.id,
+                                  progress: 100
+                                });
+                              }
                             }
                           }}
                         />
@@ -705,46 +1101,308 @@ export default function Learning() {
                   </CardContent>
                 </Card>
 
-                {/* Lesson Navigation */}
-                <Card data-testid="card-lesson-navigation">
-                  <CardHeader>
-                    <CardTitle>Course Modules</CardTitle>
-                    <CardDescription>Navigate through the course content</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {[
-                        { id: 1, title: "Introduction to Quality Standards", duration: "15 min", completed: true },
-                        { id: 2, title: "ISO 9001 Overview", duration: "25 min", completed: true },
-                        { id: 3, title: "Implementation Guidelines", duration: "30 min", completed: false },
-                        { id: 4, title: "Best Practices", duration: "20 min", completed: false },
-                        { id: 5, title: "Assessment & Quiz", duration: "10 min", completed: false }
-                      ].map((lesson) => (
-                        <div 
-                          key={lesson.id}
-                          className={`flex items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer hover:bg-muted ${
-                            lesson.id === 2 ? 'bg-muted border-primary' : ''
-                          }`}
-                          data-testid={`lesson-${lesson.id}`}
-                        >
-                          <div className="flex items-center space-x-3">
-                            {lesson.completed ? (
-                              <CheckCircle className="w-5 h-5 text-green-600" />
-                            ) : lesson.id === 2 ? (
-                              <Play className="w-5 h-5 text-primary" />
-                            ) : (
-                              <div className="w-5 h-5 rounded-full border-2 border-muted-foreground" />
-                            )}
-                            <div>
-                              <h4 className="font-medium">{lesson.title}</h4>
-                              <p className="text-sm text-muted-foreground">{lesson.duration}</p>
+                {/* Quiz Interface */}
+                {isQuizActive && currentQuiz && (
+                  <Card data-testid="card-quiz-interface">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="flex items-center">
+                            <ClipboardList className="w-5 h-5 mr-2" />
+                            {currentQuiz.title}
+                          </CardTitle>
+                          <CardDescription>{currentQuiz.description}</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {currentQuiz.timeLimit && (
+                            <Badge variant="outline">
+                              <Clock className="w-3 h-3 mr-1" />
+                              {currentQuiz.timeLimit} min limit
+                            </Badge>
+                          )}
+                          <Badge variant="secondary">
+                            Attempt {currentAttempt?.attemptNumber || 1}
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {quizQuestionsForTaking.map((question, index) => (
+                        <div key={question.id} className="space-y-4 p-4 border rounded-lg">
+                          <div className="flex items-start gap-3">
+                            <Badge variant="outline" className="text-xs px-2 py-1">
+                              Q{index + 1}
+                            </Badge>
+                            <div className="flex-1">
+                              <h4 className="font-medium text-lg leading-relaxed">
+                                {question.questionText}
+                              </h4>
                             </div>
                           </div>
-                          {lesson.id === 2 && (
-                            <Badge variant="default">Current</Badge>
+
+                          {/* Multiple Choice Questions */}
+                          {question.type === "multiple_choice" && (
+                            <div className="space-y-2 ml-8">
+                              {question.options?.map((option: string, optionIndex: number) => (
+                                <div key={optionIndex} className="flex items-center space-x-2">
+                                  <input
+                                    type="radio"
+                                    id={`${question.id}-${optionIndex}`}
+                                    name={question.id}
+                                    value={optionIndex}
+                                    checked={userAnswers[question.id] === optionIndex}
+                                    onChange={(e) => updateQuizAnswer(question.id, parseInt(e.target.value))}
+                                    className="h-4 w-4"
+                                    data-testid={`radio-question-${index}-option-${optionIndex}`}
+                                  />
+                                  <label 
+                                    htmlFor={`${question.id}-${optionIndex}`}
+                                    className="text-sm leading-relaxed cursor-pointer"
+                                  >
+                                    {option}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* True/False Questions */}
+                          {question.type === "true_false" && (
+                            <div className="space-y-2 ml-8">
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="radio"
+                                  id={`${question.id}-true`}
+                                  name={question.id}
+                                  value="0"
+                                  checked={userAnswers[question.id] === 0}
+                                  onChange={(e) => updateQuizAnswer(question.id, parseInt(e.target.value))}
+                                  className="h-4 w-4"
+                                  data-testid={`radio-question-${index}-true`}
+                                />
+                                <label 
+                                  htmlFor={`${question.id}-true`}
+                                  className="text-sm leading-relaxed cursor-pointer"
+                                >
+                                  True
+                                </label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="radio"
+                                  id={`${question.id}-false`}
+                                  name={question.id}
+                                  value="1"
+                                  checked={userAnswers[question.id] === 1}
+                                  onChange={(e) => updateQuizAnswer(question.id, parseInt(e.target.value))}
+                                  className="h-4 w-4"
+                                  data-testid={`radio-question-${index}-false`}
+                                />
+                                <label 
+                                  htmlFor={`${question.id}-false`}
+                                  className="text-sm leading-relaxed cursor-pointer"
+                                >
+                                  False
+                                </label>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Multi-Select Questions */}
+                          {question.type === "multi_select" && (
+                            <div className="space-y-2 ml-8">
+                              {question.options?.map((option: string, optionIndex: number) => (
+                                <div key={optionIndex} className="flex items-center space-x-2">
+                                  <input
+                                    type="checkbox"
+                                    id={`${question.id}-${optionIndex}`}
+                                    value={optionIndex}
+                                    checked={(userAnswers[question.id] || []).includes(optionIndex)}
+                                    onChange={(e) => {
+                                      const currentAnswers = userAnswers[question.id] || [];
+                                      let newAnswers;
+                                      if (e.target.checked) {
+                                        newAnswers = [...currentAnswers, optionIndex];
+                                      } else {
+                                        newAnswers = currentAnswers.filter((idx: number) => idx !== optionIndex);
+                                      }
+                                      updateQuizAnswer(question.id, newAnswers);
+                                    }}
+                                    className="h-4 w-4"
+                                    data-testid={`checkbox-question-${index}-option-${optionIndex}`}
+                                  />
+                                  <label 
+                                    htmlFor={`${question.id}-${optionIndex}`}
+                                    className="text-sm leading-relaxed cursor-pointer"
+                                  >
+                                    {option}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
                       ))}
+
+                      {/* Quiz Actions */}
+                      <div className="flex justify-between items-center pt-6 border-t">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => {
+                            setIsQuizActive(false);
+                            setCurrentQuiz(null);
+                            setQuizQuestionsForTaking([]);
+                            setUserAnswers({});
+                            setCurrentAttempt(null);
+                            setQuizStartTime(null);
+                          }}
+                          data-testid="button-cancel-quiz"
+                        >
+                          Cancel Quiz
+                        </Button>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">
+                            {Object.keys(userAnswers).length} of {quizQuestionsForTaking.length} answered
+                          </span>
+                          <Button 
+                            onClick={submitQuiz}
+                            disabled={Object.keys(userAnswers).length !== quizQuestionsForTaking.length || submitQuizAttemptMutation.isPending}
+                            data-testid="button-submit-quiz"
+                          >
+                            {submitQuizAttemptMutation.isPending ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                Submitting...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Submit Quiz
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Lesson Navigation */}
+                <Card data-testid="card-lesson-navigation">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Course Modules</CardTitle>
+                        <CardDescription>Navigate through the course content</CardDescription>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={goToPreviousLesson}
+                          disabled={currentLessonIndex <= 0}
+                          data-testid="button-previous-lesson"
+                        >
+                          ← Previous
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={goToNextLesson}
+                          disabled={currentLessonIndex >= availableLessons.length - 1}
+                          data-testid="button-next-lesson"
+                        >
+                          Next →
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {(courseDetails?.lessons && courseDetails.lessons.length > 0) ? (
+                        courseDetails.lessons.map((lesson: any, index: number) => {
+                          const isCompleted = lesson.progress?.status === 'completed';
+                          const isInProgress = lesson.progress?.status === 'in_progress';
+                          const hasQuiz = lesson.quiz?.quiz;
+                          const quizPassed = lesson.quiz?.latestAttempt?.passed;
+                          
+                          return (
+                            <div 
+                              key={lesson.id}
+                              className={`flex items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer hover:bg-muted ${
+                                currentLesson?.id === lesson.id ? 'bg-muted border-primary' : ''
+                              }`}
+                              data-testid={`lesson-${lesson.id}`}
+                              onClick={() => goToLesson(index)}
+                            >
+                              <div className="flex items-center space-x-3">
+                                {isCompleted ? (
+                                  <CheckCircle className="w-5 h-5 text-green-600" />
+                                ) : isInProgress ? (
+                                  <Play className="w-5 h-5 text-primary" />
+                                ) : (
+                                  <div className="w-5 h-5 rounded-full border-2 border-muted-foreground" />
+                                )}
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-medium">{lesson.title}</h4>
+                                    {hasQuiz && (
+                                      <Badge variant="outline" className="text-xs">
+                                        <ClipboardList className="w-3 h-3 mr-1" />
+                                        Quiz
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <span>{lesson.estimatedMinutes || 30} min</span>
+                                    {lesson.moduleTitle && (
+                                      <>
+                                        <span>•</span>
+                                        <span>{lesson.moduleTitle}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  {hasQuiz && lesson.quiz.latestAttempt && (
+                                    <div className="text-xs mt-1">
+                                      <span className={`inline-flex items-center gap-1 ${
+                                        quizPassed ? 'text-green-600' : 'text-red-600'
+                                      }`}>
+                                        {quizPassed ? (
+                                          <>
+                                            <CheckCircle className="w-3 h-3" />
+                                            Quiz Passed ({lesson.quiz.latestAttempt.score}%)
+                                          </>
+                                        ) : (
+                                          <>
+                                            <AlertCircle className="w-3 h-3" />
+                                            Quiz Failed ({lesson.quiz.latestAttempt.score}%) - Retake Available
+                                          </>
+                                        )}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {currentLesson?.id === lesson.id && (
+                                  <Badge variant="default">Current</Badge>
+                                )}
+                                {lesson.progress?.progressPercentage > 0 && !isCompleted && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {lesson.progress.progressPercentage}%
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <BookOpen className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                          <p>No lessons available yet</p>
+                          <p className="text-sm">Course content is being prepared</p>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -761,20 +1419,38 @@ export default function Learning() {
                     <div>
                       <div className="flex justify-between text-sm mb-2">
                         <span>Course Completion</span>
-                        <span>40%</span>
+                        <span>{courseDetails?.progress?.overall || 0}%</span>
                       </div>
-                      <Progress value={40} className="h-2" />
+                      <Progress value={courseDetails?.progress?.overall || 0} className="h-2" />
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-center">
                       <div>
-                        <div className="text-2xl font-bold text-green-600">2</div>
+                        <div className="text-2xl font-bold text-green-600">
+                          {courseDetails?.progress?.completed || 0}
+                        </div>
                         <p className="text-sm text-muted-foreground">Completed</p>
                       </div>
                       <div>
-                        <div className="text-2xl font-bold">3</div>
+                        <div className="text-2xl font-bold">
+                          {(courseDetails?.progress?.total || 0) - (courseDetails?.progress?.completed || 0)}
+                        </div>
                         <p className="text-sm text-muted-foreground">Remaining</p>
                       </div>
                     </div>
+                    {courseDetails?.enrollment && (
+                      <div className="pt-2 border-t">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Enrolled:</span>
+                          <span>{new Date(courseDetails.enrollment.enrolledAt).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm mt-1">
+                          <span className="text-muted-foreground">Status:</span>
+                          <Badge variant={courseDetails.enrollment.status === 'completed' ? 'default' : 'secondary'}>
+                            {courseDetails.enrollment.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -821,30 +1497,29 @@ export default function Learning() {
                       <Download className="w-4 h-4 mr-2" />
                       Download Resources
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full" 
-                      data-testid="button-take-quiz"
-                      onClick={() => {
-                        const enrollmentId = enrolledCourses.find(e => e.courseId === courseId)?.id;
-                        if (enrollmentId) {
-                          startQuizMutation.mutate({ 
-                            quizId: 'default-quiz', // This should be the actual quiz ID
-                            enrollmentId 
-                          });
-                        } else {
-                          toast({
-                            title: "Error",
-                            description: "You must be enrolled to take the quiz.",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                      disabled={startQuizMutation.isPending}
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      {startQuizMutation.isPending ? 'Starting...' : 'Take Quiz'}
-                    </Button>
+                    {currentLesson?.quiz?.quiz && (
+                      <Button 
+                        variant="outline" 
+                        className="w-full" 
+                        data-testid="button-take-quiz"
+                        onClick={() => {
+                          const enrollmentId = courseDetails?.enrollment?.id;
+                          if (enrollmentId && currentLesson?.quiz?.quiz) {
+                            startQuiz(currentLesson.quiz.quiz, enrollmentId);
+                          } else {
+                            toast({
+                              title: "Error",
+                              description: "You must be enrolled to take the quiz.",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        disabled={startQuizAttemptMutation.isPending || isQuizActive}
+                      >
+                        <ClipboardList className="w-4 h-4 mr-2" />
+                        {isQuizActive ? 'Quiz In Progress...' : 'Take Quiz'}
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -1087,6 +1762,208 @@ export default function Learning() {
                           <>
                             <Plus className="w-4 h-4 mr-2" />
                             Create Course
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+
+            {/* Edit Course Dialog */}
+            <Dialog 
+              open={selectedCourseForEdit !== null} 
+              onOpenChange={(open) => !open && setSelectedCourseForEdit(null)}
+            >
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Edit Course</DialogTitle>
+                  <DialogDescription>
+                    Update course information, content, and settings.
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...updateCourseForm}>
+                  <form 
+                    onSubmit={updateCourseForm.handleSubmit((data) => {
+                      if (selectedCourseForEdit) {
+                        updateCourseMutation.mutate({ 
+                          id: selectedCourseForEdit.id, 
+                          data 
+                        });
+                      }
+                    })}
+                    className="space-y-6"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={updateCourseForm.control}
+                        name="title"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Course Title</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Introduction to..." {...field} data-testid="input-edit-title" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={updateCourseForm.control}
+                        name="category"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Category</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-edit-category">
+                                  <SelectValue placeholder="Select a category" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Technical">Technical</SelectItem>
+                                <SelectItem value="Leadership">Leadership</SelectItem>
+                                <SelectItem value="Safety">Safety</SelectItem>
+                                <SelectItem value="Compliance">Compliance</SelectItem>
+                                <SelectItem value="Soft Skills">Soft Skills</SelectItem>
+                                <SelectItem value="Customer Service">Customer Service</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={updateCourseForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Describe what students will learn in this course..."
+                              className="resize-none"
+                              {...field}
+                              data-testid="textarea-edit-description"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <FormField
+                        control={updateCourseForm.control}
+                        name="targetRole"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Target Role</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-edit-target-role">
+                                  <SelectValue placeholder="All roles" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="">All Roles</SelectItem>
+                                <SelectItem value="operative">Operative</SelectItem>
+                                <SelectItem value="supervisor">Supervisor</SelectItem>
+                                <SelectItem value="leadership">Leadership</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={updateCourseForm.control}
+                        name="estimatedHours"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Estimated Hours</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.5"
+                                min="0.5"
+                                max="100"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                data-testid="input-edit-estimated-hours"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={updateCourseForm.control}
+                        name="difficulty"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Difficulty</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-edit-difficulty">
+                                  <SelectValue placeholder="Select difficulty" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Beginner">Beginner</SelectItem>
+                                <SelectItem value="Intermediate">Intermediate</SelectItem>
+                                <SelectItem value="Advanced">Advanced</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={updateCourseForm.control}
+                      name="vimeoVideoId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Vimeo Video ID (Optional)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="e.g., 123456789"
+                              {...field}
+                              data-testid="input-edit-vimeo-id"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Enter the Vimeo video ID for the main course video.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex justify-end space-x-2">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => setSelectedCourseForEdit(null)}
+                        data-testid="button-cancel-edit-course"
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        type="submit" 
+                        disabled={updateCourseMutation.isPending}
+                        data-testid="button-submit-edit-course"
+                      >
+                        {updateCourseMutation.isPending ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Update Course
                           </>
                         )}
                       </Button>
@@ -1551,21 +2428,24 @@ export default function Learning() {
                         </DialogHeader>
                         <Form {...createQuizForm}>
                           <form onSubmit={createQuizForm.handleSubmit((data) => {
-                            if (!selectedCourseForContent) {
+                            if (!selectedLessonForQuiz) {
                               toast({
                                 title: "Error",
-                                description: "Please select a course first.",
+                                description: "Please select a lesson for this quiz.",
                                 variant: "destructive",
                               });
                               return;
                             }
-                            createQuizMutation.mutate({ courseId: selectedCourseForContent, quizData: data });
+                            createQuizMutation.mutate({ lessonId: selectedLessonForQuiz, quizData: data });
                           })} className="space-y-4">
                             <div className="space-y-2">
                               <label className="text-sm font-medium">Select Course</label>
-                              <Select value={selectedCourseForContent} onValueChange={setSelectedCourseForContent}>
+                              <Select value={selectedCourseForContent} onValueChange={(value) => {
+                                setSelectedCourseForContent(value);
+                                setSelectedLessonForQuiz(""); // Reset lesson selection when course changes
+                              }}>
                                 <SelectTrigger data-testid="select-quiz-course">
-                                  <SelectValue placeholder="Choose a course to add this quiz to" />
+                                  <SelectValue placeholder="Choose a course first" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {adminCourses?.map((course: any) => (
@@ -1576,6 +2456,31 @@ export default function Learning() {
                                 </SelectContent>
                               </Select>
                             </div>
+                            
+                            {selectedCourseForContent && (
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium">Select Lesson *</label>
+                                <Select value={selectedLessonForQuiz} onValueChange={setSelectedLessonForQuiz}>
+                                  <SelectTrigger data-testid="select-quiz-lesson">
+                                    <SelectValue placeholder="Choose a lesson for this quiz" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {courseLessonsLoading ? (
+                                      <div className="p-2 text-sm text-gray-500">Loading lessons...</div>
+                                    ) : courseLessons?.length === 0 ? (
+                                      <div className="p-2 text-sm text-gray-500">No lessons found. Create a lesson first.</div>
+                                    ) : (
+                                      courseLessons?.filter((lesson: any) => !lesson.hasQuiz).map((lesson: any) => (
+                                        <SelectItem key={lesson.id} value={lesson.id}>
+                                          {lesson.title} {lesson.hasQuiz && "(Already has quiz)"}
+                                        </SelectItem>
+                                      ))
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-gray-600">Only lessons without existing quizzes are shown</p>
+                              </div>
+                            )}
                             <FormField
                               control={createQuizForm.control}
                               name="title"
@@ -1655,6 +2560,257 @@ export default function Learning() {
                     </Dialog>
                     <div className="text-sm text-muted-foreground">
                       Build quizzes with multiple choice, true/false, and essay questions
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-quiz-question-management">
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <ClipboardList className="w-5 h-5 mr-2" />
+                      Quiz Question Management
+                    </CardTitle>
+                    <CardDescription>Add and edit questions for existing quizzes</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Dialog open={isManageQuestionsOpen} onOpenChange={setIsManageQuestionsOpen}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          className="w-full" 
+                          data-testid="button-manage-questions"
+                          onClick={() => {
+                            // Find the first quiz to use as an example or allow selection
+                            setQuizQuestions([]);
+                            setSelectedQuizForQuestions("");
+                          }}
+                        >
+                          <ClipboardList className="w-4 h-4 mr-2" />
+                          Manage Quiz Questions
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Manage Quiz Questions</DialogTitle>
+                          <DialogDescription>
+                            Add, edit, and organize questions for your quizzes
+                          </DialogDescription>
+                        </DialogHeader>
+                        
+                        <div className="space-y-6">
+                          {/* Quiz Selection */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Select Quiz</label>
+                            <Select value={selectedQuizForQuestions} onValueChange={setSelectedQuizForQuestions}>
+                              <SelectTrigger data-testid="select-quiz-for-questions">
+                                <SelectValue placeholder="Choose a quiz to manage questions" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {adminCourses?.map((course: any) => 
+                                  course.quizzes?.map((quiz: any) => (
+                                    <SelectItem key={quiz.id} value={quiz.id}>
+                                      {quiz.title} ({course.title})
+                                    </SelectItem>
+                                  ))
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Questions Management */}
+                          {selectedQuizForQuestions && (
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-semibold">Questions</h3>
+                                <Button onClick={addQuestion} data-testid="button-add-question">
+                                  <Plus className="w-4 h-4 mr-2" />
+                                  Add Question
+                                </Button>
+                              </div>
+
+                              {/* Questions List */}
+                              <div className="space-y-4 max-h-96 overflow-y-auto">
+                                {quizQuestions.map((question, index) => (
+                                  <Card key={index} className="border">
+                                    <CardHeader className="pb-3">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                          <Badge variant="outline">Q{index + 1}</Badge>
+                                          <Select 
+                                            value={question.type} 
+                                            onValueChange={(value) => updateQuestion(index, { type: value })}
+                                          >
+                                            <SelectTrigger className="w-40" data-testid={`select-question-type-${index}`}>
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                                              <SelectItem value="true_false">True/False</SelectItem>
+                                              <SelectItem value="multi_select">Multi-Select</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                        <Button 
+                                          size="sm" 
+                                          variant="destructive" 
+                                          onClick={() => removeQuestion(index)}
+                                          data-testid={`button-remove-question-${index}`}
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                      {/* Question Text */}
+                                      <div>
+                                        <label className="text-sm font-medium">Question</label>
+                                        <Textarea
+                                          value={question.questionText}
+                                          onChange={(e) => updateQuestion(index, { questionText: e.target.value })}
+                                          placeholder="Enter your question here..."
+                                          className="mt-1"
+                                          data-testid={`textarea-question-${index}`}
+                                        />
+                                      </div>
+
+                                      {/* Answer Options */}
+                                      {question.type !== "true_false" && (
+                                        <div className="space-y-2">
+                                          <div className="flex items-center justify-between">
+                                            <label className="text-sm font-medium">Answer Options</label>
+                                            <Button 
+                                              size="sm" 
+                                              variant="outline" 
+                                              onClick={() => addOption(index)}
+                                              data-testid={`button-add-option-${index}`}
+                                            >
+                                              <Plus className="w-3 h-3 mr-1" />
+                                              Add Option
+                                            </Button>
+                                          </div>
+                                          {question.options?.map((option: string, optionIndex: number) => (
+                                            <div key={optionIndex} className="flex items-center space-x-2">
+                                              <Input
+                                                value={option}
+                                                onChange={(e) => updateOption(index, optionIndex, e.target.value)}
+                                                placeholder={`Option ${optionIndex + 1}`}
+                                                className="flex-1"
+                                                data-testid={`input-option-${index}-${optionIndex}`}
+                                              />
+                                              <Button
+                                                size="sm"
+                                                variant={question.correctAnswers?.includes(optionIndex) ? "default" : "outline"}
+                                                onClick={() => toggleCorrectAnswer(index, optionIndex)}
+                                                data-testid={`button-correct-${index}-${optionIndex}`}
+                                              >
+                                                {question.correctAnswers?.includes(optionIndex) ? (
+                                                  <CheckCircle className="w-4 h-4" />
+                                                ) : (
+                                                  <Circle className="w-4 h-4" />
+                                                )}
+                                              </Button>
+                                              {question.options?.length > 2 && (
+                                                <Button
+                                                  size="sm"
+                                                  variant="destructive"
+                                                  onClick={() => removeOption(index, optionIndex)}
+                                                  data-testid={`button-remove-option-${index}-${optionIndex}`}
+                                                >
+                                                  <Trash2 className="w-3 h-3" />
+                                                </Button>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {/* True/False Options */}
+                                      {question.type === "true_false" && (
+                                        <div className="space-y-2">
+                                          <label className="text-sm font-medium">Correct Answer</label>
+                                          <div className="flex space-x-2">
+                                            <Button
+                                              variant={question.correctAnswers?.[0] === 0 ? "default" : "outline"}
+                                              onClick={() => updateQuestion(index, { correctAnswers: [0] })}
+                                              data-testid={`button-true-${index}`}
+                                            >
+                                              True
+                                            </Button>
+                                            <Button
+                                              variant={question.correctAnswers?.[0] === 1 ? "default" : "outline"}
+                                              onClick={() => updateQuestion(index, { correctAnswers: [1] })}
+                                              data-testid={`button-false-${index}`}
+                                            >
+                                              False
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Explanation */}
+                                      <div>
+                                        <label className="text-sm font-medium">Explanation (Optional)</label>
+                                        <Textarea
+                                          value={question.explanation || ""}
+                                          onChange={(e) => updateQuestion(index, { explanation: e.target.value })}
+                                          placeholder="Explain why this answer is correct..."
+                                          className="mt-1"
+                                          data-testid={`textarea-explanation-${index}`}
+                                        />
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+
+                              {/* Save Questions */}
+                              <div className="flex justify-end space-x-2 pt-4 border-t">
+                                <Button 
+                                  variant="outline" 
+                                  onClick={() => {
+                                    setIsManageQuestionsOpen(false);
+                                    setQuizQuestions([]);
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button 
+                                  onClick={() => {
+                                    if (quizQuestions.length === 0) {
+                                      toast({
+                                        title: "Error",
+                                        description: "Please add at least one question.",
+                                        variant: "destructive",
+                                      });
+                                      return;
+                                    }
+                                    saveQuizQuestionsMutation.mutate({
+                                      quizId: selectedQuizForQuestions,
+                                      questions: quizQuestions
+                                    });
+                                  }}
+                                  disabled={saveQuizQuestionsMutation.isPending}
+                                  data-testid="button-save-questions"
+                                >
+                                  {saveQuizQuestionsMutation.isPending ? (
+                                    <>
+                                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                      Saving...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="w-4 h-4 mr-2" />
+                                      Save Questions
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    <div className="text-sm text-muted-foreground">
+                      Create multiple choice, true/false, and multi-select questions
                     </div>
                   </CardContent>
                 </Card>

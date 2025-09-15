@@ -181,6 +181,7 @@ export interface IStorage {
   // LMS - Course Management
   getCourses(): Promise<Course[]>;
   getCourse(courseId: string): Promise<Course | undefined>;
+  getCourseDetailsWithProgress(courseId: string, userId?: string): Promise<any>;
   createCourse(course: InsertCourse): Promise<Course>;
   updateCourse(courseId: string, updates: Partial<InsertCourse>): Promise<Course>;
   publishCourseVersion(courseId: string, version: string, changelog: string, publishedBy: string): Promise<CourseVersion>;
@@ -203,13 +204,20 @@ export interface IStorage {
 
   // LMS - Quizzes and Assessments
   getQuiz(lessonId: string): Promise<Quiz | undefined>;
+  getQuizById(quizId: string): Promise<Quiz | undefined>;
   createQuiz(quiz: InsertQuiz): Promise<Quiz>;
   updateQuiz(quizId: string, updates: Partial<InsertQuiz>): Promise<Quiz>;
+  deleteQuiz(quizId: string): Promise<void>;
   getQuizQuestions(quizId: string): Promise<QuizQuestion[]>;
   createQuizQuestion(question: InsertQuizQuestion): Promise<QuizQuestion>;
+  createQuizQuestions(questions: InsertQuizQuestion[]): Promise<QuizQuestion[]>;
+  updateQuizQuestion(questionId: string, updates: Partial<InsertQuizQuestion>): Promise<QuizQuestion>;
+  deleteQuizQuestion(questionId: string): Promise<void>;
   startQuizAttempt(attempt: InsertQuizAttempt): Promise<QuizAttempt>;
   submitQuizAttempt(attemptId: string, answers: any, timeSpent: number): Promise<QuizAttempt>;
   getQuizAttempt(attemptId: string): Promise<QuizAttempt | undefined>;
+  getUserQuizAttempts(userId: string, quizId: string): Promise<QuizAttempt[]>;
+  getLatestQuizAttempt(userId: string, quizId: string): Promise<QuizAttempt | undefined>;
 
   // LMS - Enrollments and Progress
   enrollUser(enrollment: InsertEnrollment): Promise<Enrollment>;
@@ -221,6 +229,7 @@ export interface IStorage {
   updateLessonProgress(progress: InsertLessonProgress): Promise<LessonProgress>;
   getLessonProgress(enrollmentId: string, lessonId: string): Promise<LessonProgress | undefined>;
   getUserLessonProgress(enrollmentId: string): Promise<LessonProgress[]>;
+  updateLessonProgressFromQuiz(enrollmentId: string, quizId: string, userId: string): Promise<void>;
 
   // LMS - Certificates and Badges
   issueCertificate(certificate: InsertCertificate): Promise<Certificate>;
@@ -914,6 +923,135 @@ export class DatabaseStorage implements IStorage {
     return course;
   }
 
+  async getCourseDetailsWithProgress(courseId: string, userId?: string): Promise<any> {
+    // Get basic course information
+    const course = await this.getCourse(courseId);
+    if (!course) {
+      return null;
+    }
+
+    // Get the current course version - for now use default if not versioned
+    let courseVersionId = courseId; // Simple fallback
+    
+    // Get course modules
+    const modules = await db.select()
+      .from(courseModules)
+      .where(eq(courseModules.courseVersionId, courseVersionId))
+      .orderBy(courseModules.orderIndex);
+
+    // Get all lessons for this course across modules
+    const allLessons = [];
+    let totalLessons = 0;
+    let completedLessons = 0;
+    
+    for (const module of modules) {
+      const moduleLessons = await db.select()
+        .from(lessons)
+        .where(eq(lessons.moduleId, module.id))
+        .orderBy(lessons.orderIndex);
+      
+      totalLessons += moduleLessons.length;
+      
+      // Add lesson progress if user provided
+      for (const lesson of moduleLessons) {
+        let progressData = null;
+        let quizData = null;
+        
+        if (userId) {
+          // Get user enrollment first
+          const enrollment = await db.select()
+            .from(enrollments)
+            .where(and(
+              eq(enrollments.courseVersionId, courseVersionId),
+              eq(enrollments.userId, userId)
+            ))
+            .limit(1);
+          
+          if (enrollment.length > 0) {
+            // Get lesson progress
+            const progress = await db.select()
+              .from(lessonProgress)
+              .where(and(
+                eq(lessonProgress.enrollmentId, enrollment[0].id),
+                eq(lessonProgress.lessonId, lesson.id)
+              ))
+              .limit(1);
+            
+            progressData = progress.length > 0 ? progress[0] : null;
+            if (progressData?.status === 'completed') {
+              completedLessons++;
+            }
+          }
+          
+          // Get quiz for this lesson
+          const quiz = await db.select()
+            .from(quizzes)
+            .where(eq(quizzes.lessonId, lesson.id))
+            .limit(1);
+          
+          if (quiz.length > 0 && userId && enrollment.length > 0) {
+            // Get latest quiz attempt
+            const attempt = await db.select()
+              .from(quizAttempts)
+              .where(and(
+                eq(quizAttempts.quizId, quiz[0].id),
+                eq(quizAttempts.userId, userId)
+              ))
+              .orderBy(desc(quizAttempts.startedAt))
+              .limit(1);
+              
+            quizData = {
+              quiz: quiz[0],
+              latestAttempt: attempt.length > 0 ? attempt[0] : null
+            };
+          }
+        }
+        
+        allLessons.push({
+          ...lesson,
+          moduleTitle: module.title,
+          progress: progressData,
+          quiz: quizData
+        });
+      }
+    }
+
+    // Get user enrollment info
+    let enrollmentData = null;
+    if (userId) {
+      const enrollment = await db.select()
+        .from(enrollments)
+        .where(and(
+          eq(enrollments.courseVersionId, courseVersionId),
+          eq(enrollments.userId, userId)
+        ))
+        .limit(1);
+      
+      enrollmentData = enrollment.length > 0 ? enrollment[0] : null;
+    }
+
+    // Calculate overall progress
+    const overallProgress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+    
+    // Get enrollment count  
+    const enrollmentCount = await db.select({ count: sql<number>`count(*)` })
+      .from(enrollments)
+      .where(eq(enrollments.courseVersionId, courseVersionId));
+
+    return {
+      ...course,
+      modules,
+      lessons: allLessons,
+      enrollment: enrollmentData,
+      progress: {
+        overall: overallProgress,
+        completed: completedLessons,
+        total: totalLessons
+      },
+      enrolledCount: enrollmentCount[0]?.count || 0
+    };
+  }
+
   async createCourse(course: InsertCourse): Promise<Course> {
     const [created] = await db.insert(courses).values(course).returning();
     return created;
@@ -1100,6 +1238,55 @@ export class DatabaseStorage implements IStorage {
     return attempt;
   }
 
+  async getQuizById(quizId: string): Promise<Quiz | undefined> {
+    const [quiz] = await db.select().from(quizzes).where(eq(quizzes.id, quizId));
+    return quiz;
+  }
+
+  async deleteQuiz(quizId: string): Promise<void> {
+    // First delete all questions for this quiz
+    await db.delete(quizQuestions).where(eq(quizQuestions.quizId, quizId));
+    // Then delete the quiz itself
+    await db.delete(quizzes).where(eq(quizzes.id, quizId));
+  }
+
+  async createQuizQuestions(questions: InsertQuizQuestion[]): Promise<QuizQuestion[]> {
+    if (questions.length === 0) return [];
+    const created = await db.insert(quizQuestions).values(questions).returning();
+    return created;
+  }
+
+  async updateQuizQuestion(questionId: string, updates: Partial<InsertQuizQuestion>): Promise<QuizQuestion> {
+    const [updated] = await db
+      .update(quizQuestions)
+      .set(updates)
+      .where(eq(quizQuestions.id, questionId))
+      .returning();
+    return updated;
+  }
+
+  async deleteQuizQuestion(questionId: string): Promise<void> {
+    await db.delete(quizQuestions).where(eq(quizQuestions.id, questionId));
+  }
+
+  async getUserQuizAttempts(userId: string, quizId: string): Promise<QuizAttempt[]> {
+    return await db
+      .select()
+      .from(quizAttempts)
+      .where(and(eq(quizAttempts.userId, userId), eq(quizAttempts.quizId, quizId)))
+      .orderBy(desc(quizAttempts.startedAt));
+  }
+
+  async getLatestQuizAttempt(userId: string, quizId: string): Promise<QuizAttempt | undefined> {
+    const [attempt] = await db
+      .select()
+      .from(quizAttempts)
+      .where(and(eq(quizAttempts.userId, userId), eq(quizAttempts.quizId, quizId)))
+      .orderBy(desc(quizAttempts.startedAt))
+      .limit(1);
+    return attempt;
+  }
+
   // LMS - Enrollments and Progress (stub implementations)
   async enrollUser(enrollment: InsertEnrollment): Promise<Enrollment> {
     const [created] = await db.insert(enrollments).values(enrollment).returning();
@@ -1183,6 +1370,54 @@ export class DatabaseStorage implements IStorage {
 
   async getUserLessonProgress(enrollmentId: string): Promise<LessonProgress[]> {
     return await db.select().from(lessonProgress).where(eq(lessonProgress.enrollmentId, enrollmentId));
+  }
+
+  async updateLessonProgressFromQuiz(enrollmentId: string, quizId: string, userId: string): Promise<void> {
+    try {
+      // First get the quiz to find the lesson
+      const [quiz] = await db.select().from(quizzes).where(eq(quizzes.id, quizId));
+      if (!quiz) {
+        console.error("Quiz not found for lesson progress update:", quizId);
+        return;
+      }
+
+      // Update or create lesson progress record
+      const existingProgress = await this.getLessonProgress(enrollmentId, quiz.lessonId);
+      
+      if (existingProgress) {
+        // Update existing progress - mark as completed
+        await db
+          .update(lessonProgress)
+          .set({
+            status: "completed",
+            progressPercentage: 100,
+            completedAt: new Date(),
+            updatedAt: new Date()
+          })
+          .where(and(
+            eq(lessonProgress.enrollmentId, enrollmentId),
+            eq(lessonProgress.lessonId, quiz.lessonId)
+          ));
+      } else {
+        // Create new progress record
+        await db
+          .insert(lessonProgress)
+          .values({
+            enrollmentId,
+            lessonId: quiz.lessonId,
+            userId,
+            status: "completed",
+            progressPercentage: 100,
+            timeSpent: 0, // Quiz time will be tracked separately
+            completedAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+      }
+    } catch (error) {
+      console.error("Error updating lesson progress from quiz:", error);
+      throw error;
+    }
   }
 
   // LMS - Certificates and Badges (stub implementations)

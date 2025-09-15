@@ -828,17 +828,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/lms/courses/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/lms/courses/:id', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const course = await storage.getCourse(id);
-      if (!course) {
+      const userId = req.user.claims.sub;
+      
+      const courseDetails = await storage.getCourseDetailsWithProgress(id, userId);
+      if (!courseDetails) {
         return res.status(404).json({ message: "Course not found" });
       }
-      res.json(course);
+      
+      res.json(courseDetails);
     } catch (error) {
-      console.error("Error fetching course:", error);
-      res.status(500).json({ message: "Failed to fetch course" });
+      console.error("Error fetching course details:", error);
+      res.status(500).json({ message: "Failed to fetch course details" });
     }
   });
 
@@ -1018,6 +1021,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Lesson Progress Tracking
+  app.post('/api/lms/lesson-progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId, lessonId, progressPercentage, status, timeSpent } = req.body;
+      const userId = req.user.claims.sub;
+      
+      // Verify enrollment ownership
+      const isOwner = await verifyEnrollmentOwnership(enrollmentId, userId);
+      if (!isOwner) {
+        return res.status(403).json({ message: "You can only update progress for your own enrollments" });
+      }
+      
+      const progressData = {
+        enrollmentId,
+        lessonId,
+        userId,
+        progressPercentage: progressPercentage || 0,
+        status: status || 'in_progress',
+        timeSpent: timeSpent || 0,
+        completedAt: status === 'completed' ? new Date() : null
+      };
+      
+      const progress = await storage.updateLessonProgress(progressData);
+      res.json(progress);
+    } catch (error: any) {
+      return handleValidationError(error, res, "update lesson progress");
+    }
+  });
+
   // Quizzes and Assessments
   app.get('/api/lms/lessons/:lessonId/quiz', isAuthenticated, async (req, res) => {
     try {
@@ -1076,6 +1108,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const attempt = await storage.submitQuizAttempt(attemptId, answers, timeSpent);
+      
+      // If quiz passed, update lesson progress
+      if (attempt.passed && attempt.enrollmentId) {
+        await storage.updateLessonProgressFromQuiz(attempt.enrollmentId, attempt.quizId, userId);
+      }
+      
       res.json(attempt);
     } catch (error: any) {
       return handleValidationError(error, res, "submit quiz attempt");
@@ -1229,6 +1267,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/lms/admin/courses/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = insertCourseSchema.partial().parse(req.body);
+      const course = await storage.updateCourse(id, updateData);
+      res.json(course);
+    } catch (error: any) {
+      return handleValidationError(error, res, "update course");
+    }
+  });
+
   // Admin Lesson Management
   app.post('/api/lms/admin/courses/:courseId/lessons', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
     try {
@@ -1266,6 +1315,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin Quiz Management
+  // Create quiz for a specific lesson
+  app.post('/api/lms/admin/lessons/:lessonId/quiz', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { lessonId } = req.params;
+      
+      // Verify the lesson exists
+      const lesson = await storage.getLesson(lessonId);
+      if (!lesson) {
+        return res.status(404).json({ message: "Lesson not found" });
+      }
+      
+      // Check if lesson already has a quiz
+      const existingQuiz = await storage.getQuiz(lessonId);
+      if (existingQuiz) {
+        return res.status(400).json({ message: "This lesson already has a quiz. Delete the existing quiz first." });
+      }
+      
+      // Transform frontend quiz data to match database schema
+      const quizData = {
+        lessonId,
+        title: req.body.title,
+        description: req.body.description || "",
+        passingScore: req.body.passingScore || 80,
+        timeLimit: req.body.timeLimit || 60,
+        maxAttempts: req.body.maxAttempts || 3,
+        randomizeQuestions: false
+      };
+      
+      const quiz = await storage.createQuiz(quizData);
+      res.json(quiz);
+    } catch (error: any) {
+      console.error("Error creating quiz:", error);
+      return handleValidationError(error, res, "create quiz");
+    }
+  });
+
+  // Legacy route for backward compatibility - creates quiz on default lesson
   app.post('/api/lms/admin/courses/:courseId/quizzes', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
     try {
       const { courseId } = req.params;
@@ -1311,6 +1397,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error creating quiz:", error);
       return handleValidationError(error, res, "create quiz");
+    }
+  });
+
+  // Admin Quiz Question Management
+  app.get('/api/lms/admin/quizzes/:quizId/questions', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { quizId } = req.params;
+      const questions = await storage.getQuizQuestions(quizId);
+      res.json(questions);
+    } catch (error: any) {
+      return handleValidationError(error, res, "get quiz questions");
+    }
+  });
+
+  app.post('/api/lms/admin/quizzes/:quizId/questions', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { quizId } = req.params;
+      const { questions } = req.body;
+      
+      if (!Array.isArray(questions)) {
+        return res.status(400).json({ message: "Questions must be an array" });
+      }
+
+      // First delete existing questions
+      const existingQuestions = await storage.getQuizQuestions(quizId);
+      for (const question of existingQuestions) {
+        await storage.deleteQuizQuestion(question.id);
+      }
+
+      // Create new questions with proper validation
+      const questionsData = questions.map((q: any, index: number) => {
+        const questionData = insertQuizQuestionSchema.parse({
+          quizId,
+          type: q.type,
+          questionText: q.questionText,
+          options: q.options || [],
+          correctAnswers: q.correctAnswers || [],
+          explanation: q.explanation || "",
+          orderIndex: q.orderIndex || index + 1,
+        });
+        return questionData;
+      });
+
+      const createdQuestions = await storage.createQuizQuestions(questionsData);
+      res.json(createdQuestions);
+    } catch (error: any) {
+      return handleValidationError(error, res, "create quiz questions");
+    }
+  });
+
+  app.get('/api/lms/quizzes/:quizId/questions', isAuthenticated, async (req, res) => {
+    try {
+      const { quizId } = req.params;
+      
+      // Get quiz questions without correct answers for taking the quiz
+      const questions = await storage.getQuizQuestions(quizId);
+      const questionsForTaking = questions.map(q => ({
+        id: q.id,
+        type: q.type,
+        questionText: q.questionText,
+        options: q.options,
+        orderIndex: q.orderIndex
+      }));
+      
+      res.json(questionsForTaking);
+    } catch (error: any) {
+      return handleValidationError(error, res, "get quiz questions for taking");
+    }
+  });
+
+  app.get('/api/lms/quizzes/:quizId/attempts/me', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { quizId } = req.params;
+      
+      const attempts = await storage.getUserQuizAttempts(userId, quizId);
+      res.json(attempts);
+    } catch (error: any) {
+      return handleValidationError(error, res, "get user quiz attempts");
     }
   });
 
