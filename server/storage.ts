@@ -277,6 +277,9 @@ export interface IStorage {
     trainingHours: number;
   }>;
   duplicateCourse(courseId: string, newTitle: string): Promise<Course>;
+  
+  // LMS - Data Migration
+  migrateLegacyCourses(): Promise<{ fixed: number; total: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1056,8 +1059,35 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCourse(course: InsertCourse): Promise<Course> {
+    // Create the course record first
     const [created] = await db.insert(courses).values(course).returning();
-    return created;
+    
+    // Create initial course version (1.0)
+    const [courseVersion] = await db.insert(courseVersions).values({
+      courseId: created.id,
+      version: "1.0",
+      changelog: "Initial course version",
+      publishedBy: course.createdBy,
+      publishedAt: new Date(),
+      isActive: true
+    }).returning();
+    
+    // Create default course module
+    await db.insert(courseModules).values({
+      courseVersionId: courseVersion.id,
+      title: "Main Content",
+      description: "Main course content and lessons",
+      orderIndex: 1
+    });
+    
+    // Update course to point to the current version
+    const [updatedCourse] = await db
+      .update(courses)
+      .set({ currentVersionId: courseVersion.id })
+      .where(eq(courses.id, created.id))
+      .returning();
+    
+    return updatedCourse;
   }
 
   async updateCourse(courseId: string, updates: Partial<InsertCourse>): Promise<Course> {
@@ -1352,8 +1382,6 @@ export class DatabaseStorage implements IStorage {
         .insert(lessonProgress)
         .values({
           ...progress,
-          createdAt: new Date(),
-          updatedAt: new Date()
         })
         .returning();
       return created;
@@ -1408,13 +1436,10 @@ export class DatabaseStorage implements IStorage {
           .values({
             enrollmentId,
             lessonId: quiz.lessonId,
-            userId,
             status: "completed",
             progressPercentage: 100,
             timeSpent: 0, // Quiz time will be tracked separately
             completedAt: new Date(),
-            createdAt: new Date(),
-            updatedAt: new Date()
           });
       }
     } catch (error) {
@@ -1907,6 +1932,55 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Failed to duplicate course: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     });
+  }
+
+  // LMS - Data Migration
+  async migrateLegacyCourses(): Promise<{ fixed: number; total: number }> {
+    // Find all courses that don't have currentVersionId set
+    const coursesWithoutVersions = await db
+      .select()
+      .from(courses)
+      .where(sql`current_version_id IS NULL`);
+    
+    let fixedCount = 0;
+    
+    for (const course of coursesWithoutVersions) {
+      try {
+        // Create initial course version (1.0)
+        const [courseVersion] = await db.insert(courseVersions).values({
+          courseId: course.id,
+          version: "1.0",
+          changelog: "Migrated legacy course structure",
+          publishedBy: course.createdBy,
+          publishedAt: new Date(),
+          isActive: true
+        }).returning();
+        
+        // Create default course module
+        await db.insert(courseModules).values({
+          courseVersionId: courseVersion.id,
+          title: "Main Content",
+          description: "Main course content and lessons",
+          orderIndex: 1
+        });
+        
+        // Update course to point to the current version
+        await db
+          .update(courses)
+          .set({ currentVersionId: courseVersion.id })
+          .where(eq(courses.id, course.id));
+        
+        fixedCount++;
+        console.log(`Fixed course: ${course.title} (${course.id})`);
+      } catch (error) {
+        console.error(`Failed to fix course ${course.title} (${course.id}):`, error);
+      }
+    }
+    
+    return {
+      fixed: fixedCount,
+      total: coursesWithoutVersions.length
+    };
   }
 }
 

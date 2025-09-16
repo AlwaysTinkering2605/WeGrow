@@ -1302,16 +1302,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // LMS Data Migration Route
+  app.post('/api/lms/admin/migrate-legacy-courses', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const result = await storage.migrateLegacyCourses();
+      res.json({ 
+        message: `Migration completed. Fixed ${result.fixed} out of ${result.total} courses.`,
+        ...result 
+      });
+    } catch (error: any) {
+      console.error("Error running legacy course migration:", error);
+      res.status(500).json({ message: "Failed to run migration" });
+    }
+  });
+
   // Admin Lesson Management
   app.post('/api/lms/admin/courses/:courseId/lessons', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
     try {
       const { courseId } = req.params;
       
-      // First get or create a default module for this course
-      let defaultModule = await storage.getDefaultCourseModule(courseId);
+      // Get the course to find its current version ID
+      const course = await storage.getCourse(courseId);
+      if (!course) {
+        return res.status(404).json({ message: "Course not found" });
+      }
+      
+      if (!course.currentVersionId) {
+        return res.status(400).json({ message: "Course has no current version. Please fix the course structure." });
+      }
+      
+      // First get or create a default module for this course version
+      let defaultModule = await storage.getDefaultCourseModule(course.currentVersionId);
       if (!defaultModule) {
         defaultModule = await storage.createCourseModule({
-          courseVersionId: courseId, // For simplicity, using courseId as course version
+          courseVersionId: course.currentVersionId,
           title: "Main Content",
           description: "Main course content and lessons",
           orderIndex: 1
