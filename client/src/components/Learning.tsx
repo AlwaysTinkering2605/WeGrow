@@ -982,15 +982,16 @@ export default function Learning() {
 
   // Quiz question management helper functions
   const addQuestion = () => {
+    alert("Add Question button clicked! Current questions: " + quizQuestions.length);
     const newQuestion = {
-      type: "multiple_choice",
+      type: "multiple_choice" as const,
       questionText: "",
       options: ["", ""],
       correctAnswers: [],
       explanation: "",
       orderIndex: quizQuestions.length + 1,
     };
-    setQuizQuestions([...quizQuestions, newQuestion]);
+    setQuizQuestions(prev => [...prev, newQuestion]);
     setEditingQuestionIndex(quizQuestions.length);
   };
 
