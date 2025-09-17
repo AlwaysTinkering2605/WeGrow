@@ -233,6 +233,8 @@ export default function Learning() {
   const [isEditLessonOpen, setIsEditLessonOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState<any>(null);
   const [isCreateQuizOpen, setIsCreateQuizOpen] = useState(false);
+  const [isEditQuizOpen, setIsEditQuizOpen] = useState(false);
+  const [editingQuiz, setEditingQuiz] = useState<any>(null);
   const [isCreateBadgeOpen, setIsCreateBadgeOpen] = useState(false);
   const [isManageQuestionsOpen, setIsManageQuestionsOpen] = useState(false);
   const [selectedCourseForEdit, setSelectedCourseForEdit] = useState<any>(null);
@@ -340,6 +342,30 @@ export default function Learning() {
       timeLimit: 60,
     },
   });
+
+  const editQuizForm = useForm({
+    resolver: zodResolver(quizSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      passingScore: 80,
+      maxAttempts: 3,
+      timeLimit: 60,
+    },
+  });
+
+  // Effect to populate edit quiz form when editingQuiz changes
+  useEffect(() => {
+    if (editingQuiz) {
+      editQuizForm.reset({
+        title: editingQuiz.title || "",
+        description: editingQuiz.description || "",
+        passingScore: editingQuiz.passingScore || 80,
+        maxAttempts: editingQuiz.maxAttempts || 3,
+        timeLimit: editingQuiz.timeLimit || 60,
+      });
+    }
+  }, [editingQuiz, editQuizForm]);
 
   const createBadgeForm = useForm({
     resolver: zodResolver(badgeSchema),
@@ -661,6 +687,37 @@ export default function Learning() {
       toast({
         title: "Creation Failed",
         description: error.message || "Failed to create quiz. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update quiz mutation
+  const updateQuizMutation = useMutation({
+    mutationFn: async ({ quizId, quizData }: { quizId: string; quizData: z.infer<typeof quizSchema> }) => {
+      const response = await apiRequest("PUT", `/api/lms/admin/quizzes/${quizId}`, quizData);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Quiz Updated",
+        description: "Quiz has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/courses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/admin/courses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/admin/quizzes"] });
+      // Also invalidate specific course detail if we're viewing one
+      if (selectedCourseForContent) {
+        queryClient.invalidateQueries({ queryKey: ["/api/lms/courses", selectedCourseForContent] });
+      }
+      setIsEditQuizOpen(false);
+      setEditingQuiz(null);
+      editQuizForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update quiz. Please try again.",
         variant: "destructive",
       });
     },
@@ -3023,6 +3080,137 @@ export default function Learning() {
                         </Form>
                       </DialogContent>
                     </Dialog>
+                    
+                    {/* Edit Quiz Dialog */}
+                    <Dialog open={isEditQuizOpen} onOpenChange={setIsEditQuizOpen}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Edit Assessment Quiz</DialogTitle>
+                          <DialogDescription>Update quiz settings and configuration</DialogDescription>
+                        </DialogHeader>
+                        <Form {...editQuizForm}>
+                          <form onSubmit={editQuizForm.handleSubmit((data) => {
+                            if (!editingQuiz?.id) {
+                              toast({
+                                title: "Error",
+                                description: "No quiz selected for editing.",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            updateQuizMutation.mutate({ quizId: editingQuiz.id, quizData: data });
+                          })} className="space-y-4">
+                            <FormField
+                              control={editQuizForm.control}
+                              name="title"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Quiz Title</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="e.g., ISO 9001 Knowledge Assessment" {...field} data-testid="input-edit-quiz-title" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={editQuizForm.control}
+                              name="description"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Description</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Brief description of the quiz content" {...field} data-testid="input-edit-quiz-description" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="grid grid-cols-2 gap-4">
+                              <FormField
+                                control={editQuizForm.control}
+                                name="passingScore"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Passing Score (%)</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        type="number" 
+                                        min="50" 
+                                        max="100"
+                                        {...field}
+                                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                        data-testid="input-edit-passing-score"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={editQuizForm.control}
+                                name="maxAttempts"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Max Attempts</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        type="number" 
+                                        min="1" 
+                                        max="10"
+                                        {...field}
+                                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                        data-testid="input-edit-max-attempts"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <FormField
+                              control={editQuizForm.control}
+                              name="timeLimit"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Time Limit (minutes)</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      type="number" 
+                                      min="5" 
+                                      max="180"
+                                      {...field}
+                                      onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                      data-testid="input-edit-time-limit"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="flex justify-end space-x-2">
+                              <Button type="button" variant="outline" onClick={() => setIsEditQuizOpen(false)}>
+                                Cancel
+                              </Button>
+                              <Button type="submit" disabled={updateQuizMutation.isPending} data-testid="button-update-quiz">
+                                {updateQuizMutation.isPending ? (
+                                  <>
+                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                    Updating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Update Quiz
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </form>
+                        </Form>
+                      </DialogContent>
+                    </Dialog>
+                    
                     <div className="text-sm text-muted-foreground">
                       Build quizzes with multiple choice, true/false, and essay questions
                     </div>
@@ -3513,8 +3701,8 @@ export default function Learning() {
                                         size="sm"
                                         variant="outline"
                                         onClick={() => {
-                                          setSelectedQuizForQuestions(quiz.id);
-                                          setIsManageQuestionsOpen(true);
+                                          setEditingQuiz(quiz);
+                                          setIsEditQuizOpen(true);
                                         }}
                                         data-testid={`button-edit-quiz-${quiz.id}`}
                                       >

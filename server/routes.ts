@@ -1502,6 +1502,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update quiz
+  app.put('/api/lms/admin/quizzes/:quizId', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { quizId } = req.params;
+      
+      // Verify the quiz exists
+      const existingQuiz = await storage.getQuizById(quizId);
+      if (!existingQuiz) {
+        return res.status(404).json({ message: "Quiz not found" });
+      }
+      
+      // Transform frontend quiz data to match database schema
+      const updateData: any = {};
+      if (req.body.title !== undefined) updateData.title = req.body.title;
+      if (req.body.description !== undefined) updateData.description = req.body.description;
+      if (req.body.passingScore !== undefined) updateData.passingScore = req.body.passingScore;
+      if (req.body.timeLimit !== undefined) updateData.timeLimit = req.body.timeLimit;
+      if (req.body.maxAttempts !== undefined) updateData.maxAttempts = req.body.maxAttempts;
+      if (req.body.randomizeQuestions !== undefined) updateData.randomizeQuestions = req.body.randomizeQuestions;
+      
+      const quiz = await storage.updateQuiz(quizId, updateData);
+      res.json(quiz);
+    } catch (error: any) {
+      console.error("Error updating quiz:", error);
+      return handleValidationError(error, res, "update quiz");
+    }
+  });
+
   // Admin Quiz Question Management
   app.get('/api/lms/admin/quizzes/:quizId/questions', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
     try {
