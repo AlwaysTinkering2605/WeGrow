@@ -1362,6 +1362,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update lesson
+  app.put('/api/lms/admin/lessons/:lessonId', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { lessonId } = req.params;
+      
+      // Verify the lesson exists
+      const existingLesson = await storage.getLesson(lessonId);
+      if (!existingLesson) {
+        return res.status(404).json({ message: "Lesson not found" });
+      }
+      
+      // Transform frontend lesson data to match database schema
+      const updateData: any = {};
+      
+      if (req.body.title !== undefined) updateData.title = req.body.title;
+      if (req.body.description !== undefined) updateData.description = req.body.description;
+      if (req.body.vimeoVideoId !== undefined) updateData.vimeoVideoId = req.body.vimeoVideoId;
+      if (req.body.order !== undefined) updateData.orderIndex = req.body.order;
+      if (req.body.estimatedMinutes !== undefined) {
+        updateData.estimatedDuration = req.body.estimatedMinutes * 60; // Convert minutes to seconds
+      }
+      
+      const lesson = await storage.updateLesson(lessonId, updateData);
+      res.json(lesson);
+    } catch (error: any) {
+      console.error("Error updating lesson:", error);
+      return handleValidationError(error, res, "update lesson");
+    }
+  });
+
   // Admin Quiz Management
   // Create quiz for a specific lesson
   app.post('/api/lms/admin/lessons/:lessonId/quiz', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {

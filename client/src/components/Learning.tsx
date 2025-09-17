@@ -230,6 +230,8 @@ export default function Learning() {
   // Admin interface state
   const [isCreateCourseOpen, setIsCreateCourseOpen] = useState(false);
   const [isCreateLessonOpen, setIsCreateLessonOpen] = useState(false);
+  const [isEditLessonOpen, setIsEditLessonOpen] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<any>(null);
   const [isCreateQuizOpen, setIsCreateQuizOpen] = useState(false);
   const [isCreateBadgeOpen, setIsCreateBadgeOpen] = useState(false);
   const [isManageQuestionsOpen, setIsManageQuestionsOpen] = useState(false);
@@ -299,6 +301,30 @@ export default function Learning() {
       estimatedMinutes: 30,
     },
   });
+
+  const editLessonForm = useForm({
+    resolver: zodResolver(lessonSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      vimeoVideoId: "",
+      order: 1,
+      estimatedMinutes: 30,
+    },
+  });
+
+  // Effect to populate edit lesson form when editingLesson changes
+  useEffect(() => {
+    if (editingLesson) {
+      editLessonForm.reset({
+        title: editingLesson.title || "",
+        description: editingLesson.description || "",
+        vimeoVideoId: editingLesson.vimeoVideoId || "",
+        order: editingLesson.orderIndex || 1,
+        estimatedMinutes: Math.round((editingLesson.estimatedDuration || 1800) / 60), // Convert seconds to minutes
+      });
+    }
+  }, [editingLesson, editLessonForm]);
 
   const createQuizForm = useForm({
     resolver: zodResolver(quizSchema),
@@ -570,6 +596,37 @@ export default function Learning() {
       toast({
         title: "Creation Failed",
         description: error.message || "Failed to create lesson. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update lesson mutation
+  const updateLessonMutation = useMutation({
+    mutationFn: async ({ lessonId, lessonData }: { lessonId: string; lessonData: z.infer<typeof lessonSchema> }) => {
+      const response = await apiRequest("PUT", `/api/lms/admin/lessons/${lessonId}`, lessonData);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Lesson Updated",
+        description: "Lesson has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/courses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/admin/courses"] });
+      // Also invalidate specific course detail if we're viewing one
+      if (selectedCourseForContent) {
+        queryClient.invalidateQueries({ queryKey: ["/api/lms/courses", selectedCourseForContent] });
+        queryClient.invalidateQueries({ queryKey: ["/api/lms/courses", selectedCourseForContent, "lessons"] });
+      }
+      setIsEditLessonOpen(false);
+      setEditingLesson(null);
+      editLessonForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update lesson. Please try again.",
         variant: "destructive",
       });
     },
@@ -2381,11 +2438,8 @@ export default function Learning() {
                                   variant="outline" 
                                   size="sm"
                                   onClick={() => {
-                                    // TODO: Implement lesson editing functionality
-                                    toast({
-                                      title: "Feature Coming Soon",
-                                      description: "Lesson editing will be available in the next update.",
-                                    });
+                                    setEditingLesson(lesson);
+                                    setIsEditLessonOpen(true);
                                   }}
                                   data-testid={`button-edit-lesson-${lesson.id}`}
                                 >
@@ -2569,6 +2623,154 @@ export default function Learning() {
                         </Form>
                       </DialogContent>
                     </Dialog>
+
+                    {/* Edit Lesson Dialog */}
+                    <Dialog open={isEditLessonOpen} onOpenChange={setIsEditLessonOpen}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Edit Lesson</DialogTitle>
+                          <DialogDescription>Update lesson details and settings</DialogDescription>
+                        </DialogHeader>
+                        <Form {...editLessonForm}>
+                          <form onSubmit={editLessonForm.handleSubmit((data) => {
+                            if (!editingLesson) {
+                              toast({
+                                title: "Error",
+                                description: "No lesson selected for editing.",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            updateLessonMutation.mutate({ lessonId: editingLesson.id, lessonData: data });
+                          })} className="space-y-4">
+                            <FormField
+                              control={editLessonForm.control}
+                              name="title"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Lesson Title</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="e.g., Introduction to Quality Standards" {...field} data-testid="input-edit-lesson-title" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={editLessonForm.control}
+                              name="vimeoVideoId"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Vimeo Video ID</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      placeholder="e.g., 123456789" 
+                                      {...field} 
+                                      data-testid="input-edit-lesson-vimeo-id"
+                                    />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Find the Video ID from your Vimeo URL: vimeo.com/[VIDEO_ID]
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={editLessonForm.control}
+                              name="description"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Description (Optional)</FormLabel>
+                                  <FormControl>
+                                    <Textarea 
+                                      placeholder="Brief description of lesson content and learning objectives"
+                                      {...field}
+                                      data-testid="input-edit-lesson-description"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="flex space-x-4">
+                              <FormField
+                                control={editLessonForm.control}
+                                name="order"
+                                render={({ field }) => (
+                                  <FormItem className="flex-1">
+                                    <FormLabel>Lesson Order</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        type="number" 
+                                        min="1" 
+                                        {...field}
+                                        value={field.value || 1}
+                                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                        data-testid="input-edit-lesson-order"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={editLessonForm.control}
+                                name="estimatedMinutes"
+                                render={({ field }) => (
+                                  <FormItem className="flex-1">
+                                    <FormLabel>Duration (minutes)</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        type="number" 
+                                        min="1" 
+                                        max="300"
+                                        {...field}
+                                        value={field.value || 30}
+                                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                        data-testid="input-edit-lesson-duration"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <div className="flex justify-end space-x-2">
+                              <Button 
+                                type="button" 
+                                variant="outline" 
+                                onClick={() => {
+                                  setIsEditLessonOpen(false);
+                                  setEditingLesson(null);
+                                }}
+                                data-testid="button-cancel-edit-lesson"
+                              >
+                                Cancel
+                              </Button>
+                              <Button 
+                                type="submit" 
+                                disabled={updateLessonMutation.isPending} 
+                                data-testid="button-submit-edit-lesson"
+                              >
+                                {updateLessonMutation.isPending ? (
+                                  <>
+                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                    Updating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Update Lesson
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </form>
+                        </Form>
+                      </DialogContent>
+                    </Dialog>
+
                     <div className="text-sm text-muted-foreground">
                       Organize video content, track progress, and manage course curriculum
                     </div>
