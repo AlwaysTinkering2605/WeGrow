@@ -199,8 +199,8 @@ export default function Learning() {
   const params = useParams();
   
   // Check if we're viewing a specific course
-  const isViewingCourse = location.startsWith("/learning/course/");
-  const courseId = isViewingCourse ? location.split("/learning/course/")[1] : null;
+  const isViewingCourse = location.startsWith("/learning/courses/");
+  const courseId = isViewingCourse ? location.split("/learning/courses/")[1] : null;
   
   // Extract active tab from URL
   const getActiveTab = () => {
