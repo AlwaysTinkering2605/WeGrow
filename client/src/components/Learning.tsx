@@ -242,6 +242,10 @@ export default function Learning() {
   const [adminTab, setAdminTab] = useState("courses");
   const [isAdminMode, setIsAdminMode] = useState(false);
 
+  // Assessment viewing state
+  const [selectedCourseForViewing, setSelectedCourseForViewing] = useState<string>("all");
+  const [selectedLessonForViewing, setSelectedLessonForViewing] = useState<string>("all");
+
   // Quiz question management state
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
   const [editingQuestionIndex, setEditingQuestionIndex] = useState<number>(-1);
@@ -807,6 +811,53 @@ export default function Learning() {
       return await response.json();
     },
     enabled: !!(selectedCourseForContent && (user?.role === 'supervisor' || user?.role === 'leadership')),
+    retry: false,
+  });
+
+  // Fetch lessons for selected course for viewing assessments
+  const { data: viewingCourseLessons, isLoading: viewingCourseLessonsLoading } = useQuery<any[]>({
+    queryKey: ["/api/lms/courses", selectedCourseForViewing, "lessons"],
+    queryFn: async () => {
+      if (!selectedCourseForViewing || selectedCourseForViewing === "all") return [];
+      const response = await apiRequest("GET", `/api/lms/courses/${selectedCourseForViewing}/lessons`);
+      return await response.json();
+    },
+    enabled: !!(selectedCourseForViewing && selectedCourseForViewing !== "all" && (user?.role === 'supervisor' || user?.role === 'leadership')),
+    retry: false,
+  });
+
+  // Fetch quizzes for selected course
+  const { data: courseQuizzes, isLoading: courseQuizzesLoading, error: courseQuizzesError } = useQuery<any[]>({
+    queryKey: ["/api/lms/courses", selectedCourseForViewing, "quizzes"],
+    queryFn: async () => {
+      if (!selectedCourseForViewing || selectedCourseForViewing === "all") return [];
+      const response = await apiRequest("GET", `/api/lms/courses/${selectedCourseForViewing}/quizzes`);
+      return await response.json();
+    },
+    enabled: !!(selectedCourseForViewing && selectedCourseForViewing !== "all" && (user?.role === 'supervisor' || user?.role === 'leadership')),
+    retry: false,
+  });
+
+  // Fetch quizzes for selected lesson
+  const { data: lessonQuizzes, isLoading: lessonQuizzesLoading, error: lessonQuizzesError } = useQuery<any[]>({
+    queryKey: ["/api/lms/lessons", selectedLessonForViewing, "quizzes"],
+    queryFn: async () => {
+      if (!selectedLessonForViewing || selectedLessonForViewing === "all") return [];
+      const response = await apiRequest("GET", `/api/lms/lessons/${selectedLessonForViewing}/quizzes`);
+      return await response.json();
+    },
+    enabled: !!(selectedLessonForViewing && selectedLessonForViewing !== "all" && (user?.role === 'supervisor' || user?.role === 'leadership')),
+    retry: false,
+  });
+
+  // Fetch all quizzes across all courses (for "All Courses" functionality)
+  const { data: allQuizzes, isLoading: allQuizzesLoading, error: allQuizzesError } = useQuery<any[]>({
+    queryKey: ["/api/lms/admin/quizzes"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/lms/admin/quizzes`);
+      return await response.json();
+    },
+    enabled: !!(selectedCourseForViewing === "all" && (user?.role === 'supervisor' || user?.role === 'leadership')),
     retry: false,
   });
 
@@ -3265,6 +3316,254 @@ export default function Learning() {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Assessment Viewing Interface */}
+              <Card data-testid="card-assessment-viewing" className="mt-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <BarChart3 className="w-5 h-5 mr-2" />
+                    Assessment Overview
+                  </CardTitle>
+                  <CardDescription>View and manage existing quizzes and assessments</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Filtering Interface */}
+                  <div className="space-y-4">
+                    <div className="flex flex-col md:flex-row gap-4">
+                      <div className="flex-1">
+                        <label className="text-sm font-medium mb-2 block">Filter by Course</label>
+                        <Select value={selectedCourseForViewing} onValueChange={(value) => {
+                          setSelectedCourseForViewing(value);
+                          setSelectedLessonForViewing("all"); // Reset lesson selection when course changes
+                        }}>
+                          <SelectTrigger data-testid="select-viewing-course">
+                            <SelectValue placeholder="Select a course to view assessments" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Courses</SelectItem>
+                            {adminCourses?.map((course: any) => (
+                              <SelectItem key={course.id} value={course.id}>
+                                {course.title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {selectedCourseForViewing !== "all" && (
+                        <div className="flex-1">
+                          <label className="text-sm font-medium mb-2 block">Filter by Lesson (Optional)</label>
+                          <Select value={selectedLessonForViewing} onValueChange={setSelectedLessonForViewing}>
+                            <SelectTrigger data-testid="select-viewing-lesson">
+                              <SelectValue placeholder="Select a specific lesson" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Lessons</SelectItem>
+                              {viewingCourseLessonsLoading ? (
+                                <div className="p-2 text-sm text-gray-500">Loading lessons...</div>
+                              ) : viewingCourseLessons?.length === 0 ? (
+                                <div className="p-2 text-sm text-gray-500">No lessons found</div>
+                              ) : (
+                                viewingCourseLessons?.map((lesson: any) => (
+                                  <SelectItem key={lesson.id} value={lesson.id}>
+                                    {lesson.title}
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Info Display */}
+                    <div className="text-sm text-muted-foreground">
+                      {selectedCourseForViewing === "all" 
+                        ? "Showing all assessments across all courses"
+                        : selectedLessonForViewing === "all" 
+                          ? "Showing all assessments for selected course" 
+                          : "Showing assessments for selected lesson"
+                      }
+                    </div>
+                  </div>
+
+                  {/* Assessment Display */}
+                  <div className="space-y-4">
+                    {(() => {
+                      // Determine loading state based on current selection
+                      const isLoading = selectedCourseForViewing === "all" 
+                        ? allQuizzesLoading
+                        : selectedLessonForViewing !== "all" 
+                          ? lessonQuizzesLoading
+                          : courseQuizzesLoading;
+
+                      // Determine error state based on current selection
+                      const hasError = selectedCourseForViewing === "all" 
+                        ? allQuizzesError
+                        : selectedLessonForViewing !== "all" 
+                          ? lessonQuizzesError
+                          : courseQuizzesError;
+
+                      // Determine display quizzes based on current selection
+                      const displayQuizzes = selectedCourseForViewing === "all" 
+                        ? allQuizzes
+                        : selectedLessonForViewing !== "all" 
+                          ? lessonQuizzes
+                          : courseQuizzes;
+
+                      const quizzes = Array.isArray(displayQuizzes) ? displayQuizzes : [];
+
+                      // Loading State
+                      if (isLoading) {
+                        return (
+                          <div className="text-center py-8">
+                            <RefreshCw className="w-8 h-8 mx-auto mb-4 animate-spin" />
+                            <p>Loading assessments...</p>
+                          </div>
+                        );
+                      }
+
+                      // Error State
+                      if (hasError) {
+                        return (
+                          <div className="text-center py-8">
+                            <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+                            <h3 className="text-lg font-semibold mb-2 text-destructive">Error Loading Assessments</h3>
+                            <p className="text-muted-foreground mb-4">Failed to load assessments for the selected {selectedCourseForViewing === "all" ? "courses" : selectedLessonForViewing !== "all" ? "lesson" : "course"}.</p>
+                            <Button 
+                              variant="outline" 
+                              onClick={() => {
+                                // Force refetch based on current selection
+                                if (selectedCourseForViewing === "all") {
+                                  queryClient.invalidateQueries({ queryKey: ["/api/lms/admin/quizzes"] });
+                                } else if (selectedLessonForViewing !== "all") {
+                                  queryClient.invalidateQueries({ queryKey: ["/api/lms/lessons", selectedLessonForViewing, "quizzes"] });
+                                } else {
+                                  queryClient.invalidateQueries({ queryKey: ["/api/lms/courses", selectedCourseForViewing, "quizzes"] });
+                                }
+                              }}
+                              data-testid="button-retry-assessments"
+                            >
+                              <RefreshCw className="w-4 h-4 mr-2" />
+                              Try Again
+                            </Button>
+                          </div>
+                        );
+                      }
+
+                      // Quiz Display Grid or Empty State
+                      return quizzes.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {quizzes.map((quiz: any) => (
+                            <Card key={quiz.id} className="hover:shadow-md transition-shadow" data-testid={`quiz-card-${quiz.id}`}>
+                              <CardHeader className="pb-3">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <CardTitle className="text-lg line-clamp-2">{quiz.title || 'Untitled Quiz'}</CardTitle>
+                                    <CardDescription className="mt-1">
+                                      {selectedCourseForViewing === "all" && quiz.courseTitle && (
+                                        <span className="text-sm block">Course: {quiz.courseTitle}</span>
+                                      )}
+                                      {quiz.lessonTitle && <span className="text-sm">Lesson: {quiz.lessonTitle}</span>}
+                                    </CardDescription>
+                                  </div>
+                                  <Badge variant="outline" className="ml-2">
+                                    <ClipboardList className="w-3 h-3 mr-1" />
+                                    Quiz
+                                  </Badge>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="space-y-3">
+                                {quiz.description && (
+                                  <p className="text-sm text-muted-foreground line-clamp-2">
+                                    {quiz.description}
+                                  </p>
+                                )}
+                                    
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between text-sm">
+                                        <span className="flex items-center">
+                                          <Target className="w-3 h-3 mr-1" />
+                                          Passing Score
+                                        </span>
+                                        <span className="font-medium">{quiz.passingScore || 70}%</span>
+                                      </div>
+                                      
+                                      {quiz.timeLimit && (
+                                        <div className="flex items-center justify-between text-sm">
+                                          <span className="flex items-center">
+                                            <Clock className="w-3 h-3 mr-1" />
+                                            Time Limit
+                                          </span>
+                                          <span className="font-medium">{quiz.timeLimit} min</span>
+                                        </div>
+                                      )}
+                                      
+                                      <div className="flex items-center justify-between text-sm">
+                                        <span className="flex items-center">
+                                          <RefreshCw className="w-3 h-3 mr-1" />
+                                          Max Attempts
+                                        </span>
+                                        <span className="font-medium">{quiz.maxAttempts || 'Unlimited'}</span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-1 pt-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setSelectedQuizForQuestions(quiz.id);
+                                          setIsManageQuestionsOpen(true);
+                                        }}
+                                        data-testid={`button-edit-quiz-${quiz.id}`}
+                                      >
+                                        <Edit className="w-3 h-3 mr-1" />
+                                        Edit
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(quiz.id);
+                                          toast({
+                                            title: "Quiz ID Copied",
+                                            description: "Quiz ID has been copied to clipboard.",
+                                          });
+                                        }}
+                                        data-testid={`button-copy-quiz-id-${quiz.id}`}
+                                      >
+                                        <Copy className="w-3 h-3 mr-1" />
+                                        Copy ID
+                                      </Button>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-8">
+                              <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                              <h3 className="text-lg font-semibold mb-2">No Assessments Found</h3>
+                              <p className="text-muted-foreground mb-4">
+                                {selectedLessonForViewing !== "all" 
+                                  ? "No quizzes have been created for this lesson yet."
+                                  : "No quizzes have been created for this course yet."
+                                }
+                              </p>
+                              <Button 
+                                onClick={() => setIsCreateQuizOpen(true)}
+                                data-testid="button-create-first-quiz"
+                              >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Create Your First Quiz
+                              </Button>
+                            </div>
+                          );
+                        })()}
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="badges" className="space-y-6">

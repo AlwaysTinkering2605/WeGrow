@@ -1067,6 +1067,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all quizzes for a specific lesson (for assessment viewing)
+  app.get('/api/lms/lessons/:lessonId/quizzes', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { lessonId } = req.params;
+      const quizzes = await storage.getQuizzesByLesson(lessonId);
+      res.json(quizzes);
+    } catch (error) {
+      console.error("Error fetching quizzes for lesson:", error);
+      res.status(500).json({ message: "Failed to fetch quizzes for lesson" });
+    }
+  });
+
   app.post('/api/lms/quizzes/:quizId/attempts', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -1268,15 +1280,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get quizzes for a specific lesson (admin endpoint)
-  app.get('/api/lms/lessons/:lessonId/quizzes', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+
+  // Get quizzes for a specific course (admin endpoint)
+  app.get('/api/lms/courses/:courseId/quizzes', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
     try {
-      const { lessonId } = req.params;
-      const quizzes = await storage.getQuizzesByLesson(lessonId);
+      const { courseId } = req.params;
+      const quizzes = await storage.getQuizzesByCourse(courseId);
       res.json(quizzes);
     } catch (error) {
-      console.error("Error fetching quizzes for lesson:", error);
-      res.status(500).json({ message: "Failed to fetch quizzes for lesson" });
+      console.error("Error fetching quizzes for course:", error);
+      res.status(500).json({ message: "Failed to fetch quizzes for course" });
     }
   });
 
@@ -1393,6 +1406,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin Quiz Management
+  // Get all quizzes across all courses (for "All Courses" functionality)
+  app.get('/api/lms/admin/quizzes', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const quizzes = await storage.getAllQuizzes();
+      res.json(quizzes);
+    } catch (error) {
+      console.error("Error fetching all quizzes:", error);
+      res.status(500).json({ message: "Failed to fetch all quizzes" });
+    }
+  });
+
   // Create quiz for a specific lesson
   app.post('/api/lms/admin/lessons/:lessonId/quiz', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
     try {

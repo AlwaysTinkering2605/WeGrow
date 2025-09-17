@@ -87,7 +87,7 @@ import {
   updateUserProfileSchema,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations - required for Replit Auth
@@ -205,6 +205,9 @@ export interface IStorage {
   // LMS - Quizzes and Assessments
   getQuiz(lessonId: string): Promise<Quiz | undefined>;
   getQuizById(quizId: string): Promise<Quiz | undefined>;
+  getQuizzesByLesson(lessonId: string): Promise<Quiz[]>;
+  getQuizzesByCourse(courseId: string): Promise<Quiz[]>;
+  getAllQuizzes(): Promise<Quiz[]>;
   createQuiz(quiz: InsertQuiz): Promise<Quiz>;
   updateQuiz(quizId: string, updates: Partial<InsertQuiz>): Promise<Quiz>;
   deleteQuiz(quizId: string): Promise<void>;
@@ -1302,6 +1305,76 @@ export class DatabaseStorage implements IStorage {
     await db.delete(quizQuestions).where(eq(quizQuestions.id, questionId));
   }
 
+  async getQuizzesByLesson(lessonId: string): Promise<Quiz[]> {
+    return await db.select().from(quizzes).where(eq(quizzes.lessonId, lessonId));
+  }
+
+  async getQuizzesByCourse(courseId: string): Promise<Quiz[]> {
+    // Get all lessons for the course by finding course modules first
+    const modules = await this.getCourseModules(courseId);
+    const allLessons = [];
+    
+    for (const module of modules) {
+      const moduleLessons = await this.getLessons(module.id);
+      allLessons.push(...moduleLessons);
+    }
+    
+    if (allLessons.length === 0) {
+      return [];
+    }
+
+    const lessonIds = allLessons.map(lesson => lesson.id);
+
+    // Get all quizzes for these lessons with lesson info
+    const result = await db
+      .select({
+        id: quizzes.id,
+        lessonId: quizzes.lessonId,
+        title: quizzes.title,
+        description: quizzes.description,
+        passingScore: quizzes.passingScore,
+        timeLimit: quizzes.timeLimit,
+        maxAttempts: quizzes.maxAttempts,
+        randomizeQuestions: quizzes.randomizeQuestions,
+        createdAt: quizzes.createdAt,
+        updatedAt: quizzes.updatedAt,
+        lessonTitle: lessons.title
+      })
+      .from(quizzes)
+      .innerJoin(lessons, eq(quizzes.lessonId, lessons.id))
+      .where(inArray(quizzes.lessonId, lessonIds));
+    
+    return result as any[];
+  }
+
+  async getAllQuizzes(): Promise<Quiz[]> {
+    // Get all quizzes with lesson, module, and course information
+    const result = await db
+      .select({
+        id: quizzes.id,
+        lessonId: quizzes.lessonId,
+        title: quizzes.title,
+        description: quizzes.description,
+        passingScore: quizzes.passingScore,
+        timeLimit: quizzes.timeLimit,
+        maxAttempts: quizzes.maxAttempts,
+        randomizeQuestions: quizzes.randomizeQuestions,
+        createdAt: quizzes.createdAt,
+        updatedAt: quizzes.updatedAt,
+        lessonTitle: lessons.title,
+        moduleTitle: courseModules.title,
+        courseTitle: courses.title
+      })
+      .from(quizzes)
+      .innerJoin(lessons, eq(quizzes.lessonId, lessons.id))
+      .innerJoin(courseModules, eq(lessons.moduleId, courseModules.id))
+      .innerJoin(courseVersions, eq(courseModules.courseVersionId, courseVersions.id))
+      .innerJoin(courses, eq(courseVersions.courseId, courses.id))
+      .orderBy(courses.title, courseModules.title, lessons.title, quizzes.title);
+    
+    return result as any[];
+  }
+
   async getUserQuizAttempts(userId: string, quizId: string): Promise<QuizAttempt[]> {
     return await db
       .select()
@@ -1662,13 +1735,6 @@ export class DatabaseStorage implements IStorage {
     return lessonRows;
   }
 
-  async getQuizzesByLesson(lessonId: string): Promise<Quiz[]> {
-    const quizRows = await db.select()
-      .from(quizzes)
-      .where(eq(quizzes.lessonId, lessonId));
-
-    return quizRows;
-  }
 
   async deleteCourse(courseId: string): Promise<void> {
     return await db.transaction(async (tx) => {
