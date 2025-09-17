@@ -1337,7 +1337,6 @@ export class DatabaseStorage implements IStorage {
         maxAttempts: quizzes.maxAttempts,
         randomizeQuestions: quizzes.randomizeQuestions,
         createdAt: quizzes.createdAt,
-        updatedAt: quizzes.updatedAt,
         lessonTitle: lessons.title
       })
       .from(quizzes)
@@ -1360,7 +1359,6 @@ export class DatabaseStorage implements IStorage {
         maxAttempts: quizzes.maxAttempts,
         randomizeQuestions: quizzes.randomizeQuestions,
         createdAt: quizzes.createdAt,
-        updatedAt: quizzes.updatedAt,
         lessonTitle: lessons.title,
         moduleTitle: courseModules.title,
         courseTitle: courses.title

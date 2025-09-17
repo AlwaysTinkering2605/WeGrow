@@ -918,6 +918,32 @@ export default function Learning() {
     retry: false,
   });
 
+  // Fetch quiz questions for selected quiz
+  const { data: quizQuestionsData, isLoading: quizQuestionsLoading } = useQuery<any[]>({
+    queryKey: ["/api/lms/admin/quizzes", selectedQuizForQuestions, "questions"],
+    queryFn: async () => {
+      if (!selectedQuizForQuestions) return [];
+      const response = await apiRequest("GET", `/api/lms/admin/quizzes/${selectedQuizForQuestions}/questions`);
+      return await response.json();
+    },
+    enabled: !!(selectedQuizForQuestions && (user?.role === 'supervisor' || user?.role === 'leadership')),
+    retry: false,
+  });
+
+  // Update quiz questions state when data changes
+  useEffect(() => {
+    if (quizQuestionsData) {
+      setQuizQuestions(quizQuestionsData.map((q: any) => ({
+        type: q.type,
+        questionText: q.questionText,
+        options: q.options || [],
+        correctAnswers: q.correctAnswers || [],
+        explanation: q.explanation || "",
+        orderIndex: q.orderIndex || 1
+      })));
+    }
+  }, [quizQuestionsData]);
+
   // Calculate learning metrics from real data with proper fallbacks
   const enrolledCourses = Array.isArray(enrollments) ? enrollments : [];
   const recentCertificates = Array.isArray(certificates) ? certificates : [];
@@ -3258,13 +3284,11 @@ export default function Learning() {
                                 <SelectValue placeholder="Choose a quiz to manage questions" />
                               </SelectTrigger>
                               <SelectContent>
-                                {adminCourses?.map((course: any) => 
-                                  course.quizzes?.map((quiz: any) => (
-                                    <SelectItem key={quiz.id} value={quiz.id}>
-                                      {quiz.title} ({course.title})
-                                    </SelectItem>
-                                  ))
-                                )}
+                                {allQuizzes?.map((quiz: any) => (
+                                  <SelectItem key={quiz.id} value={quiz.id}>
+                                    {quiz.title} ({quiz.courseTitle})
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                           </div>
@@ -3708,6 +3732,18 @@ export default function Learning() {
                                       >
                                         <Edit className="w-3 h-3 mr-1" />
                                         Edit
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setSelectedQuizForQuestions(quiz.id);
+                                          setIsManageQuestionsOpen(true);
+                                        }}
+                                        data-testid={`button-manage-questions-${quiz.id}`}
+                                      >
+                                        <Plus className="w-3 h-3 mr-1" />
+                                        Questions
                                       </Button>
                                       <Button
                                         size="sm"
