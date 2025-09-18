@@ -458,6 +458,7 @@ export default function Learning() {
     },
   });
 
+
   // Lesson progress mutation
   const updateProgressMutation = useMutation({
     mutationFn: async ({ enrollmentId, lessonId, progressPercentage, lastPosition, timeSpent, status }: {
@@ -4192,7 +4193,7 @@ export default function Learning() {
                     <Button 
                       className="ml-4" 
                       data-testid={`button-continue-${course.id}`}
-                      onClick={() => window.location.href = `/learning/course/${course.id}`}
+                      onClick={() => window.location.href = `/learning/courses/${course.courseId || course.id}`}
                     >
                       <Play className="w-4 h-4 mr-2" />
                       Continue

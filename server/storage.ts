@@ -1398,7 +1398,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserEnrollments(userId: string): Promise<Enrollment[]> {
-    return await db.select().from(enrollments).where(eq(enrollments.userId, userId));
+    // Get enrollments with full course details
+    const result = await db
+      .select({
+        id: enrollments.id,
+        userId: enrollments.userId,
+        courseVersionId: enrollments.courseVersionId,
+        status: enrollments.status,
+        enrolledAt: enrollments.enrolledAt,
+        startedAt: enrollments.startedAt,
+        completedAt: enrollments.completedAt,
+        dueDate: enrollments.dueDate,
+        progress: enrollments.progress,
+        currentModuleId: enrollments.currentModuleId,
+        currentLessonId: enrollments.currentLessonId,
+        courseId: courses.id,
+        courseTitle: courses.title,
+        courseDescription: courses.description,
+        courseCategory: courses.category,
+        courseLevel: courses.level,
+        courseThumbnailUrl: courses.thumbnailUrl,
+        courseEstimatedDuration: courses.estimatedDuration,
+        versionNumber: courseVersions.version,
+      })
+      .from(enrollments)
+      .innerJoin(courseVersions, eq(enrollments.courseVersionId, courseVersions.id))
+      .innerJoin(courses, eq(courseVersions.courseId, courses.id))
+      .where(eq(enrollments.userId, userId))
+      .orderBy(enrollments.enrolledAt);
+
+    return result as any[];
   }
 
   async getEnrollment(enrollmentId: string): Promise<Enrollment | undefined> {
