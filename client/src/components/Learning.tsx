@@ -118,6 +118,12 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   useEffect(() => {
     if (!playerRef.current || !videoId) return;
 
+    // Reset state when switching videos
+    lastSavedProgress.current = 0;
+    setIsCompleted(false);
+    setIsLoading(true);
+    setError(null);
+
     // Initialize Vimeo Player
     try {
       const videoIdNumber = parseInt(videoId);
@@ -190,7 +196,7 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
         vimeoPlayer.current.destroy();
       }
     };
-  }, [videoId, onProgressUpdate, onComplete]);
+  }, [videoId, onProgressUpdate, onComplete, onProgressComplete]);
 
   if (error) {
     return (
@@ -1374,21 +1380,8 @@ export default function Learning() {
                             }
                           }}
                           onComplete={() => {
-                            // Mark lesson as completed when video ends (only if no quiz, or if quiz already passed)
-                            const enrollmentId = courseDetails?.enrollment?.id;
-                            if (enrollmentId && currentLesson?.id) {
-                              const hasQuiz = !!currentLesson.quiz?.quiz;
-                              const quizPassed = currentLesson.quiz?.latestAttempt?.passed;
-                              
-                              // Only complete lesson if no quiz or quiz already passed
-                              if (!hasQuiz || quizPassed) {
-                                updateLessonProgressMutation.mutate({
-                                  enrollmentId,
-                                  lessonId: currentLesson.id,
-                                  progress: 100
-                                });
-                              }
-                            }
+                            // Video ended - just for UX feedback, completion handled by onProgressComplete at 90%
+                            console.log('Video ended');
                           }}
                         />
                       ) : (
