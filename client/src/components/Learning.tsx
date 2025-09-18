@@ -820,13 +820,20 @@ export default function Learning() {
 
   // LESSON PROGRESS MUTATION
   const updateLessonProgressMutation = useMutation({
-    mutationFn: async ({ enrollmentId, lessonId, progress }: { enrollmentId: string; lessonId: string; progress: number }) => {
+    mutationFn: async ({ enrollmentId, lessonId, progress, lastPosition, status }: { 
+      enrollmentId: string; 
+      lessonId: string; 
+      progress: number; 
+      lastPosition?: number;
+      status?: string;
+    }) => {
       const response = await apiRequest("POST", "/api/lms/lesson-progress", {
         enrollmentId,
         lessonId,
         userId: user?.id,
         progressPercentage: progress,
-        status: progress >= 100 ? "completed" : "in_progress",
+        lastPosition: lastPosition || 0,
+        status: status || (progress >= 100 ? "completed" : "in_progress"),
         timeSpent: 0 // Will be calculated separately for video
       });
       return await response.json();
@@ -1315,8 +1322,26 @@ export default function Learning() {
                               updateLessonProgressMutation.mutate({
                                 enrollmentId,
                                 lessonId: currentLesson.id,
-                                progress: progress
+                                progress: progress,
+                                lastPosition: timePosition
                               });
+                              
+                              // Auto-complete lesson when 90% threshold is reached
+                              if (progress >= 90) {
+                                const hasQuiz = !!currentLesson.quiz?.quiz;
+                                const quizPassed = currentLesson.quiz?.latestAttempt?.passed;
+                                
+                                // Auto-complete if no quiz, or if quiz already passed
+                                if (!hasQuiz || quizPassed) {
+                                  updateLessonProgressMutation.mutate({
+                                    enrollmentId,
+                                    lessonId: currentLesson.id,
+                                    progress: Math.min(progress, 100),
+                                    lastPosition: timePosition,
+                                    status: 'completed'
+                                  });
+                                }
+                              }
                             }
                           }}
                           onComplete={() => {
