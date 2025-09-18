@@ -432,9 +432,11 @@ export default function Learning() {
 
   // Enrollment mutation
   const enrollMutation = useMutation({
-    mutationFn: async (courseId: string) => {
+    mutationFn: async (course: any) => {
+      // Use courseVersionId (currentVersionId) instead of courseId for enrollment
+      const courseVersionId = course.currentVersionId || course.courseVersionId || course.id;
       const response = await apiRequest("POST", "/api/lms/enrollments", {
-        courseId
+        courseVersionId
       });
       return await response.json();
     },
@@ -1004,7 +1006,13 @@ export default function Learning() {
 
   // Check if user is already enrolled in a course
   const isEnrolledInCourse = (courseId: string) => {
-    return enrolledCourses.some((enrollment: any) => enrollment.courseId === courseId);
+    return enrolledCourses.some((enrollment: any) => {
+      // Check both courseId (if it exists) and match courseVersionId with course's currentVersionId
+      return enrollment.courseId === courseId || 
+             (availableCourses?.find((course: any) => 
+               course.id === courseId && course.currentVersionId === enrollment.courseVersionId
+             ));
+    });
   };
 
   // Quiz question management helper functions
@@ -4431,7 +4439,7 @@ export default function Learning() {
                         ) : (
                           <Button 
                             className="w-full" 
-                            onClick={() => enrollMutation.mutate(course.id)}
+                            onClick={() => enrollMutation.mutate(course)}
                             disabled={enrollMutation.isPending}
                             data-testid={`button-enroll-${course.id}`}
                           >
