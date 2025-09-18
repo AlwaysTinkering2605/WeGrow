@@ -1033,7 +1033,6 @@ export default function Learning() {
 
   // Quiz question management helper functions
   const addQuestion = () => {
-    alert("Add Question button clicked! Current questions: " + quizQuestions.length);
     const newQuestion = {
       type: "multiple_choice" as const,
       questionText: "",
@@ -1542,7 +1541,7 @@ export default function Learning() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle>Course Modules</CardTitle>
+                        <CardTitle>Course Lessons</CardTitle>
                         <CardDescription>Navigate through the course content</CardDescription>
                       </div>
                       <div className="flex items-center gap-2">

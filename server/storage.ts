@@ -939,8 +939,12 @@ export class DatabaseStorage implements IStorage {
       return null;
     }
 
-    // Get the current course version - for now use default if not versioned
-    let courseVersionId = courseId; // Simple fallback
+    // Get the current course version from the course record
+    let courseVersionId = course.currentVersionId;
+    if (!courseVersionId) {
+      console.warn(`Course ${courseId} has no currentVersionId set`);
+      return { ...course, lessons: [], modules: [], totalLessons: 0, completedLessons: 0, progressPercentage: 0 };
+    }
     
     // Get course modules
     const modules = await db.select()
