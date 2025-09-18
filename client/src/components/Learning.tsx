@@ -151,9 +151,13 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
 
       // If we have a videoId on mount, initialize with it
       if (videoId) {
+        console.log('Initializing Vimeo player with video ID:', videoId);
         const videoIdNumber = parseInt(videoId);
         if (!isNaN(videoIdNumber)) {
           (playerOptions as any).id = videoIdNumber;
+          console.log('Parsed video ID number:', videoIdNumber);
+        } else {
+          console.error('Invalid video ID format:', videoId);
         }
       }
 
@@ -170,6 +174,7 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
 
       vimeoPlayer.current.on('error', (error) => {
         console.error('Vimeo Player Error:', error);
+        console.error('Failed Video ID:', videoId);
         setError(`Failed to load video: ${error.message || 'Unknown error'}`);
         setIsLoading(false);
         if (loadingTimeoutRef.current) {
@@ -340,6 +345,11 @@ export default function Learning() {
   // Check if we're viewing a specific course
   const isViewingCourse = location.startsWith("/learning/courses/");
   const courseId = isViewingCourse ? location.split("/learning/courses/")[1] : null;
+  
+  // Debug logging
+  console.log('Learning component - location:', location);
+  console.log('Learning component - isViewingCourse:', isViewingCourse);
+  console.log('Learning component - courseId:', courseId);
   
   // Extract active tab from URL
   const getActiveTab = () => {
