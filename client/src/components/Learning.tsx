@@ -439,8 +439,11 @@ export default function Learning() {
       // Set which course is being enrolled to show loading state on specific button
       setEnrollingCourseId(course.id);
       
-      // Use courseVersionId (currentVersionId) instead of courseId for enrollment
-      const courseVersionId = course.currentVersionId || course.courseVersionId || course.id;
+      // Use courseVersionId (currentVersionId) for enrollment - must be valid
+      if (!course.currentVersionId) {
+        throw new Error("Course is missing version information. Please contact support.");
+      }
+      const courseVersionId = course.currentVersionId;
       const response = await apiRequest("POST", "/api/lms/enrollments", {
         courseVersionId
       });
