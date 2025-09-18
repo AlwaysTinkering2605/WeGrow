@@ -346,14 +346,14 @@ export default function Learning() {
   const isViewingCourse = location.startsWith("/learning/courses/");
   const courseId = isViewingCourse ? location.split("/learning/courses/")[1] : null;
   
-  // Debug logging
-  console.log('Learning component - location:', location);
-  console.log('Learning component - isViewingCourse:', isViewingCourse);
-  console.log('Learning component - courseId:', courseId);
+  // Check if we're viewing the course catalog
+  const isViewingCatalog = location === "/learning/courses";
+  
   
   // Extract active tab from URL
   const getActiveTab = () => {
     if (location === "/learning" || !params.tab) return "dashboard";
+    if (isViewingCatalog) return "courses"; // Handle catalog view
     return params.tab || "dashboard";
   };
 
@@ -2019,6 +2019,33 @@ export default function Learning() {
                                 }
                               </p>
                             </div>
+                            <Button 
+                              className="w-full"
+                              onClick={() => {
+                                if (currentLesson?.quiz?.quiz) {
+                                  const enrollmentId = enrolledCourses.find(e => e.courseId === courseId)?.id;
+                                  if (enrollmentId) {
+                                    startQuiz(currentLesson.quiz.quiz, enrollmentId);
+                                  } else {
+                                    toast({
+                                      title: "Error",
+                                      description: "You must be enrolled to take this quiz.",
+                                      variant: "destructive",
+                                    });
+                                  }
+                                } else {
+                                  toast({
+                                    title: "Quiz Error",
+                                    description: "Quiz not found for this lesson.",
+                                    variant: "destructive",
+                                  });
+                                }
+                              }}
+                              data-testid="button-take-quiz"
+                            >
+                              <ClipboardList className="w-4 h-4 mr-2" />
+                              {hasQuizAttempts ? 'Retake Quiz' : 'Take Quiz'}
+                            </Button>
                             {hasQuizAttempts && (
                               <div className="text-xs p-2 bg-orange-50 border border-orange-200 rounded">
                                 <AlertCircle className="w-3 h-3 inline mr-1" />

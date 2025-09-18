@@ -54,6 +54,7 @@ export default function Layout() {
   };
 
   const activeTab = getActiveTab();
+  
 
   // Base tabs available to all users
   const baseTabs = [
