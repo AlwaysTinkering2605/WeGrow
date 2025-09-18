@@ -1245,9 +1245,27 @@ export class DatabaseStorage implements IStorage {
     let correctAnswers = 0;
     const totalQuestions = questions.length;
     
+    console.log('Quiz scoring debug:', {
+      totalQuestions,
+      answers: JSON.stringify(answers),
+      questionsData: questions.map(q => ({
+        id: q.id,
+        correctAnswers: q.correctAnswers,
+        type: q.type
+      }))
+    });
+    
     questions.forEach((question, index) => {
       const userAnswer = answers[question.id] || answers[index];
       const correctAnswer = question.correctAnswers;
+      
+      console.log(`Question ${question.id} comparison:`, {
+        userAnswer: JSON.stringify(userAnswer),
+        correctAnswer: JSON.stringify(correctAnswer),
+        userAnswerType: typeof userAnswer,
+        correctAnswerType: typeof correctAnswer,
+        matches: JSON.stringify(userAnswer) === JSON.stringify(correctAnswer)
+      });
       
       if (JSON.stringify(userAnswer) === JSON.stringify(correctAnswer)) {
         correctAnswers++;
