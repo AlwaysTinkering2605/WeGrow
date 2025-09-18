@@ -114,46 +114,92 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   const [error, setError] = useState<string | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
   const lastSavedProgress = useRef<number>(0);
+  const loadingTimeoutRef = useRef<number | null>(null);
+
+  // Store callbacks in refs to avoid effect dependencies
+  const onProgressUpdateRef = useRef(onProgressUpdate);
+  const onCompleteRef = useRef(onComplete);
+  const onProgressCompleteRef = useRef(onProgressComplete);
+
+  // Update callback refs when props change
+  useEffect(() => {
+    onProgressUpdateRef.current = onProgressUpdate;
+  }, [onProgressUpdate]);
 
   useEffect(() => {
-    if (!playerRef.current || !videoId) return;
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
-    // Reset state when switching videos
-    lastSavedProgress.current = 0;
-    setIsCompleted(false);
-    setIsLoading(true);
-    setError(null);
+  useEffect(() => {
+    onProgressCompleteRef.current = onProgressComplete;
+  }, [onProgressComplete]);
 
-    // Initialize Vimeo Player
+  // Initialize player once on mount
+  useEffect(() => {
+    if (!playerRef.current) return;
+
+    // Initialize Vimeo Player with initial video ID if available
     try {
-      const videoIdNumber = parseInt(videoId);
-      if (isNaN(videoIdNumber)) {
-        throw new Error(`Invalid video ID: ${videoId}`);
-      }
-
-      vimeoPlayer.current = new Player(playerRef.current, {
-        id: videoIdNumber,
+      const playerOptions = {
         width: 640,
         height: 360,
         responsive: true,
         controls: true,
         autopause: false
-      });
+      };
+
+      // If we have a videoId on mount, initialize with it
+      if (videoId) {
+        const videoIdNumber = parseInt(videoId);
+        if (!isNaN(videoIdNumber)) {
+          (playerOptions as any).id = videoIdNumber;
+        }
+      }
+
+      vimeoPlayer.current = new Player(playerRef.current, playerOptions);
 
       // Set up event listeners for progress tracking
       vimeoPlayer.current.on('loaded', () => {
         setIsLoading(false);
+        if (loadingTimeoutRef.current) {
+          window.clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
       });
 
       vimeoPlayer.current.on('error', (error) => {
         console.error('Vimeo Player Error:', error);
         setError(`Failed to load video: ${error.message || 'Unknown error'}`);
         setIsLoading(false);
+        if (loadingTimeoutRef.current) {
+          window.clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
+      });
+
+      // Clear loading on multiple events for better reliability
+      vimeoPlayer.current.on('play', () => {
+        setIsLoading(false);
+        if (loadingTimeoutRef.current) {
+          window.clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
+      });
+
+      vimeoPlayer.current.on('bufferend', () => {
+        setIsLoading(false);
       });
 
       // Track progress with throttling to avoid API spam
       vimeoPlayer.current.on('timeupdate', async (data) => {
         const { seconds, duration } = data;
+        
+        // Clear loading state on first timeupdate
+        setIsLoading(false);
+        if (loadingTimeoutRef.current) {
+          window.clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
         
         // Guard against invalid duration
         if (duration <= 0) return;
@@ -165,22 +211,22 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
           lastSavedProgress.current = progress;
           
           // Always call progress update for regular tracking
-          if (onProgressUpdate) {
-            onProgressUpdate(progress, seconds);
+          if (onProgressUpdateRef.current) {
+            onProgressUpdateRef.current(progress, seconds);
           }
           
           // Call completion callback when 90% reached (only once)
-          if (progress >= 90 && !isCompleted && onProgressComplete) {
+          if (progress >= 90 && !isCompleted && onProgressCompleteRef.current) {
             setIsCompleted(true);
-            onProgressComplete(progress, seconds);
+            onProgressCompleteRef.current(progress, seconds);
           }
         }
       });
 
       // Track video completion
       vimeoPlayer.current.on('ended', () => {
-        if (onComplete) {
-          onComplete();
+        if (onCompleteRef.current) {
+          onCompleteRef.current();
         }
       });
 
@@ -190,13 +236,72 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
       setIsLoading(false);
     }
 
-    // Cleanup
+    // Cleanup on unmount only
     return () => {
+      if (loadingTimeoutRef.current) {
+        window.clearTimeout(loadingTimeoutRef.current);
+      }
       if (vimeoPlayer.current) {
         vimeoPlayer.current.destroy();
       }
     };
-  }, [videoId, onProgressUpdate, onComplete, onProgressComplete]);
+  }, []); // Only run once on mount
+
+  // Handle video ID changes by loading new video
+  useEffect(() => {
+    if (!videoId) return;
+
+    // Reset state when switching videos
+    lastSavedProgress.current = 0;
+    setIsCompleted(false);
+    setIsLoading(true);
+    setError(null);
+
+    // Clear any existing timeout
+    if (loadingTimeoutRef.current) {
+      window.clearTimeout(loadingTimeoutRef.current);
+    }
+
+    // Set loading timeout (10 seconds)
+    loadingTimeoutRef.current = window.setTimeout(() => {
+      setError('Video loading timed out. Please check your connection or try refreshing.');
+      setIsLoading(false);
+    }, 10000);
+
+    try {
+      const videoIdNumber = parseInt(videoId);
+      if (isNaN(videoIdNumber)) {
+        throw new Error(`Invalid video ID: ${videoId}`);
+      }
+
+      // If player not initialized yet, it will be initialized with this video ID in the mount effect
+      if (!vimeoPlayer.current) {
+        return; // The mount effect will handle this video ID
+      }
+
+      // Load new video using existing player instance
+      vimeoPlayer.current.loadVideo(videoIdNumber).then(() => {
+        console.log(`Successfully loaded video ${videoIdNumber}`);
+      }).catch((err) => {
+        console.error('Error loading video:', err);
+        setError(`Failed to load video: ${err.message || 'Video may be private or not found'}`);
+        setIsLoading(false);
+        if (loadingTimeoutRef.current) {
+          window.clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
+      });
+
+    } catch (err) {
+      console.error('Error loading video:', err);
+      setError(`Failed to load video: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setIsLoading(false);
+      if (loadingTimeoutRef.current) {
+        window.clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+    }
+  }, [videoId]); // Only depend on videoId
 
   if (error) {
     return (
