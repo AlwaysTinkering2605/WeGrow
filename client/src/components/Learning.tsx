@@ -51,7 +51,8 @@ import {
   GraduationCap,
   Layers,
   PlayCircle,
-  Circle
+  Circle,
+  Lock
 } from "lucide-react";
 
 // Form Schemas for Admin Interface
@@ -215,8 +216,8 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
             onProgressUpdateRef.current(progress, seconds);
           }
           
-          // Call completion callback when 90% reached (only once)
-          if (progress >= 90 && !isCompleted && onProgressCompleteRef.current) {
+          // Call completion callback when 100% reached (only once)
+          if (progress >= 100 && !isCompleted && onProgressCompleteRef.current) {
             setIsCompleted(true);
             onProgressCompleteRef.current(progress, seconds);
           }
@@ -1311,23 +1312,71 @@ export default function Learning() {
   // Lesson navigation logic for course player
   const availableLessons = courseDetails?.lessons || [];
   
+  // Helper function to check if a lesson is locked (requires previous lessons to be completed)
+  const isLessonLocked = (lessonIndex: number): boolean => {
+    if (lessonIndex === 0) return false; // First lesson is never locked
+    
+    // Check if all previous lessons are completed
+    for (let i = 0; i < lessonIndex; i++) {
+      const previousLesson = availableLessons[i];
+      const isVideoCompleted = previousLesson.progress?.status === 'completed';
+      const hasQuiz = !!previousLesson.quiz?.quiz;
+      const isQuizPassed = previousLesson.quiz?.latestAttempt?.passed;
+      
+      // For lessons with quizzes, both video AND quiz must be completed
+      if (hasQuiz) {
+        if (!isVideoCompleted || !isQuizPassed) {
+          return true; // Lesson is locked
+        }
+      } else {
+        // For lessons without quizzes, just need video completion
+        if (!isVideoCompleted) {
+          return true; // Lesson is locked
+        }
+      }
+    }
+    
+    return false; // All prerequisites met, lesson is unlocked
+  };
+  
+  // Helper function to get the next available (unlocked) lesson
+  const getNextAvailableLesson = (): { lesson: any, index: number } | null => {
+    for (let i = 0; i < availableLessons.length; i++) {
+      if (!isLessonLocked(i) && availableLessons[i].progress?.status !== 'completed') {
+        return { lesson: availableLessons[i], index: i };
+      }
+    }
+    // If all lessons are completed, return the last lesson
+    return availableLessons.length > 0 ? { 
+      lesson: availableLessons[availableLessons.length - 1], 
+      index: availableLessons.length - 1 
+    } : null;
+  };
+  
   // Set current lesson when course data loads
   useEffect(() => {
     if (availableLessons.length > 0 && !currentLesson) {
-      // Find first incomplete lesson or default to first lesson
-      const incompleteLesson = availableLessons.find((lesson: any) => 
-        lesson.progress?.status !== 'completed'
-      );
-      const lessonToSet = incompleteLesson || availableLessons[0];
-      const lessonIndex = availableLessons.findIndex((l: any) => l.id === lessonToSet.id);
-      setCurrentLessonIndex(lessonIndex);
-      setCurrentLesson(lessonToSet);
+      // Find the next available lesson that's not locked
+      const nextAvailable = getNextAvailableLesson();
+      if (nextAvailable) {
+        setCurrentLessonIndex(nextAvailable.index);
+        setCurrentLesson(nextAvailable.lesson);
+      }
     }
   }, [courseDetails, availableLessons.length]);
 
   // Lesson navigation functions
   const goToLesson = (lessonIndex: number) => {
     if (lessonIndex >= 0 && lessonIndex < availableLessons.length) {
+      // Check if the lesson is locked
+      if (isLessonLocked(lessonIndex)) {
+        toast({
+          title: "Lesson Locked",
+          description: "Complete the previous lesson(s) and any quizzes to unlock this lesson.",
+          variant: "destructive",
+        });
+        return;
+      }
       setCurrentLessonIndex(lessonIndex);
       setCurrentLesson(availableLessons[lessonIndex]);
     }
@@ -1335,7 +1384,7 @@ export default function Learning() {
 
   const goToNextLesson = () => {
     const nextIndex = currentLessonIndex + 1;
-    if (nextIndex < availableLessons.length) {
+    if (nextIndex < availableLessons.length && !isLessonLocked(nextIndex)) {
       goToLesson(nextIndex);
     }
   };
@@ -1466,7 +1515,7 @@ export default function Learning() {
                             }
                           }}
                           onProgressComplete={(progress, timePosition) => {
-                            // Handle 90% completion (called only once by VimeoPlayer)
+                            // Handle 100% completion (called only once by VimeoPlayer)
                             const enrollmentId = courseDetails?.enrollment?.id;
                             if (enrollmentId && currentLesson?.id) {
                               const hasQuiz = !!currentLesson.quiz?.quiz;
@@ -1485,7 +1534,7 @@ export default function Learning() {
                             }
                           }}
                           onComplete={() => {
-                            // Video ended - just for UX feedback, completion handled by onProgressComplete at 90%
+                            // Video ended - completion handled by onProgressComplete at 100%
                             console.log('Video ended');
                           }}
                         />
@@ -1726,18 +1775,26 @@ export default function Learning() {
                           const isInProgress = lesson.progress?.status === 'in_progress';
                           const hasQuiz = lesson.quiz?.quiz;
                           const quizPassed = lesson.quiz?.latestAttempt?.passed;
+                          const isLocked = isLessonLocked(index);
+                          const isCurrent = currentLesson?.id === lesson.id;
                           
                           return (
                             <div 
                               key={lesson.id}
-                              className={`flex items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer hover:bg-muted ${
-                                currentLesson?.id === lesson.id ? 'bg-muted border-primary' : ''
+                              className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                                isLocked 
+                                  ? 'cursor-not-allowed bg-muted/50 opacity-60' 
+                                  : 'cursor-pointer hover:bg-muted'
+                              } ${
+                                isCurrent ? 'bg-muted border-primary' : ''
                               }`}
                               data-testid={`lesson-${lesson.id}`}
-                              onClick={() => goToLesson(index)}
+                              onClick={() => !isLocked && goToLesson(index)}
                             >
                               <div className="flex items-center space-x-3">
-                                {isCompleted ? (
+                                {isLocked ? (
+                                  <Lock className="w-5 h-5 text-muted-foreground" />
+                                ) : isCompleted ? (
                                   <CheckCircle className="w-5 h-5 text-green-600" />
                                 ) : isInProgress ? (
                                   <Play className="w-5 h-5 text-primary" />
@@ -1746,7 +1803,9 @@ export default function Learning() {
                                 )}
                                 <div>
                                   <div className="flex items-center gap-2">
-                                    <h4 className="font-medium">{lesson.title}</h4>
+                                    <h4 className={`font-medium ${isLocked ? 'text-muted-foreground' : ''}`}>
+                                      {lesson.title}
+                                    </h4>
                                     {hasQuiz && (
                                       <Badge variant="outline" className="text-xs">
                                         <ClipboardList className="w-3 h-3 mr-1" />
@@ -1755,11 +1814,17 @@ export default function Learning() {
                                     )}
                                   </div>
                                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <span>{lesson.estimatedMinutes || 30} min</span>
-                                    {lesson.moduleTitle && (
+                                    {isLocked ? (
+                                      <span className="text-orange-600 font-medium">Complete previous lesson to unlock</span>
+                                    ) : (
                                       <>
-                                        <span>•</span>
-                                        <span>{lesson.moduleTitle}</span>
+                                        <span>{lesson.estimatedMinutes || 30} min</span>
+                                        {lesson.moduleTitle && (
+                                          <>
+                                            <span>•</span>
+                                            <span>{lesson.moduleTitle}</span>
+                                          </>
+                                        )}
                                       </>
                                     )}
                                   </div>
@@ -1855,72 +1920,138 @@ export default function Learning() {
                   </CardContent>
                 </Card>
 
-                {/* Course Actions */}
+                {/* Course Actions - Dynamic based on progress */}
                 <Card data-testid="card-course-actions">
                   <CardHeader>
                     <CardTitle>Course Actions</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <Button 
-                      className="w-full" 
-                      data-testid="button-mark-complete"
-                      onClick={() => {
-                        const enrollmentId = enrolledCourses.find(e => e.courseId === courseId)?.id;
-                        if (enrollmentId) {
-                          completeCourseMutation.mutate(enrollmentId);
-                        } else {
-                          toast({
-                            title: "Error",
-                            description: "You must be enrolled to complete this course.",
-                            variant: "destructive",
-                          });
+                    {(() => {
+                      if (!currentLesson) {
+                        return (
+                          <div className="text-center text-muted-foreground py-4">
+                            <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                            <p>Select a lesson to get started</p>
+                          </div>
+                        );
+                      }
+
+                      const isVideoCompleted = currentLesson.progress?.status === 'completed';
+                      const videoProgress = currentLesson.progress?.progressPercentage || 0;
+                      const hasQuiz = !!currentLesson.quiz?.quiz;
+                      const quizPassed = currentLesson.quiz?.latestAttempt?.passed;
+                      const hasQuizAttempts = currentLesson.quiz?.latestAttempt;
+                      
+                      // Check if all lessons are completed for course completion
+                      const allLessonsCompleted = availableLessons.every((lesson: any) => {
+                        const lessonVideoComplete = lesson.progress?.status === 'completed';
+                        const lessonHasQuiz = !!lesson.quiz?.quiz;
+                        const lessonQuizPassed = lesson.quiz?.latestAttempt?.passed;
+                        
+                        if (lessonHasQuiz) {
+                          return lessonVideoComplete && lessonQuizPassed;
                         }
-                      }}
-                      disabled={completeCourseMutation.isPending}
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      {completeCourseMutation.isPending ? 'Completing...' : 'Mark as Complete'}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full" 
-                      data-testid="button-download-resources"
-                      onClick={() => {
-                        // Implement resource download
-                        toast({
-                          title: "Download Started",
-                          description: "Course resources are being downloaded.",
-                        });
-                        // In a real implementation, this would trigger a download
-                        window.open('/api/lms/courses/' + courseId + '/resources', '_blank');
-                      }}
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download Resources
-                    </Button>
-                    {currentLesson?.quiz?.quiz && (
-                      <Button 
-                        variant="outline" 
-                        className="w-full" 
-                        data-testid="button-take-quiz"
-                        onClick={() => {
-                          const enrollmentId = courseDetails?.enrollment?.id;
-                          if (enrollmentId && currentLesson?.quiz?.quiz) {
-                            startQuiz(currentLesson.quiz.quiz, enrollmentId);
-                          } else {
-                            toast({
-                              title: "Error",
-                              description: "You must be enrolled to take the quiz.",
-                              variant: "destructive",
-                            });
-                          }
-                        }}
-                        disabled={startQuizAttemptMutation.isPending || isQuizActive}
-                      >
-                        <ClipboardList className="w-4 h-4 mr-2" />
-                        {isQuizActive ? 'Quiz In Progress...' : 'Take Quiz'}
-                      </Button>
-                    )}
+                        return lessonVideoComplete;
+                      });
+                      
+                      if (allLessonsCompleted) {
+                        return (
+                          <Button 
+                            className="w-full" 
+                            data-testid="button-complete-course"
+                            onClick={() => {
+                              const enrollmentId = enrolledCourses.find(e => e.courseId === courseId)?.id;
+                              if (enrollmentId) {
+                                completeCourseMutation.mutate(enrollmentId);
+                              } else {
+                                toast({
+                                  title: "Error",
+                                  description: "You must be enrolled to complete this course.",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                            disabled={completeCourseMutation.isPending}
+                          >
+                            <Trophy className="w-4 h-4 mr-2" />
+                            {completeCourseMutation.isPending ? 'Completing...' : 'Complete Course & Get Certificate'}
+                          </Button>
+                        );
+                      }
+
+                      if (!isVideoCompleted) {
+                        return (
+                          <div className="space-y-3">
+                            <div className="text-center">
+                              <Play className="w-8 h-8 mx-auto mb-2 text-primary" />
+                              <p className="font-medium">Watch the video to continue</p>
+                              <p className="text-sm text-muted-foreground">
+                                Progress: {videoProgress}% complete (must reach 100%)
+                              </p>
+                            </div>
+                            <Progress value={videoProgress} className="w-full" />
+                          </div>
+                        );
+                      }
+
+                      if (hasQuiz && !quizPassed) {
+                        return (
+                          <div className="space-y-3">
+                            <div className="text-center">
+                              <ClipboardList className="w-8 h-8 mx-auto mb-2 text-primary" />
+                              <p className="font-medium">
+                                {hasQuizAttempts ? 'Retake Quiz to Continue' : 'Take Quiz to Continue'}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {hasQuizAttempts 
+                                  ? `Previous score: ${currentLesson.quiz.latestAttempt.score}% (need 70%+)`
+                                  : 'Pass with 70% or higher to unlock next lesson'
+                                }
+                              </p>
+                            </div>
+                            {hasQuizAttempts && (
+                              <div className="text-xs p-2 bg-orange-50 border border-orange-200 rounded">
+                                <AlertCircle className="w-3 h-3 inline mr-1" />
+                                Quiz failed - scroll down to retake
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      // Video completed and quiz passed (or no quiz) - can go to next lesson
+                      const nextLessonIndex = currentLessonIndex + 1;
+                      const hasNextLesson = nextLessonIndex < availableLessons.length;
+                      
+                      if (hasNextLesson) {
+                        const nextLesson = availableLessons[nextLessonIndex];
+                        return (
+                          <div className="space-y-3">
+                            <div className="text-center text-green-600 mb-3">
+                              <CheckCircle className="w-8 h-8 mx-auto mb-2" />
+                              <p className="font-medium">Lesson Complete! 🎉</p>
+                            </div>
+                            <Button 
+                              className="w-full"
+                              onClick={() => goToNextLesson()}
+                              data-testid="button-next-lesson"
+                            >
+                              <PlayCircle className="w-4 h-4 mr-2" />
+                              Continue to: {nextLesson.title}
+                            </Button>
+                          </div>
+                        );
+                      }
+
+                      // This is the last lesson and it's completed
+                      return (
+                        <div className="text-center">
+                          <Trophy className="w-8 h-8 mx-auto mb-2 text-yellow-500" />
+                          <p className="font-medium text-green-600">All Lessons Complete!</p>
+                          <p className="text-sm text-muted-foreground">Ready to complete the course</p>
+                        </div>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
 
