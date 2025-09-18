@@ -11,10 +11,24 @@ import Home from "./pages/home";
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 bg-primary rounded-lg animate-pulse mx-auto"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
+      {!isAuthenticated ? (
+        <>
+          <Route path="/" component={Landing} />
+          <Route component={NotFound} />
+        </>
       ) : (
         <>
           <Route path="/" component={Home} />
@@ -31,9 +45,9 @@ function Router() {
           <Route path="/team-objectives" component={Home} />
           <Route path="/reports" component={Home} />
           <Route path="/settings" component={Home} />
+          <Route component={NotFound} />
         </>
       )}
-      <Route component={NotFound} />
     </Switch>
   );
 }
