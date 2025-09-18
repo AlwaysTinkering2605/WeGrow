@@ -9,6 +9,7 @@ import {
   integer,
   boolean,
   pgEnum,
+  unique,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -327,7 +328,10 @@ export const enrollments = pgTable("enrollments", {
   progress: integer("progress").default(0), // 0-100 percentage
   currentModuleId: varchar("current_module_id"),
   currentLessonId: varchar("current_lesson_id"),
-});
+}, (table) => ({
+  // Prevent duplicate enrollments for the same user and course version
+  uniqueUserCourseVersion: unique().on(table.userId, table.courseVersionId),
+}));
 
 // Lesson progress tracking
 export const lessonProgress = pgTable("lesson_progress", {

@@ -219,6 +219,9 @@ export default function Learning() {
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [currentLesson, setCurrentLesson] = useState<any>(null);
   
+  // Track which course is currently being enrolled to prevent shared loading state
+  const [enrollingCourseId, setEnrollingCourseId] = useState<string | null>(null);
+  
   // Quiz taking state
   const [isQuizActive, setIsQuizActive] = useState(false);
   const [currentQuiz, setCurrentQuiz] = useState<any>(null);
@@ -433,6 +436,9 @@ export default function Learning() {
   // Enrollment mutation
   const enrollMutation = useMutation({
     mutationFn: async (course: any) => {
+      // Set which course is being enrolled to show loading state on specific button
+      setEnrollingCourseId(course.id);
+      
       // Use courseVersionId (currentVersionId) instead of courseId for enrollment
       const courseVersionId = course.currentVersionId || course.courseVersionId || course.id;
       const response = await apiRequest("POST", "/api/lms/enrollments", {
@@ -441,6 +447,9 @@ export default function Learning() {
       return await response.json();
     },
     onSuccess: () => {
+      // Clear enrolling state
+      setEnrollingCourseId(null);
+      
       toast({
         title: "Enrollment Successful",
         description: "You've been enrolled in the course. Check your dashboard to start learning!",
@@ -450,6 +459,9 @@ export default function Learning() {
       queryClient.invalidateQueries({ queryKey: ["/api/lms/courses"] });
     },
     onError: (error: any) => {
+      // Clear enrolling state on error
+      setEnrollingCourseId(null);
+      
       toast({
         title: "Enrollment Failed",
         description: error.message || "Failed to enroll in course. Please try again.",
@@ -4441,10 +4453,10 @@ export default function Learning() {
                           <Button 
                             className="w-full" 
                             onClick={() => enrollMutation.mutate(course)}
-                            disabled={enrollMutation.isPending}
+                            disabled={enrollingCourseId === course.id}
                             data-testid={`button-enroll-${course.id}`}
                           >
-                            {enrollMutation.isPending ? (
+                            {enrollingCourseId === course.id ? (
                               <>
                                 <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                                 Enrolling...
