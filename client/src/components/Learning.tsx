@@ -864,6 +864,33 @@ export default function Learning() {
     queryKey: ["/api/lms/courses", selectedCourseForContent, "lessons"],
     queryFn: async () => {
       if (!selectedCourseForContent) return [];
+      
+      // If "all" courses selected, fetch lessons from all courses
+      if (selectedCourseForContent === "all") {
+        if (!adminCourses) return [];
+        
+        // Fetch lessons from all courses and aggregate them
+        const allLessonsPromises = adminCourses.map(async (course: any) => {
+          try {
+            const response = await apiRequest("GET", `/api/lms/courses/${course.id}/lessons`);
+            const lessons = await response.json();
+            // Add course information to each lesson for display purposes
+            return lessons.map((lesson: any) => ({
+              ...lesson,
+              courseName: course.title,
+              courseId: course.id
+            }));
+          } catch (error) {
+            console.error(`Failed to fetch lessons for course ${course.id}:`, error);
+            return [];
+          }
+        });
+        
+        const allLessonsArrays = await Promise.all(allLessonsPromises);
+        // Flatten the array of arrays into a single array
+        return allLessonsArrays.flat();
+      }
+      
       const response = await apiRequest("GET", `/api/lms/courses/${selectedCourseForContent}/lessons`);
       return await response.json();
     },
@@ -2443,18 +2470,26 @@ export default function Learning() {
                           ) : adminCourses?.length === 0 ? (
                             <div className="p-2 text-sm text-gray-500">No courses found. Create a course first.</div>
                           ) : (
-                            adminCourses?.map((course: any) => (
-                              <SelectItem key={course.id} value={course.id}>
-                                {course.title}
-                              </SelectItem>
-                            ))
+                            <>
+                              <SelectItem value="all">All Courses</SelectItem>
+                              {adminCourses?.map((course: any) => (
+                                <SelectItem key={course.id} value={course.id}>
+                                  {course.title}
+                                </SelectItem>
+                              ))}
+                            </>
                           )}
                         </SelectContent>
                       </Select>
                     </div>
                     {selectedCourseForContent && (
                       <div className="text-sm text-muted-foreground">
-                        Managing content for: <strong>{adminCourses?.find((c: any) => c.id === selectedCourseForContent)?.title}</strong>
+                        Managing content for: <strong>
+                          {selectedCourseForContent === "all" 
+                            ? "All Courses" 
+                            : adminCourses?.find((c: any) => c.id === selectedCourseForContent)?.title
+                          }
+                        </strong>
                       </div>
                     )}
                   </div>
@@ -2476,8 +2511,19 @@ export default function Learning() {
                         </CardDescription>
                       </div>
                       <Button 
-                        onClick={() => setIsCreateLessonOpen(true)} 
+                        onClick={() => {
+                          if (selectedCourseForContent === "all") {
+                            toast({
+                              title: "Select a Course",
+                              description: "Please select a specific course to add a lesson to.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          setIsCreateLessonOpen(true);
+                        }} 
                         size="sm"
+                        disabled={selectedCourseForContent === "all"}
                         data-testid="button-add-lesson-quick"
                       >
                         <Plus className="w-4 h-4 mr-2" />
@@ -2509,7 +2555,21 @@ export default function Learning() {
                         <p className="text-muted-foreground mb-4">
                           This course doesn't have any lessons. Start by creating your first lesson.
                         </p>
-                        <Button onClick={() => setIsCreateLessonOpen(true)} data-testid="button-create-first-lesson">
+                        <Button 
+                          onClick={() => {
+                            if (selectedCourseForContent === "all") {
+                              toast({
+                                title: "Select a Course",
+                                description: "Please select a specific course to add a lesson to.",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            setIsCreateLessonOpen(true);
+                          }} 
+                          disabled={selectedCourseForContent === "all"}
+                          data-testid="button-create-first-lesson"
+                        >
                           <Plus className="w-4 h-4 mr-2" />
                           Create First Lesson
                         </Button>
@@ -2531,6 +2591,12 @@ export default function Learning() {
                                   <h4 className="font-semibold text-lg" data-testid={`text-lesson-title-${lesson.id}`}>
                                     {lesson.title}
                                   </h4>
+                                  {selectedCourseForContent === "all" && lesson.courseName && (
+                                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                      <GraduationCap className="w-3 h-3 mr-1" />
+                                      {lesson.courseName}
+                                    </Badge>
+                                  )}
                                   {lesson.vimeoVideoId && (
                                     <Badge variant="secondary" className="text-xs">
                                       <Video className="w-3 h-3 mr-1" />
@@ -2633,7 +2699,20 @@ export default function Learning() {
                   <CardContent className="space-y-4">
                     <Dialog open={isCreateLessonOpen} onOpenChange={setIsCreateLessonOpen}>
                       <DialogTrigger asChild>
-                        <Button className="w-full" data-testid="button-create-lesson">
+                        <Button 
+                          className="w-full" 
+                          data-testid="button-create-lesson"
+                          disabled={selectedCourseForContent === "all"}
+                          onClick={() => {
+                            if (selectedCourseForContent === "all") {
+                              toast({
+                                title: "Select a Course",
+                                description: "Please select a specific course to add a lesson to.",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                        >
                           <Plus className="w-4 h-4 mr-2" />
                           Add New Lesson
                         </Button>
@@ -2645,10 +2724,10 @@ export default function Learning() {
                         </DialogHeader>
                         <Form {...createLessonForm}>
                           <form onSubmit={createLessonForm.handleSubmit((data) => {
-                            if (!selectedCourseForContent) {
+                            if (!selectedCourseForContent || selectedCourseForContent === "all") {
                               toast({
                                 title: "Error",
-                                description: "Please select a course first.",
+                                description: "Please select a specific course first.",
                                 variant: "destructive",
                               });
                               return;
