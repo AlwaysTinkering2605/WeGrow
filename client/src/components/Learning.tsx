@@ -100,27 +100,38 @@ const badgeSchema = z.object({
 });
 
 // Vimeo Player Component with Progress Tracking
-function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComplete }: {
+function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComplete, onProgressComplete }: {
   videoId: string;
   enrollmentId: string;
   lessonId: string;
   onProgressUpdate?: (progress: number, timePosition: number) => void;
   onComplete?: () => void;
+  onProgressComplete?: (progress: number, timePosition: number) => void;
 }) {
   const playerRef = useRef<HTMLDivElement>(null);
   const vimeoPlayer = useRef<Player | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const lastSavedProgress = useRef<number>(0);
 
   useEffect(() => {
     if (!playerRef.current || !videoId) return;
 
     // Initialize Vimeo Player
     try {
+      const videoIdNumber = parseInt(videoId);
+      if (isNaN(videoIdNumber)) {
+        throw new Error(`Invalid video ID: ${videoId}`);
+      }
+
       vimeoPlayer.current = new Player(playerRef.current, {
-        id: videoId,
+        id: videoIdNumber,
         width: 640,
-        responsive: true
+        height: 360,
+        responsive: true,
+        controls: true,
+        autopause: false
       });
 
       // Set up event listeners for progress tracking
@@ -130,17 +141,33 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
 
       vimeoPlayer.current.on('error', (error) => {
         console.error('Vimeo Player Error:', error);
-        setError('Failed to load video');
+        setError(`Failed to load video: ${error.message || 'Unknown error'}`);
         setIsLoading(false);
       });
 
-      // Track progress every 5 seconds
+      // Track progress with throttling to avoid API spam
       vimeoPlayer.current.on('timeupdate', async (data) => {
         const { seconds, duration } = data;
+        
+        // Guard against invalid duration
+        if (duration <= 0) return;
+        
         const progress = Math.round((seconds / duration) * 100);
         
-        if (onProgressUpdate) {
-          onProgressUpdate(progress, seconds);
+        // Throttle progress updates: only save when progress increases by at least 1%
+        if (progress > lastSavedProgress.current) {
+          lastSavedProgress.current = progress;
+          
+          // Always call progress update for regular tracking
+          if (onProgressUpdate) {
+            onProgressUpdate(progress, seconds);
+          }
+          
+          // Call completion callback when 90% reached (only once)
+          if (progress >= 90 && !isCompleted && onProgressComplete) {
+            setIsCompleted(true);
+            onProgressComplete(progress, seconds);
+          }
         }
       });
 
@@ -153,7 +180,7 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
 
     } catch (err) {
       console.error('Error initializing Vimeo player:', err);
-      setError('Failed to initialize video player');
+      setError(`Failed to initialize video player: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setIsLoading(false);
     }
 
@@ -1316,7 +1343,7 @@ export default function Learning() {
                           enrollmentId={courseDetails?.enrollment?.id || ''}
                           lessonId={currentLesson.id}
                           onProgressUpdate={(progress, timePosition) => {
-                            // Throttle progress updates to avoid too many API calls
+                            // Save progress updates (already throttled by VimeoPlayer)
                             const enrollmentId = courseDetails?.enrollment?.id;
                             if (enrollmentId && progress > 0 && currentLesson?.id) {
                               updateLessonProgressMutation.mutate({
@@ -1325,22 +1352,24 @@ export default function Learning() {
                                 progress: progress,
                                 lastPosition: timePosition
                               });
+                            }
+                          }}
+                          onProgressComplete={(progress, timePosition) => {
+                            // Handle 90% completion (called only once by VimeoPlayer)
+                            const enrollmentId = courseDetails?.enrollment?.id;
+                            if (enrollmentId && currentLesson?.id) {
+                              const hasQuiz = !!currentLesson.quiz?.quiz;
+                              const quizPassed = currentLesson.quiz?.latestAttempt?.passed;
                               
-                              // Auto-complete lesson when 90% threshold is reached
-                              if (progress >= 90) {
-                                const hasQuiz = !!currentLesson.quiz?.quiz;
-                                const quizPassed = currentLesson.quiz?.latestAttempt?.passed;
-                                
-                                // Auto-complete if no quiz, or if quiz already passed
-                                if (!hasQuiz || quizPassed) {
-                                  updateLessonProgressMutation.mutate({
-                                    enrollmentId,
-                                    lessonId: currentLesson.id,
-                                    progress: Math.min(progress, 100),
-                                    lastPosition: timePosition,
-                                    status: 'completed'
-                                  });
-                                }
+                              // Auto-complete if no quiz, or if quiz already passed
+                              if (!hasQuiz || quizPassed) {
+                                updateLessonProgressMutation.mutate({
+                                  enrollmentId,
+                                  lessonId: currentLesson.id,
+                                  progress: Math.min(progress, 100),
+                                  lastPosition: timePosition,
+                                  status: 'completed'
+                                });
                               }
                             }
                           }}
