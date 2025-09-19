@@ -1409,8 +1409,10 @@ export default function Learning() {
       
       // For lessons with quizzes, both video AND quiz must be completed with 70%+ score
       if (hasQuiz) {
-        if (!isVideoCompleted || !isQuizPassed || quizScore < 70) {
-          return true; // Lesson is locked - quiz not passed with required 70%+ score
+        // Enforce minimum 70% requirement regardless of quiz's configured passing score
+        const requiredScore = Math.max(70, previousLesson.quiz?.quiz?.passingScore || 70);
+        if (!videoMeetsRequirement || !isQuizPassed || quizScore < requiredScore) {
+          return true; // Lesson is locked - quiz not passed with required score
         }
       } else {
         // For lessons without quizzes, just need video completion
@@ -1465,14 +1467,18 @@ export default function Learning() {
           const isQuizPassed = prevLesson.quiz?.latestAttempt?.passed;
           const quizScore = prevLesson.quiz?.latestAttempt?.score || 0;
           
-          if (!isVideoCompleted && videoProgress < 95) {
-            missingRequirement = `Watch at least 95% of "${prevLesson.title}" to continue`;
+          const videoMeetsRequirement = isVideoCompleted || videoProgress >= 95;
+          if (!videoMeetsRequirement) {
+            missingRequirement = `Watch at least 95% of "${prevLesson.title}" to continue (currently ${videoProgress}%)`;
             break;
           }
           
-          if (hasQuiz && (!isQuizPassed || quizScore < 70)) {
-            missingRequirement = `Pass the quiz for "${prevLesson.title}" with 70%+ to continue`;
-            break;
+          if (hasQuiz) {
+            const requiredScore = Math.max(70, prevLesson.quiz?.quiz?.passingScore || 70);
+            if (!isQuizPassed || quizScore < requiredScore) {
+              missingRequirement = `Pass the quiz for "${prevLesson.title}" with ${requiredScore}%+ to continue${quizScore > 0 ? ` (current score: ${quizScore}%)` : ''}`;
+              break;
+            }
           }
         }
         
@@ -1535,6 +1541,29 @@ export default function Learning() {
           </div>
         ) : (
           <div className="space-y-6">
+            {/* Breadcrumb Navigation */}
+            <nav className="flex items-center space-x-2 text-sm text-muted-foreground" data-testid="breadcrumb-navigation">
+              <Link href="/learning" className="hover:text-foreground transition-colors">
+                Learning
+              </Link>
+              <span>/</span>
+              <Link href="/learning/courses" className="hover:text-foreground transition-colors">
+                Courses
+              </Link>
+              <span>/</span>
+              <span className="text-foreground font-medium truncate max-w-xs" title={courseDetails?.title}>
+                {courseDetails?.title}
+              </span>
+              {currentLesson && (
+                <>
+                  <span>/</span>
+                  <span className="text-primary font-medium truncate max-w-xs" title={currentLesson.title}>
+                    Lesson {currentLessonIndex + 1}: {currentLesson.title}
+                  </span>
+                </>
+              )}
+            </nav>
+            
             {/* Course Header */}
             <div className="border-b pb-6">
               <div className="flex items-center justify-between mb-4">
@@ -1955,25 +1984,42 @@ export default function Learning() {
                           return (
                             <div 
                               key={lesson.id}
-                              className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                              className={`flex items-center justify-between p-3 rounded-lg border transition-all duration-200 ${
                                 isLocked 
-                                  ? 'cursor-not-allowed bg-muted/50 opacity-60' 
-                                  : 'cursor-pointer hover:bg-muted'
+                                  ? 'cursor-not-allowed bg-muted/50 opacity-60 border-muted' 
+                                  : 'cursor-pointer hover:bg-muted hover:border-primary/30'
                               } ${
-                                isCurrent ? 'bg-muted border-primary' : ''
+                                isCompleted 
+                                  ? 'border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-800' 
+                                  : isCurrent 
+                                    ? 'border-primary bg-primary/5 shadow-sm' 
+                                    : ''
                               }`}
                               data-testid={`lesson-${lesson.id}`}
                               onClick={() => !isLocked && goToLesson(index)}
                             >
                               <div className="flex items-center space-x-3">
                                 {isLocked ? (
-                                  <Lock className="w-5 h-5 text-muted-foreground" />
+                                  <div className="relative">
+                                    <Lock className="w-5 h-5 text-orange-500" />
+                                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                                  </div>
                                 ) : isCompleted ? (
-                                  <CheckCircle className="w-5 h-5 text-green-600" />
+                                  <div className="relative">
+                                    <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center shadow-sm">
+                                      <CheckCircle className="w-4 h-4 text-white fill-white" />
+                                    </div>
+                                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" />
+                                  </div>
                                 ) : isInProgress ? (
-                                  <Play className="w-5 h-5 text-primary" />
+                                  <div className="relative">
+                                    <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-sm">
+                                      <Play className="w-3 h-3 text-white fill-white ml-0.5" />
+                                    </div>
+                                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+                                  </div>
                                 ) : (
-                                  <div className="w-5 h-5 rounded-full border-2 border-muted-foreground" />
+                                  <Circle className="w-5 h-5 text-muted-foreground/50" />
                                 )}
                                 <div>
                                   <div className="flex items-center gap-2">
