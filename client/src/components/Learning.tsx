@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Player from '@vimeo/player';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -105,7 +105,7 @@ const badgeSchema = z.object({
   color: z.string().default("#3B82F6"),
 });
 
-// Vimeo Player Component with Progress Tracking
+// Vimeo Player Component with Progress Tracking and Reliability
 function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComplete, onProgressComplete }: {
   videoId: string;
   enrollmentId: string;
@@ -121,6 +121,9 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   const [isCompleted, setIsCompleted] = useState(false);
   const lastSavedProgress = useRef<number>(0);
   const loadingTimeoutRef = useRef<number | null>(null);
+  const retryCountRef = useRef<number>(0);
+  const maxRetries = 3;
+  const isLoadingVideoRef = useRef<boolean>(false);
 
   // Store callbacks in refs to avoid effect dependencies
   const onProgressUpdateRef = useRef(onProgressUpdate);
@@ -258,60 +261,95 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
     };
   }, []); // Only run once on mount
 
-  // Handle video ID changes by loading new video
+  // Retry logic with exponential backoff
+  const loadVideoWithRetry = useCallback(async (videoIdNumber: number) => {
+    if (!vimeoPlayer.current || isLoadingVideoRef.current) return;
+    
+    isLoadingVideoRef.current = true;
+    const currentRetry = retryCountRef.current;
+    
+    try {
+      // Properly unload any existing video first
+      await vimeoPlayer.current.unload().catch(() => {
+        // Ignore unload errors - video might not be loaded
+      });
+      
+      // Wait a bit after unload to prevent race conditions
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Load the new video
+      await vimeoPlayer.current.loadVideo(videoIdNumber);
+      
+      console.log(`Successfully loaded video ${videoIdNumber}`);
+      retryCountRef.current = 0; // Reset retry counter on success
+      setError(null);
+      
+    } catch (err: any) {
+      console.error(`Error loading video (attempt ${currentRetry + 1}):`, err);
+      
+      if (currentRetry < maxRetries) {
+        retryCountRef.current = currentRetry + 1;
+        const delay = Math.pow(2, currentRetry) * 1000; // Exponential backoff
+        
+        console.log(`Retrying in ${delay}ms... (attempt ${currentRetry + 2}/${maxRetries + 1})`);
+        setTimeout(() => {
+          isLoadingVideoRef.current = false;
+          loadVideoWithRetry(videoIdNumber);
+        }, delay);
+      } else {
+        setError(`Failed to load video after ${maxRetries + 1} attempts: ${err.message || 'Video may be private or not found'}`);
+        setIsLoading(false);
+        if (loadingTimeoutRef.current) {
+          window.clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
+      }
+    } finally {
+      if (retryCountRef.current === 0) {
+        isLoadingVideoRef.current = false;
+      }
+    }
+  }, []);
+
+  // Handle video ID changes by loading new video with proper lifecycle
   useEffect(() => {
     if (!videoId) return;
+
+    // Validate video ID first
+    const videoIdNumber = parseInt(videoId);
+    if (isNaN(videoIdNumber) || videoIdNumber <= 0) {
+      setError(`Invalid video ID: ${videoId}`);
+      setIsLoading(false);
+      return;
+    }
 
     // Reset state when switching videos
     lastSavedProgress.current = 0;
     setIsCompleted(false);
     setIsLoading(true);
     setError(null);
+    retryCountRef.current = 0;
+    isLoadingVideoRef.current = false;
 
     // Clear any existing timeout
     if (loadingTimeoutRef.current) {
       window.clearTimeout(loadingTimeoutRef.current);
     }
 
-    // Set loading timeout (10 seconds)
+    // Set loading timeout (15 seconds to account for retries)
     loadingTimeoutRef.current = window.setTimeout(() => {
       setError('Video loading timed out. Please check your connection or try refreshing.');
       setIsLoading(false);
-    }, 10000);
+      isLoadingVideoRef.current = false;
+    }, 15000);
 
-    try {
-      const videoIdNumber = parseInt(videoId);
-      if (isNaN(videoIdNumber)) {
-        throw new Error(`Invalid video ID: ${videoId}`);
-      }
-
-      // If player not initialized yet, it will be initialized with this video ID in the mount effect
-      if (!vimeoPlayer.current) {
-        return; // The mount effect will handle this video ID
-      }
-
-      // Load new video using existing player instance
-      vimeoPlayer.current.loadVideo(videoIdNumber).then(() => {
-        console.log(`Successfully loaded video ${videoIdNumber}`);
-      }).catch((err) => {
-        console.error('Error loading video:', err);
-        setError(`Failed to load video: ${err.message || 'Video may be private or not found'}`);
-        setIsLoading(false);
-        if (loadingTimeoutRef.current) {
-          window.clearTimeout(loadingTimeoutRef.current);
-          loadingTimeoutRef.current = null;
-        }
-      });
-
-    } catch (err) {
-      console.error('Error loading video:', err);
-      setError(`Failed to load video: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      setIsLoading(false);
-      if (loadingTimeoutRef.current) {
-        window.clearTimeout(loadingTimeoutRef.current);
-        loadingTimeoutRef.current = null;
-      }
+    // If player not initialized yet, wait for mount effect to handle initialization
+    if (!vimeoPlayer.current) {
+      return;
     }
+
+    // Load video with retry logic
+    loadVideoWithRetry(videoIdNumber);
   }, [videoId]); // Only depend on videoId
 
   if (error) {
@@ -1528,6 +1566,7 @@ export default function Learning() {
                       {/* Enhanced Vimeo Video Integration */}
                       {currentLesson?.vimeoVideoId ? (
                         <VimeoPlayer
+                          key={`${currentLesson.id}-${currentLesson.vimeoVideoId}`}
                           videoId={currentLesson.vimeoVideoId}
                           enrollmentId={courseDetails?.enrollment?.id || ''}
                           lessonId={currentLesson.id}
