@@ -4641,7 +4641,7 @@ export default function Learning() {
           </div>
         </div>)}
 
-        {activeTab === "courses" && (<div className="space-y-6">
+        {!isAdminMode && activeTab === "courses" && (<div className="space-y-6">
           {/* Search and Filter Controls */}
           <Card data-testid="card-course-filters">
             <CardHeader>
@@ -4826,7 +4826,7 @@ export default function Learning() {
           </div>
         </div>)}
 
-        {activeTab === "certificates" && (<div className="space-y-6">
+        {!isAdminMode && activeTab === "certificates" && (<div className="space-y-6">
           {/* Certificates Overview */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card data-testid="card-total-certificates">
@@ -5083,7 +5083,7 @@ Authorized by Apex Learning Management System
           </Card>
         </div>)}
 
-        {activeTab === "matrix" && (<div className="space-y-6">
+        {!isAdminMode && activeTab === "matrix" && (<div className="space-y-6">
           {/* Training Matrix Overview */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <Card data-testid="card-required-training">
