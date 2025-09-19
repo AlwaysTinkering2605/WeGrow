@@ -1146,6 +1146,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { quizId } = req.params;
       const { enrollmentId, attemptNumber } = req.body;
       
+      // Prevent starting quizzes with no questions
+      const questions = await storage.getQuizQuestions(quizId);
+      if (questions.length === 0) {
+        return res.status(400).json({ 
+          message: "This quiz has no questions and cannot be started. Please contact your instructor to add questions first." 
+        });
+      }
+      
       // Verify enrollment ownership before allowing quiz attempt
       if (enrollmentId) {
         const isOwner = await verifyEnrollmentOwnership(enrollmentId, userId);
@@ -1644,6 +1652,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get quiz questions without correct answers for taking the quiz
       const questions = await storage.getQuizQuestions(quizId);
+      
+      // Maintain backward compatibility by always returning an array
+      // Add warning via HTTP header for empty quizzes
+      if (questions.length === 0) {
+        res.set('X-Quiz-Warning', 'This quiz has no questions. Please add questions before taking it.');
+        return res.json([]);
+      }
+      
       const questionsForTaking = questions.map(q => ({
         id: q.id,
         type: q.type,
