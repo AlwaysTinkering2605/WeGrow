@@ -229,8 +229,8 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
             onProgressUpdateRef.current(progress, seconds);
           }
           
-          // Call completion callback when 100% reached (only once)
-          if (progress >= 100 && !isCompleted && onProgressCompleteRef.current) {
+          // Call completion callback when 95% reached (auto-complete) or 100% reached (only once)
+          if (progress >= 95 && !isCompleted && onProgressCompleteRef.current) {
             setIsCompleted(true);
             onProgressCompleteRef.current(progress, seconds);
           }
@@ -424,6 +424,10 @@ export default function Learning() {
   const [userAnswers, setUserAnswers] = useState<{ [key: string]: any }>({});
   const [currentAttempt, setCurrentAttempt] = useState<any>(null);
   const [quizStartTime, setQuizStartTime] = useState<Date | null>(null);
+  
+  // Progressive quiz state
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [isQuizComplete, setIsQuizComplete] = useState(false);
 
   // Admin interface state
   const [isCreateCourseOpen, setIsCreateCourseOpen] = useState(false);
@@ -1334,6 +1338,10 @@ export default function Learning() {
       setCurrentQuiz(quiz);
       setQuizQuestionsForTaking(questions);
       setCurrentAttempt(attemptResult);
+      
+      // Reset progressive quiz state
+      setCurrentQuestionIndex(0);
+      setIsQuizComplete(false);
       setUserAnswers({});
       setQuizStartTime(new Date());
       setIsQuizActive(true);
@@ -1383,17 +1391,26 @@ export default function Learning() {
   const isLessonLocked = (lessonIndex: number): boolean => {
     if (lessonIndex === 0) return false; // First lesson is never locked
     
-    // Check if all previous lessons are completed
+    // Check if all previous lessons are completed with strict requirements
     for (let i = 0; i < lessonIndex; i++) {
       const previousLesson = availableLessons[i];
       const isVideoCompleted = previousLesson.progress?.status === 'completed';
+      const videoProgress = previousLesson.progress?.progressPercentage || 0;
       const hasQuiz = !!previousLesson.quiz?.quiz;
       const isQuizPassed = previousLesson.quiz?.latestAttempt?.passed;
+      const quizScore = previousLesson.quiz?.latestAttempt?.score || 0;
       
-      // For lessons with quizzes, both video AND quiz must be completed
+      // Strict video completion requirement: must be completed OR have 95%+ progress
+      const videoMeetsRequirement = isVideoCompleted || videoProgress >= 95;
+      
+      if (!videoMeetsRequirement) {
+        return true; // Lesson is locked - video not sufficiently complete
+      }
+      
+      // For lessons with quizzes, both video AND quiz must be completed with 70%+ score
       if (hasQuiz) {
-        if (!isVideoCompleted || !isQuizPassed) {
-          return true; // Lesson is locked
+        if (!isVideoCompleted || !isQuizPassed || quizScore < 70) {
+          return true; // Lesson is locked - quiz not passed with required 70%+ score
         }
       } else {
         // For lessons without quizzes, just need video completion
@@ -1437,9 +1454,31 @@ export default function Learning() {
     if (lessonIndex >= 0 && lessonIndex < availableLessons.length) {
       // Check if the lesson is locked
       if (isLessonLocked(lessonIndex)) {
+        // Find which specific requirement is missing for better messaging
+        let missingRequirement = "Complete all requirements from previous lessons";
+        
+        for (let i = 0; i < lessonIndex; i++) {
+          const prevLesson = availableLessons[i];
+          const isVideoCompleted = prevLesson.progress?.status === 'completed';
+          const videoProgress = prevLesson.progress?.progressPercentage || 0;
+          const hasQuiz = !!prevLesson.quiz?.quiz;
+          const isQuizPassed = prevLesson.quiz?.latestAttempt?.passed;
+          const quizScore = prevLesson.quiz?.latestAttempt?.score || 0;
+          
+          if (!isVideoCompleted && videoProgress < 95) {
+            missingRequirement = `Watch at least 95% of "${prevLesson.title}" to continue`;
+            break;
+          }
+          
+          if (hasQuiz && (!isQuizPassed || quizScore < 70)) {
+            missingRequirement = `Pass the quiz for "${prevLesson.title}" with 70%+ to continue`;
+            break;
+          }
+        }
+        
         toast({
-          title: "Lesson Locked",
-          description: "Complete the previous lesson(s) and any quizzes to unlock this lesson.",
+          title: "Lesson Locked 🔒",
+          description: missingRequirement,
           variant: "destructive",
         });
         return;
@@ -1583,7 +1622,7 @@ export default function Learning() {
                             }
                           }}
                           onProgressComplete={(progress, timePosition) => {
-                            // Handle 100% completion (called only once by VimeoPlayer)
+                            // Handle 95%+ completion (called only once by VimeoPlayer)
                             const enrollmentId = courseDetails?.enrollment?.id;
                             if (enrollmentId && currentLesson?.id) {
                               const hasQuiz = !!currentLesson.quiz?.quiz;
@@ -1597,6 +1636,13 @@ export default function Learning() {
                                   progress: Math.min(progress, 100),
                                   lastPosition: timePosition,
                                   status: 'completed'
+                                });
+                                
+                                toast({
+                                  title: "Video Auto-Completed! 🎉",
+                                  description: progress >= 100 
+                                    ? "You've watched the full video!" 
+                                    : `Auto-completed at ${progress}% watched!`,
                                 });
                               }
                             }
@@ -1619,9 +1665,9 @@ export default function Learning() {
                   </CardContent>
                 </Card>
 
-                {/* Quiz Interface */}
-                {isQuizActive && currentQuiz && (
-                  <Card data-testid="card-quiz-interface">
+                {/* Progressive Quiz Interface */}
+                {isQuizActive && currentQuiz && quizQuestionsForTaking.length > 0 && (
+                  <Card data-testid="card-progressive-quiz">
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div>
@@ -1643,164 +1689,224 @@ export default function Learning() {
                           </Badge>
                         </div>
                       </div>
+                      
+                      {/* Quiz Progress */}
+                      <div className="mt-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">
+                            Question {currentQuestionIndex + 1} of {quizQuestionsForTaking.length}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            {Object.keys(userAnswers).length} answered
+                          </span>
+                        </div>
+                        <Progress value={((currentQuestionIndex + 1) / quizQuestionsForTaking.length) * 100} className="h-2" />
+                      </div>
                     </CardHeader>
+                    
                     <CardContent className="space-y-6">
-                      {quizQuestionsForTaking.map((question, index) => (
-                        <div key={question.id} className="space-y-4 p-4 border rounded-lg">
-                          <div className="flex items-start gap-3">
-                            <Badge variant="outline" className="text-xs px-2 py-1">
-                              Q{index + 1}
-                            </Badge>
-                            <div className="flex-1">
-                              <h4 className="font-medium text-lg leading-relaxed">
-                                {question.questionText}
-                              </h4>
+                      {(() => {
+                        const currentQuestion = quizQuestionsForTaking[currentQuestionIndex];
+                        if (!currentQuestion) return null;
+
+                        return (
+                          <div className="space-y-6">
+                            {/* Question Display */}
+                            <div className="text-center p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg">
+                              <div className="inline-flex items-center justify-center w-12 h-12 bg-primary text-primary-foreground rounded-full mb-4">
+                                <span className="text-lg font-bold">{currentQuestionIndex + 1}</span>
+                              </div>
+                              <h3 className="text-xl font-semibold leading-relaxed text-center max-w-2xl mx-auto">
+                                {currentQuestion.questionText}
+                              </h3>
+                            </div>
+
+                            {/* Answer Options */}
+                            <div className="space-y-3">
+                              {/* Multiple Choice Questions */}
+                              {currentQuestion.type === "multiple_choice" && (
+                                <div className="grid gap-3 max-w-2xl mx-auto">
+                                  {currentQuestion.options?.map((option: string, optionIndex: number) => (
+                                    <label 
+                                      key={optionIndex}
+                                      className={`flex items-center space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                                        userAnswers[currentQuestion.id] === optionIndex 
+                                          ? 'border-primary bg-primary/5 shadow-sm' 
+                                          : 'border-border hover:border-primary/50 hover:bg-primary/5'
+                                      }`}
+                                    >
+                                      <input
+                                        type="radio"
+                                        name={currentQuestion.id}
+                                        value={optionIndex}
+                                        checked={userAnswers[currentQuestion.id] === optionIndex}
+                                        onChange={(e) => updateQuizAnswer(currentQuestion.id, parseInt(e.target.value))}
+                                        className="h-4 w-4 text-primary"
+                                        data-testid={`radio-question-${currentQuestionIndex}-option-${optionIndex}`}
+                                      />
+                                      <span className="text-base leading-relaxed flex-1">
+                                        {option}
+                                      </span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* True/False Questions */}
+                              {currentQuestion.type === "true_false" && (
+                                <div className="grid grid-cols-2 gap-4 max-w-lg mx-auto">
+                                  <label 
+                                    className={`flex items-center justify-center space-x-3 p-6 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                                      userAnswers[currentQuestion.id] === 0 
+                                        ? 'border-green-500 bg-green-50 text-green-700 dark:bg-green-900/20' 
+                                        : 'border-border hover:border-green-500/50 hover:bg-green-50/50'
+                                    }`}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name={currentQuestion.id}
+                                      value="0"
+                                      checked={userAnswers[currentQuestion.id] === 0}
+                                      onChange={(e) => updateQuizAnswer(currentQuestion.id, parseInt(e.target.value))}
+                                      className="sr-only"
+                                      data-testid={`radio-question-${currentQuestionIndex}-true`}
+                                    />
+                                    <CheckCircle className="w-5 h-5" />
+                                    <span className="font-semibold">True</span>
+                                  </label>
+                                  <label 
+                                    className={`flex items-center justify-center space-x-3 p-6 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                                      userAnswers[currentQuestion.id] === 1 
+                                        ? 'border-red-500 bg-red-50 text-red-700 dark:bg-red-900/20' 
+                                        : 'border-border hover:border-red-500/50 hover:bg-red-50/50'
+                                    }`}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name={currentQuestion.id}
+                                      value="1"
+                                      checked={userAnswers[currentQuestion.id] === 1}
+                                      onChange={(e) => updateQuizAnswer(currentQuestion.id, parseInt(e.target.value))}
+                                      className="sr-only"
+                                      data-testid={`radio-question-${currentQuestionIndex}-false`}
+                                    />
+                                    <AlertCircle className="w-5 h-5" />
+                                    <span className="font-semibold">False</span>
+                                  </label>
+                                </div>
+                              )}
+
+                              {/* Multi-Select Questions */}
+                              {currentQuestion.type === "multi_select" && (
+                                <div className="space-y-3 max-w-2xl mx-auto">
+                                  <p className="text-sm text-muted-foreground text-center mb-4">
+                                    Select all that apply
+                                  </p>
+                                  {currentQuestion.options?.map((option: string, optionIndex: number) => (
+                                    <label 
+                                      key={optionIndex}
+                                      className={`flex items-center space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                                        (userAnswers[currentQuestion.id] || []).includes(optionIndex)
+                                          ? 'border-primary bg-primary/5 shadow-sm' 
+                                          : 'border-border hover:border-primary/50 hover:bg-primary/5'
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        value={optionIndex}
+                                        checked={(userAnswers[currentQuestion.id] || []).includes(optionIndex)}
+                                        onChange={(e) => {
+                                          const currentAnswers = userAnswers[currentQuestion.id] || [];
+                                          let newAnswers;
+                                          if (e.target.checked) {
+                                            newAnswers = [...currentAnswers, optionIndex];
+                                          } else {
+                                            newAnswers = currentAnswers.filter((idx: number) => idx !== optionIndex);
+                                          }
+                                          updateQuizAnswer(currentQuestion.id, newAnswers);
+                                        }}
+                                        className="h-4 w-4 text-primary"
+                                        data-testid={`checkbox-question-${currentQuestionIndex}-option-${optionIndex}`}
+                                      />
+                                      <span className="text-base leading-relaxed flex-1">
+                                        {option}
+                                      </span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Navigation and Actions */}
+                            <div className="flex justify-between items-center pt-6">
+                              <Button 
+                                variant="outline"
+                                onClick={() => {
+                                  if (currentQuestionIndex > 0) {
+                                    setCurrentQuestionIndex(currentQuestionIndex - 1);
+                                  }
+                                }}
+                                disabled={currentQuestionIndex === 0}
+                                data-testid="button-previous-question"
+                              >
+                                ← Previous
+                              </Button>
+                              
+                              <div className="flex items-center gap-4">
+                                <Button 
+                                  variant="outline" 
+                                  onClick={() => {
+                                    setIsQuizActive(false);
+                                    setCurrentQuiz(null);
+                                    setQuizQuestionsForTaking([]);
+                                    setUserAnswers({});
+                                    setCurrentAttempt(null);
+                                    setQuizStartTime(null);
+                                    setCurrentQuestionIndex(0);
+                                    setIsQuizComplete(false);
+                                  }}
+                                  data-testid="button-cancel-quiz"
+                                >
+                                  Cancel Quiz
+                                </Button>
+                                
+                                {currentQuestionIndex < quizQuestionsForTaking.length - 1 ? (
+                                  <Button 
+                                    onClick={() => {
+                                      setCurrentQuestionIndex(currentQuestionIndex + 1);
+                                    }}
+                                    disabled={userAnswers[currentQuestion.id] === undefined || 
+                                             (currentQuestion.type === "multi_select" && 
+                                              (!userAnswers[currentQuestion.id] || userAnswers[currentQuestion.id].length === 0))}
+                                    data-testid="button-next-question"
+                                  >
+                                    Next →
+                                  </Button>
+                                ) : (
+                                  <Button 
+                                    onClick={submitQuiz}
+                                    disabled={Object.keys(userAnswers).length !== quizQuestionsForTaking.length || submitQuizAttemptMutation.isPending}
+                                    data-testid="button-submit-quiz"
+                                    className="bg-green-600 hover:bg-green-700"
+                                  >
+                                    {submitQuizAttemptMutation.isPending ? (
+                                      <>
+                                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                        Submitting...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle className="w-4 h-4 mr-2" />
+                                        Submit Quiz
+                                      </>
+                                    )}
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           </div>
-
-                          {/* Multiple Choice Questions */}
-                          {question.type === "multiple_choice" && (
-                            <div className="space-y-2 ml-8">
-                              {question.options?.map((option: string, optionIndex: number) => (
-                                <div key={optionIndex} className="flex items-center space-x-2">
-                                  <input
-                                    type="radio"
-                                    id={`${question.id}-${optionIndex}`}
-                                    name={question.id}
-                                    value={optionIndex}
-                                    checked={userAnswers[question.id] === optionIndex}
-                                    onChange={(e) => updateQuizAnswer(question.id, parseInt(e.target.value))}
-                                    className="h-4 w-4"
-                                    data-testid={`radio-question-${index}-option-${optionIndex}`}
-                                  />
-                                  <label 
-                                    htmlFor={`${question.id}-${optionIndex}`}
-                                    className="text-sm leading-relaxed cursor-pointer"
-                                  >
-                                    {option}
-                                  </label>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* True/False Questions */}
-                          {question.type === "true_false" && (
-                            <div className="space-y-2 ml-8">
-                              <div className="flex items-center space-x-2">
-                                <input
-                                  type="radio"
-                                  id={`${question.id}-true`}
-                                  name={question.id}
-                                  value="0"
-                                  checked={userAnswers[question.id] === 0}
-                                  onChange={(e) => updateQuizAnswer(question.id, parseInt(e.target.value))}
-                                  className="h-4 w-4"
-                                  data-testid={`radio-question-${index}-true`}
-                                />
-                                <label 
-                                  htmlFor={`${question.id}-true`}
-                                  className="text-sm leading-relaxed cursor-pointer"
-                                >
-                                  True
-                                </label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <input
-                                  type="radio"
-                                  id={`${question.id}-false`}
-                                  name={question.id}
-                                  value="1"
-                                  checked={userAnswers[question.id] === 1}
-                                  onChange={(e) => updateQuizAnswer(question.id, parseInt(e.target.value))}
-                                  className="h-4 w-4"
-                                  data-testid={`radio-question-${index}-false`}
-                                />
-                                <label 
-                                  htmlFor={`${question.id}-false`}
-                                  className="text-sm leading-relaxed cursor-pointer"
-                                >
-                                  False
-                                </label>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Multi-Select Questions */}
-                          {question.type === "multi_select" && (
-                            <div className="space-y-2 ml-8">
-                              {question.options?.map((option: string, optionIndex: number) => (
-                                <div key={optionIndex} className="flex items-center space-x-2">
-                                  <input
-                                    type="checkbox"
-                                    id={`${question.id}-${optionIndex}`}
-                                    value={optionIndex}
-                                    checked={(userAnswers[question.id] || []).includes(optionIndex)}
-                                    onChange={(e) => {
-                                      const currentAnswers = userAnswers[question.id] || [];
-                                      let newAnswers;
-                                      if (e.target.checked) {
-                                        newAnswers = [...currentAnswers, optionIndex];
-                                      } else {
-                                        newAnswers = currentAnswers.filter((idx: number) => idx !== optionIndex);
-                                      }
-                                      updateQuizAnswer(question.id, newAnswers);
-                                    }}
-                                    className="h-4 w-4"
-                                    data-testid={`checkbox-question-${index}-option-${optionIndex}`}
-                                  />
-                                  <label 
-                                    htmlFor={`${question.id}-${optionIndex}`}
-                                    className="text-sm leading-relaxed cursor-pointer"
-                                  >
-                                    {option}
-                                  </label>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-
-                      {/* Quiz Actions */}
-                      <div className="flex justify-between items-center pt-6 border-t">
-                        <Button 
-                          variant="outline" 
-                          onClick={() => {
-                            setIsQuizActive(false);
-                            setCurrentQuiz(null);
-                            setQuizQuestionsForTaking([]);
-                            setUserAnswers({});
-                            setCurrentAttempt(null);
-                            setQuizStartTime(null);
-                          }}
-                          data-testid="button-cancel-quiz"
-                        >
-                          Cancel Quiz
-                        </Button>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">
-                            {Object.keys(userAnswers).length} of {quizQuestionsForTaking.length} answered
-                          </span>
-                          <Button 
-                            onClick={submitQuiz}
-                            disabled={Object.keys(userAnswers).length !== quizQuestionsForTaking.length || submitQuizAttemptMutation.isPending}
-                            data-testid="button-submit-quiz"
-                          >
-                            {submitQuizAttemptMutation.isPending ? (
-                              <>
-                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                Submitting...
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Submit Quiz
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
+                        );
+                      })()}
                     </CardContent>
                   </Card>
                 )}
@@ -2048,16 +2154,47 @@ export default function Learning() {
                       }
 
                       if (!isVideoCompleted) {
+                        const canManuallyComplete = videoProgress >= 90;
+                        
                         return (
                           <div className="space-y-3">
                             <div className="text-center">
                               <Play className="w-8 h-8 mx-auto mb-2 text-primary" />
                               <p className="font-medium">Watch the video to continue</p>
                               <p className="text-sm text-muted-foreground">
-                                Progress: {videoProgress}% complete (must reach 100%)
+                                Progress: {videoProgress}% complete 
+                                {videoProgress >= 95 ? ' (auto-completing...)' : ' (need 95% or manual complete at 90%)'}
                               </p>
                             </div>
                             <Progress value={videoProgress} className="w-full" />
+                            
+                            {canManuallyComplete && (
+                              <Button
+                                className="w-full"
+                                onClick={() => {
+                                  const enrollmentId = courseDetails?.enrollment?.id;
+                                  if (enrollmentId && currentLesson?.id) {
+                                    updateLessonProgressMutation.mutate({
+                                      enrollmentId,
+                                      lessonId: currentLesson.id,
+                                      progress: 100,
+                                      lastPosition: currentLesson.estimatedDuration || 0,
+                                      status: 'completed'
+                                    });
+                                    
+                                    toast({
+                                      title: "Video Completed! ✅",
+                                      description: `You've watched ${videoProgress}% of the video and marked it complete.`,
+                                    });
+                                  }
+                                }}
+                                disabled={updateLessonProgressMutation.isPending}
+                                data-testid="button-complete-video"
+                              >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                {updateLessonProgressMutation.isPending ? 'Completing...' : 'Mark Video Complete'}
+                              </Button>
+                            )}
                           </div>
                         );
                       }
