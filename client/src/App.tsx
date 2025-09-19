@@ -22,31 +22,32 @@ function Router() {
     );
   }
 
+  // Use early return to ensure Switch gets direct Route children
+  if (!isAuthenticated) {
+    return (
+      <Switch>
+        <Route path="/" component={Landing} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+
   return (
     <Switch>
-      {!isAuthenticated ? (
-        <>
-          <Route path="/" component={Landing} />
-          <Route component={NotFound} />
-        </>
-      ) : (
-        <>
-          <Route path="/" component={Home} />
-          <Route path="/dashboard" component={Home} />
-          <Route path="/goals" component={Home} />
-          <Route path="/development" component={Home} />
-          <Route path="/learning" component={Home} />
-          <Route path="/learning/:rest*" component={Home} />
-          <Route path="/recognition" component={Home} />
-          <Route path="/meetings" component={Home} />
-          <Route path="/profile" component={Home} />
-          <Route path="/team" component={Home} />
-          <Route path="/team-objectives" component={Home} />
-          <Route path="/reports" component={Home} />
-          <Route path="/settings" component={Home} />
-          <Route component={NotFound} />
-        </>
-      )}
+      <Route path="/" component={Home} />
+      <Route path="/dashboard" component={Home} />
+      <Route path="/goals" component={Home} />
+      <Route path="/development" component={Home} />
+      <Route path="/learning" component={Home} />
+      <Route path="/learning/:rest*" component={Home} />
+      <Route path="/recognition" component={Home} />
+      <Route path="/meetings" component={Home} />
+      <Route path="/profile" component={Home} />
+      <Route path="/team" component={Home} />
+      <Route path="/team-objectives" component={Home} />
+      <Route path="/reports" component={Home} />
+      <Route path="/settings" component={Home} />
+      <Route component={NotFound} />
     </Switch>
   );
 }
