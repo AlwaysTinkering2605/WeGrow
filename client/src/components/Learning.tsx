@@ -67,12 +67,17 @@ const courseSchema = z.object({
   isPublished: z.boolean().default(false),
 });
 
-const lessonSchema = z.object({
-  title: z.string().min(1, "Lesson title is required"),
-  description: z.string().optional(),
-  vimeoVideoId: z.string().optional(),
-  order: z.coerce.number().min(1),
-  estimatedMinutes: z.coerce.number().min(1).max(300),
+// Import the proper lesson schema from shared
+import { insertLessonSchema } from "@shared/schema";
+
+// Extend the insert schema for client-side validation
+const lessonSchema = insertLessonSchema.extend({
+  // Override to make these coercible from form inputs
+  orderIndex: z.coerce.number().min(1),
+  estimatedDuration: z.coerce.number().min(60).max(18000), // 1 minute to 5 hours in seconds
+  type: z.enum(["video", "document", "link", "quiz"]).default("video"),
+}).omit({
+  moduleId: true, // Will be provided by the courseId context
 });
 
 const quizSchema = z.object({
@@ -458,8 +463,10 @@ export default function Learning() {
       title: "",
       description: "",
       vimeoVideoId: "",
-      order: 1,
-      estimatedMinutes: 30,
+      type: "video" as const,
+      orderIndex: 1,
+      estimatedDuration: 1800, // 30 minutes in seconds
+      isRequired: true,
     },
   });
 
@@ -469,8 +476,10 @@ export default function Learning() {
       title: "",
       description: "",
       vimeoVideoId: "",
-      order: 1,
-      estimatedMinutes: 30,
+      type: "video" as const,
+      orderIndex: 1,
+      estimatedDuration: 1800, // 30 minutes in seconds
+      isRequired: true,
     },
   });
 
@@ -481,8 +490,10 @@ export default function Learning() {
         title: editingLesson.title || "",
         description: editingLesson.description || "",
         vimeoVideoId: editingLesson.vimeoVideoId || "",
-        order: editingLesson.orderIndex || 1,
-        estimatedMinutes: Math.round((editingLesson.estimatedDuration || 1800) / 60), // Convert seconds to minutes
+        type: editingLesson.type || "video",
+        orderIndex: editingLesson.orderIndex || 1,
+        estimatedDuration: editingLesson.estimatedDuration || 1800,
+        isRequired: editingLesson.isRequired ?? true,
       });
     }
   }, [editingLesson, editLessonForm]);
@@ -3129,7 +3140,7 @@ export default function Learning() {
                             <div className="grid grid-cols-2 gap-4">
                               <FormField
                                 control={createLessonForm.control}
-                                name="order"
+                                name="orderIndex"
                                 render={({ field }) => (
                                   <FormItem>
                                     <FormLabel>Lesson Order</FormLabel>
@@ -3148,10 +3159,10 @@ export default function Learning() {
                               />
                               <FormField
                                 control={createLessonForm.control}
-                                name="estimatedMinutes"
+                                name="estimatedDuration"
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel>Duration (minutes)</FormLabel>
+                                    <FormLabel>Duration (seconds)</FormLabel>
                                     <FormControl>
                                       <Input 
                                         type="number" 
@@ -3261,7 +3272,7 @@ export default function Learning() {
                             <div className="flex space-x-4">
                               <FormField
                                 control={editLessonForm.control}
-                                name="order"
+                                name="orderIndex"
                                 render={({ field }) => (
                                   <FormItem className="flex-1">
                                     <FormLabel>Lesson Order</FormLabel>
@@ -3281,10 +3292,10 @@ export default function Learning() {
                               />
                               <FormField
                                 control={editLessonForm.control}
-                                name="estimatedMinutes"
+                                name="estimatedDuration"
                                 render={({ field }) => (
                                   <FormItem className="flex-1">
-                                    <FormLabel>Duration (minutes)</FormLabel>
+                                    <FormLabel>Duration (seconds)</FormLabel>
                                     <FormControl>
                                       <Input 
                                         type="number" 
