@@ -233,6 +233,7 @@ export interface IStorage {
   getLessonProgress(enrollmentId: string, lessonId: string): Promise<LessonProgress | undefined>;
   getUserLessonProgress(enrollmentId: string): Promise<LessonProgress[]>;
   updateLessonProgressFromQuiz(enrollmentId: string, quizId: string, userId: string): Promise<void>;
+  completeLessonManually(enrollmentId: string, lessonId: string): Promise<{ success: boolean; message: string }>;
 
   // LMS - Certificates and Badges
   issueCertificate(certificate: InsertCertificate): Promise<Certificate>;
@@ -1546,6 +1547,7 @@ export class DatabaseStorage implements IStorage {
           .set({
             status: "completed",
             progressPercentage: 100,
+            completionMethod: "quiz",
             completedAt: new Date(),
             updatedAt: new Date()
           })
@@ -1562,6 +1564,7 @@ export class DatabaseStorage implements IStorage {
             lessonId: quiz.lessonId,
             status: "completed",
             progressPercentage: 100,
+            completionMethod: "quiz",
             timeSpent: 0, // Quiz time will be tracked separately
             completedAt: new Date(),
           });
@@ -1569,6 +1572,51 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error updating lesson progress from quiz:", error);
       throw error;
+    }
+  }
+
+  async completeLessonManually(enrollmentId: string, lessonId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // Get current lesson progress
+      const progress = await this.getLessonProgress(enrollmentId, lessonId);
+      
+      if (!progress) {
+        return { success: false, message: "No progress found for this lesson. Please watch some of the video first." };
+      }
+
+      // Calculate watched percentage from lastPosition and durationSeconds
+      let watchedPercent = 0;
+      if (progress.durationSeconds && progress.durationSeconds > 0 && progress.lastPosition !== null) {
+        watchedPercent = Math.floor((progress.lastPosition / progress.durationSeconds) * 100);
+      }
+
+      // Check if watched at least 90%
+      if (watchedPercent < 90) {
+        return { 
+          success: false, 
+          message: `You need to watch at least 90% of the video to complete this lesson. Currently watched: ${watchedPercent}%` 
+        };
+      }
+
+      // Update lesson to completed with manual completion method
+      await db
+        .update(lessonProgress)
+        .set({
+          status: "completed",
+          progressPercentage: 100,
+          completionMethod: "manual",
+          completedAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(and(
+          eq(lessonProgress.enrollmentId, enrollmentId),
+          eq(lessonProgress.lessonId, lessonId)
+        ));
+
+      return { success: true, message: "Lesson marked as complete!" };
+    } catch (error) {
+      console.error("Error completing lesson manually:", error);
+      return { success: false, message: "Error completing lesson. Please try again." };
     }
   }
 

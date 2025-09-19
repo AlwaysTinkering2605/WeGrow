@@ -1084,7 +1084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add the route that the frontend expects (PATCH /api/lms/progress)
   app.patch('/api/lms/progress', isAuthenticated, async (req: any, res) => {
     try {
-      const { enrollmentId, lessonId, progressPercentage, lastPosition, timeSpent, status } = req.body;
+      const { enrollmentId, lessonId, progressPercentage, lastPosition, timeSpent, status, durationSeconds } = req.body;
       const userId = req.user.claims.sub;
       
       // Verify enrollment ownership
@@ -1101,6 +1101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: status || (progressPercentage >= 100 ? 'completed' : 'in_progress'),
         timeSpent: timeSpent || 0,
         lastPosition: lastPosition || 0,
+        durationSeconds: durationSeconds || null,
         completedAt: (status === 'completed' || progressPercentage >= 100) ? new Date() : null
       };
       
@@ -1108,6 +1109,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(progress);
     } catch (error: any) {
       return handleValidationError(error, res, "update lesson progress");
+    }
+  });
+
+  // Manual lesson completion
+  app.post('/api/lms/lessons/:lessonId/complete', isAuthenticated, async (req: any, res) => {
+    try {
+      const { lessonId } = req.params;
+      const { enrollmentId } = req.body;
+      const userId = req.user.claims.sub;
+      
+      // Verify enrollment ownership
+      const isOwner = await verifyEnrollmentOwnership(enrollmentId, userId);
+      if (!isOwner) {
+        return res.status(403).json({ message: "You can only complete lessons for your own enrollments" });
+      }
+      
+      const result = await storage.completeLessonManually(enrollmentId, lessonId);
+      
+      if (result.success) {
+        res.json({ message: result.message, success: true });
+      } else {
+        res.status(400).json({ message: result.message, success: false });
+      }
+    } catch (error: any) {
+      console.error("Error completing lesson manually:", error);
+      res.status(500).json({ message: "Failed to complete lesson", success: false });
     }
   });
 
