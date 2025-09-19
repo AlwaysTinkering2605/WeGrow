@@ -38,6 +38,7 @@ export const companyValueEnum = pgEnum("company_value", ["excellence", "teamwork
 export const lessonTypeEnum = pgEnum("lesson_type", ["video", "quiz", "document", "link"]);
 export const enrollmentStatusEnum = pgEnum("enrollment_status", ["enrolled", "in_progress", "completed", "expired"]);
 export const lessonStatusEnum = pgEnum("lesson_status", ["not_started", "in_progress", "completed"]);
+export const completionMethodEnum = pgEnum("completion_method", ["manual", "quiz", "auto"]);
 export const questionTypeEnum = pgEnum("question_type", ["multiple_choice", "true_false", "multi_select"]);
 export const trainingStatusEnum = pgEnum("training_status", ["in_progress", "completed", "on_hold"]);
 
@@ -341,7 +342,9 @@ export const lessonProgress = pgTable("lesson_progress", {
   status: lessonStatusEnum("status").default("not_started"),
   progressPercentage: integer("progress_percentage").default(0),
   lastPosition: integer("last_position").default(0), // Video position in seconds
+  durationSeconds: integer("duration_seconds"), // Total video duration
   timeSpent: integer("time_spent").default(0), // Total time in seconds
+  completionMethod: completionMethodEnum("completion_method"), // How the lesson was completed
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
