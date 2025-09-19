@@ -106,19 +106,22 @@ const badgeSchema = z.object({
 });
 
 // Vimeo Player Component with Progress Tracking and Manual Completion
-function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComplete, onDurationReceived }: {
+function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComplete, onDurationReceived, onTestModeProgress }: {
   videoId: string;
   enrollmentId: string;
   lessonId: string;
   onProgressUpdate?: (progress: number, timePosition: number, duration?: number) => void;
   onComplete?: () => void;
   onDurationReceived?: (duration: number) => void;
+  onTestModeProgress?: (progress: number, isTestMode: boolean) => void;
 }) {
   const playerRef = useRef<HTMLDivElement>(null);
   const vimeoPlayer = useRef<Player | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [testMode, setTestMode] = useState(false);
+  const [simulatedProgress, setSimulatedProgress] = useState(0);
   const lastSavedProgress = useRef<number>(0);
   const loadingTimeoutRef = useRef<number | null>(null);
   const retryCountRef = useRef<number>(0);
@@ -142,6 +145,34 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   useEffect(() => {
     onDurationReceivedRef.current = onDurationReceived;
   }, [onDurationReceived]);
+
+  // Test mode functions
+  const startTestMode = () => {
+    setTestMode(true);
+    setError(null);
+    setIsLoading(false);
+    // Start with 0% progress
+    setSimulatedProgress(0);
+    console.log('Test mode enabled for manual completion testing');
+  };
+
+  const simulateProgress = async (targetProgress: number) => {
+    setSimulatedProgress(targetProgress);
+    console.log(`Simulating progress: ${targetProgress}%`);
+    
+    // Notify parent component about test mode progress
+    if (onTestModeProgress) {
+      onTestModeProgress(targetProgress, true);
+    }
+    
+    if (onProgressUpdateRef.current) {
+      // Simulate 30-minute duration (1800 seconds)
+      const duration = 1800;
+      const timePosition = (targetProgress / 100) * duration;
+      // This will trigger the mutation that updates server state
+      onProgressUpdateRef.current(targetProgress, timePosition, duration);
+    }
+  };
 
   // Initialize player once on mount
   useEffect(() => {
@@ -359,13 +390,60 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
     tryLoadVideo();
   }, [videoId]); // Only depend on videoId
 
-  if (error) {
+  if (error && !testMode) {
     return (
       <div className="aspect-video bg-black rounded-lg overflow-hidden relative flex items-center justify-center">
-        <div className="text-center text-white">
+        <div className="text-center text-white space-y-4">
           <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-75" />
-          <p className="text-lg">Error loading video</p>
-          <p className="text-sm opacity-75">{error}</p>
+          <div>
+            <p className="text-lg">Error loading video</p>
+            <p className="text-sm opacity-75">{error}</p>
+          </div>
+          <button 
+            onClick={startTestMode}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"
+          >
+            Enable Test Mode
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (testMode) {
+    return (
+      <div className="aspect-video bg-gray-800 rounded-lg overflow-hidden relative flex items-center justify-center">
+        <div className="text-center text-white space-y-4 p-6">
+          <div className="flex items-center justify-center mb-4">
+            <PlayCircle className="w-16 h-16 text-blue-400" />
+          </div>
+          <div>
+            <p className="text-lg font-semibold">Test Mode Active</p>
+            <p className="text-sm opacity-75">Simulated Progress: {simulatedProgress}%</p>
+          </div>
+          <div className="space-y-2">
+            <div className="flex space-x-2 justify-center">
+              <button 
+                onClick={() => simulateProgress(50)}
+                className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm"
+              >
+                50%
+              </button>
+              <button 
+                onClick={() => simulateProgress(90)}
+                className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
+              >
+                90%
+              </button>
+              <button 
+                onClick={() => simulateProgress(95)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+              >
+                95%
+              </button>
+            </div>
+            <p className="text-xs opacity-50">Click progress buttons to test manual completion</p>
+          </div>
         </div>
       </div>
     );
@@ -420,6 +498,10 @@ export default function Learning() {
   // Course player state
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [currentLesson, setCurrentLesson] = useState<any>(null);
+  
+  // Test mode state for manual completion testing
+  const [testModeProgress, setTestModeProgress] = useState<number>(0);
+  const [isInTestMode, setIsInTestMode] = useState<boolean>(false);
   
   // Track which course is currently being enrolled to prevent shared loading state
   const [enrollingCourseId, setEnrollingCourseId] = useState<string | null>(null);
@@ -1719,6 +1801,12 @@ export default function Learning() {
                             // Video ended - no auto-completion, user must manually complete
                             console.log('Video ended - manual completion required');
                           }}
+                          onTestModeProgress={(progress, isTestMode) => {
+                            // Handle test mode progress for manual completion testing
+                            setTestModeProgress(progress);
+                            setIsInTestMode(isTestMode);
+                            console.log(`Test mode progress: ${progress}%`);
+                          }}
                         />
                       ) : (
                         <div className="aspect-video bg-black rounded-lg overflow-hidden relative flex items-center justify-center">
@@ -2196,7 +2284,8 @@ export default function Learning() {
                       }
 
                       const isVideoCompleted = currentLesson.progress?.status === 'completed';
-                      const videoProgress = currentLesson.progress?.progressPercentage || 0;
+                      // Use test mode progress when available, otherwise use actual progress
+                      const videoProgress = isInTestMode ? testModeProgress : (currentLesson.progress?.progressPercentage || 0);
                       const hasQuiz = !!currentLesson.quiz?.quiz;
                       const quizPassed = currentLesson.quiz?.latestAttempt?.passed;
                       const hasQuizAttempts = currentLesson.quiz?.latestAttempt;
@@ -5048,15 +5137,16 @@ export default function Learning() {
 
                       <div className="pt-2">
                         {isEnrolledInCourse(course.id) ? (
-                          <Button 
-                            className="w-full" 
-                            variant="outline" 
-                            disabled
-                            data-testid={`button-enrolled-${course.id}`}
-                          >
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Enrolled
-                          </Button>
+                          <Link href={`/learning/courses/${course.id}`}>
+                            <Button 
+                              className="w-full" 
+                              variant="outline"
+                              data-testid={`button-enrolled-${course.id}`}
+                            >
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              View Course
+                            </Button>
+                          </Link>
                         ) : (
                           <Button 
                             className="w-full" 
