@@ -105,14 +105,14 @@ const badgeSchema = z.object({
   color: z.string().default("#3B82F6"),
 });
 
-// Vimeo Player Component with Progress Tracking and Reliability
-function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComplete, onProgressComplete }: {
+// Vimeo Player Component with Progress Tracking and Manual Completion
+function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComplete, onDurationReceived }: {
   videoId: string;
   enrollmentId: string;
   lessonId: string;
-  onProgressUpdate?: (progress: number, timePosition: number) => void;
+  onProgressUpdate?: (progress: number, timePosition: number, duration?: number) => void;
   onComplete?: () => void;
-  onProgressComplete?: (progress: number, timePosition: number) => void;
+  onDurationReceived?: (duration: number) => void;
 }) {
   const playerRef = useRef<HTMLDivElement>(null);
   const vimeoPlayer = useRef<Player | null>(null);
@@ -128,7 +128,7 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   // Store callbacks in refs to avoid effect dependencies
   const onProgressUpdateRef = useRef(onProgressUpdate);
   const onCompleteRef = useRef(onComplete);
-  const onProgressCompleteRef = useRef(onProgressComplete);
+  const onDurationReceivedRef = useRef(onDurationReceived);
 
   // Update callback refs when props change
   useEffect(() => {
@@ -140,8 +140,8 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   }, [onComplete]);
 
   useEffect(() => {
-    onProgressCompleteRef.current = onProgressComplete;
-  }, [onProgressComplete]);
+    onDurationReceivedRef.current = onDurationReceived;
+  }, [onDurationReceived]);
 
   // Initialize player once on mount
   useEffect(() => {
@@ -215,6 +215,11 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
           loadingTimeoutRef.current = null;
         }
         
+        // Send duration to parent component on first update
+        if (onDurationReceivedRef.current) {
+          onDurationReceivedRef.current(duration);
+        }
+        
         // Guard against invalid duration
         if (duration <= 0) return;
         
@@ -224,15 +229,9 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
         if (progress > lastSavedProgress.current) {
           lastSavedProgress.current = progress;
           
-          // Always call progress update for regular tracking
+          // Always call progress update for regular tracking (now includes duration)
           if (onProgressUpdateRef.current) {
-            onProgressUpdateRef.current(progress, seconds);
-          }
-          
-          // Call completion callback when 95% reached (auto-complete) or 100% reached (only once)
-          if (progress >= 95 && !isCompleted && onProgressCompleteRef.current) {
-            setIsCompleted(true);
-            onProgressCompleteRef.current(progress, seconds);
+            onProgressUpdateRef.current(progress, seconds, duration);
           }
         }
       });
@@ -1025,7 +1024,12 @@ export default function Learning() {
         title: "Quiz Submitted",
         description: `Quiz completed! Score: ${result.score}% ${result.passed ? '✅ Passed' : '❌ Failed'}`,
       });
+      // Invalidate all relevant caches to ensure status updates
       queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/progress"] });
+      if (courseId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/lms/courses/${courseId}`] });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -1038,19 +1042,20 @@ export default function Learning() {
 
   // LESSON PROGRESS MUTATION
   const updateLessonProgressMutation = useMutation({
-    mutationFn: async ({ enrollmentId, lessonId, progress, lastPosition, status }: { 
+    mutationFn: async ({ enrollmentId, lessonId, progress, lastPosition, status, durationSeconds }: { 
       enrollmentId: string; 
       lessonId: string; 
       progress: number; 
       lastPosition?: number;
       status?: string;
+      durationSeconds?: number;
     }) => {
-      const response = await apiRequest("POST", "/api/lms/lesson-progress", {
+      const response = await apiRequest("PATCH", "/api/lms/progress", {
         enrollmentId,
         lessonId,
-        userId: user?.id,
         progressPercentage: progress,
         lastPosition: lastPosition || 0,
+        durationSeconds: durationSeconds || null,
         status: status || (progress >= 100 ? "completed" : "in_progress"),
         timeSpent: 0 // Will be calculated separately for video
       });
@@ -1059,9 +1064,48 @@ export default function Learning() {
     onSuccess: () => {
       // Invalidate enrollment queries to refresh progress
       queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/progress"] });
     },
     onError: (error: any) => {
       console.error("Failed to update lesson progress:", error);
+    },
+  });
+
+  // MANUAL LESSON COMPLETION MUTATION
+  const completeLessonManuallyMutation = useMutation({
+    mutationFn: async ({ enrollmentId, lessonId }: { 
+      enrollmentId: string; 
+      lessonId: string; 
+    }) => {
+      const response = await apiRequest("POST", `/api/lms/lessons/${lessonId}/complete`, {
+        enrollmentId
+      });
+      return await response.json();
+    },
+    onSuccess: (result) => {
+      if (result.success) {
+        toast({
+          title: "Lesson Completed! ✅",
+          description: result.message,
+        });
+        // Invalidate enrollment queries to refresh progress
+        queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/lms/progress"] });
+      } else {
+        toast({
+          title: "Cannot Complete Lesson",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
+    },
+    onError: (error: any) => {
+      console.error('Failed to complete lesson manually:', error);
+      toast({
+        title: "Error",
+        description: "Failed to complete lesson. Please try again.",
+        variant: "destructive"
+      });
     },
   });
 
@@ -1654,7 +1698,7 @@ export default function Learning() {
                           videoId={currentLesson.vimeoVideoId}
                           enrollmentId={courseDetails?.enrollment?.id || ''}
                           lessonId={currentLesson.id}
-                          onProgressUpdate={(progress, timePosition) => {
+                          onProgressUpdate={(progress, timePosition, duration) => {
                             // Save progress updates (already throttled by VimeoPlayer)
                             const enrollmentId = courseDetails?.enrollment?.id;
                             if (enrollmentId && progress > 0 && currentLesson?.id) {
@@ -1662,39 +1706,18 @@ export default function Learning() {
                                 enrollmentId,
                                 lessonId: currentLesson.id,
                                 progress: progress,
-                                lastPosition: timePosition
+                                lastPosition: timePosition,
+                                durationSeconds: duration ? Math.floor(duration) : undefined
                               });
                             }
                           }}
-                          onProgressComplete={(progress, timePosition) => {
-                            // Handle 95%+ completion (called only once by VimeoPlayer)
-                            const enrollmentId = courseDetails?.enrollment?.id;
-                            if (enrollmentId && currentLesson?.id) {
-                              const hasQuiz = !!currentLesson.quiz?.quiz;
-                              const quizPassed = currentLesson.quiz?.latestAttempt?.passed;
-                              
-                              // Auto-complete if no quiz, or if quiz already passed
-                              if (!hasQuiz || quizPassed) {
-                                updateLessonProgressMutation.mutate({
-                                  enrollmentId,
-                                  lessonId: currentLesson.id,
-                                  progress: Math.min(progress, 100),
-                                  lastPosition: timePosition,
-                                  status: 'completed'
-                                });
-                                
-                                toast({
-                                  title: "Video Auto-Completed! 🎉",
-                                  description: progress >= 100 
-                                    ? "You've watched the full video!" 
-                                    : `Auto-completed at ${progress}% watched!`,
-                                });
-                              }
-                            }
+                          onDurationReceived={(duration) => {
+                            // Store duration for manual completion validation
+                            console.log(`Video duration received: ${Math.floor(duration)}s`);
                           }}
                           onComplete={() => {
-                            // Video ended - completion handled by onProgressComplete at 100%
-                            console.log('Video ended');
+                            // Video ended - no auto-completion, user must manually complete
+                            console.log('Video ended - manual completion required');
                           }}
                         />
                       ) : (
@@ -2225,38 +2248,44 @@ export default function Learning() {
                               <p className="font-medium">Watch the video to continue</p>
                               <p className="text-sm text-muted-foreground">
                                 Progress: {videoProgress}% complete 
-                                {videoProgress >= 95 ? ' (auto-completing...)' : ' (need 95% or manual complete at 90%)'}
+                                {videoProgress >= 90 ? ' (can mark as complete)' : ' (need 90% to mark complete)'}
                               </p>
                             </div>
                             <Progress value={videoProgress} className="w-full" />
                             
-                            {canManuallyComplete && (
-                              <Button
-                                className="w-full"
-                                onClick={() => {
-                                  const enrollmentId = courseDetails?.enrollment?.id;
-                                  if (enrollmentId && currentLesson?.id) {
-                                    updateLessonProgressMutation.mutate({
-                                      enrollmentId,
-                                      lessonId: currentLesson.id,
-                                      progress: 100,
-                                      lastPosition: currentLesson.estimatedDuration || 0,
-                                      status: 'completed'
-                                    });
-                                    
-                                    toast({
-                                      title: "Video Completed! ✅",
-                                      description: `You've watched ${videoProgress}% of the video and marked it complete.`,
-                                    });
+                            <div className="flex items-center space-x-2 p-3 bg-muted rounded-lg">
+                              <input
+                                type="checkbox"
+                                id="complete-lesson-checkbox"
+                                className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+                                disabled={!canManuallyComplete || completeLessonManuallyMutation.isPending}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    const enrollmentId = courseDetails?.enrollment?.id;
+                                    if (enrollmentId && currentLesson?.id) {
+                                      completeLessonManuallyMutation.mutate({
+                                        enrollmentId,
+                                        lessonId: currentLesson.id
+                                      });
+                                      // Reset checkbox if failed (success will be handled by cache invalidation)
+                                      setTimeout(() => {
+                                        e.target.checked = false;
+                                      }, 100);
+                                    }
                                   }
                                 }}
-                                disabled={updateLessonProgressMutation.isPending}
-                                data-testid="button-complete-video"
+                                data-testid={`checkbox-complete-lesson-${currentLesson.id}`}
+                              />
+                              <label 
+                                htmlFor="complete-lesson-checkbox" 
+                                className={`text-sm ${canManuallyComplete ? 'text-foreground' : 'text-muted-foreground'}`}
                               >
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                {updateLessonProgressMutation.isPending ? 'Completing...' : 'Mark Video Complete'}
-                              </Button>
-                            )}
+                                Mark video as complete {!canManuallyComplete && '(watch 90%+ first)'}
+                              </label>
+                              {completeLessonManuallyMutation.isPending && (
+                                <RefreshCw className="w-4 h-4 animate-spin text-primary" />
+                              )}
+                            </div>
                           </div>
                         );
                       }
