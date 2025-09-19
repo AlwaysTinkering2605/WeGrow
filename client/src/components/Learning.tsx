@@ -336,20 +336,28 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
       window.clearTimeout(loadingTimeoutRef.current);
     }
 
-    // Set loading timeout (25 seconds to give more time for video to load)
+    // Set loading timeout (30 seconds to give more time for video to load)
     loadingTimeoutRef.current = window.setTimeout(() => {
       setError('Video loading timed out. Please check your connection or try refreshing.');
       setIsLoading(false);
       isLoadingVideoRef.current = false;
-    }, 25000);
+    }, 30000);
 
-    // If player not initialized yet, wait for mount effect to handle initialization
-    if (!vimeoPlayer.current) {
-      return;
-    }
-
-    // Load video with retry logic
-    loadVideoWithRetry(videoIdNumber);
+    // Wait a bit if player not ready yet, then try loading
+    const tryLoadVideo = () => {
+      if (vimeoPlayer.current) {
+        loadVideoWithRetry(videoIdNumber);
+      } else {
+        // If player not ready, try again after a short delay
+        setTimeout(() => {
+          if (vimeoPlayer.current) {
+            loadVideoWithRetry(videoIdNumber);
+          }
+        }, 500);
+      }
+    };
+    
+    tryLoadVideo();
   }, [videoId]); // Only depend on videoId
 
   if (error) {
@@ -1356,6 +1364,14 @@ export default function Learning() {
     
     const timeSpent = Math.floor((new Date().getTime() - quizStartTime.getTime()) / 1000);
     
+    console.log('Submitting quiz with answers:', {
+      attemptId: currentAttempt.id,
+      userAnswers,
+      answersKeys: Object.keys(userAnswers),
+      answersValues: Object.values(userAnswers),
+      answersStringified: JSON.stringify(userAnswers)
+    });
+    
     try {
       const result = await submitQuizAttemptMutation.mutateAsync({
         attemptId: currentAttempt.id,
@@ -1759,7 +1775,7 @@ export default function Learning() {
                                     <label 
                                       key={optionIndex}
                                       className={`flex items-center space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                                        userAnswers[currentQuestion.id] === optionIndex 
+                                        JSON.stringify(userAnswers[currentQuestion.id]) === JSON.stringify([optionIndex]) 
                                           ? 'border-primary bg-primary/5 shadow-sm' 
                                           : 'border-border hover:border-primary/50 hover:bg-primary/5'
                                       }`}
@@ -1768,8 +1784,8 @@ export default function Learning() {
                                         type="radio"
                                         name={currentQuestion.id}
                                         value={optionIndex}
-                                        checked={userAnswers[currentQuestion.id] === optionIndex}
-                                        onChange={(e) => updateQuizAnswer(currentQuestion.id, optionIndex)}
+                                        checked={JSON.stringify(userAnswers[currentQuestion.id]) === JSON.stringify([optionIndex])}
+                                        onChange={(e) => updateQuizAnswer(currentQuestion.id, [optionIndex])}
                                         className="h-4 w-4 text-primary"
                                         data-testid={`radio-question-${currentQuestionIndex}-option-${optionIndex}`}
                                       />
@@ -1786,7 +1802,7 @@ export default function Learning() {
                                 <div className="grid grid-cols-2 gap-4 max-w-lg mx-auto">
                                   <label 
                                     className={`flex items-center justify-center space-x-3 p-6 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                                      userAnswers[currentQuestion.id] === 0 
+                                      JSON.stringify(userAnswers[currentQuestion.id]) === JSON.stringify([0]) 
                                         ? 'border-green-500 bg-green-50 text-green-700 dark:bg-green-900/20' 
                                         : 'border-border hover:border-green-500/50 hover:bg-green-50/50'
                                     }`}
@@ -1795,8 +1811,8 @@ export default function Learning() {
                                       type="radio"
                                       name={currentQuestion.id}
                                       value="0"
-                                      checked={userAnswers[currentQuestion.id] === 0}
-                                      onChange={(e) => updateQuizAnswer(currentQuestion.id, 0)}
+                                      checked={JSON.stringify(userAnswers[currentQuestion.id]) === JSON.stringify([0])}
+                                      onChange={(e) => updateQuizAnswer(currentQuestion.id, [0])}
                                       className="sr-only"
                                       data-testid={`radio-question-${currentQuestionIndex}-true`}
                                     />
@@ -1805,7 +1821,7 @@ export default function Learning() {
                                   </label>
                                   <label 
                                     className={`flex items-center justify-center space-x-3 p-6 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                                      userAnswers[currentQuestion.id] === 1 
+                                      JSON.stringify(userAnswers[currentQuestion.id]) === JSON.stringify([1]) 
                                         ? 'border-red-500 bg-red-50 text-red-700 dark:bg-red-900/20' 
                                         : 'border-border hover:border-red-500/50 hover:bg-red-50/50'
                                     }`}
@@ -1814,8 +1830,8 @@ export default function Learning() {
                                       type="radio"
                                       name={currentQuestion.id}
                                       value="1"
-                                      checked={userAnswers[currentQuestion.id] === 1}
-                                      onChange={(e) => updateQuizAnswer(currentQuestion.id, 1)}
+                                      checked={JSON.stringify(userAnswers[currentQuestion.id]) === JSON.stringify([1])}
+                                      onChange={(e) => updateQuizAnswer(currentQuestion.id, [1])}
                                       className="sr-only"
                                       data-testid={`radio-question-${currentQuestionIndex}-false`}
                                     />
