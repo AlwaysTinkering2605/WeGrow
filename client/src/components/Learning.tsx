@@ -352,9 +352,12 @@ export default function Learning() {
   
   // Extract active tab from URL
   const getActiveTab = () => {
-    if (location === "/learning" || !params.tab) return "dashboard";
-    if (isViewingCatalog) return "courses"; // Handle catalog view
-    return params.tab || "dashboard";
+    if (location === "/learning") return "dashboard";
+    if (location === "/learning/courses") return "courses";
+    if (location === "/learning/certificates") return "certificates";
+    if (location === "/learning/matrix") return "matrix";
+    if (location.startsWith("/learning/courses/")) return "courses"; // Individual course pages
+    return "dashboard";
   };
 
   const activeTab = getActiveTab();
