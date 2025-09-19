@@ -1256,7 +1256,7 @@ export class DatabaseStorage implements IStorage {
     });
     
     questions.forEach((question, index) => {
-      const userAnswer = answers[question.id] || answers[index];
+      const userAnswer = answers[question.id];
       const correctAnswer = question.correctAnswers;
       
       console.log(`Question ${question.id} comparison:`, {
@@ -1264,10 +1264,12 @@ export class DatabaseStorage implements IStorage {
         correctAnswer: JSON.stringify(correctAnswer),
         userAnswerType: typeof userAnswer,
         correctAnswerType: typeof correctAnswer,
-        matches: JSON.stringify(userAnswer) === JSON.stringify(correctAnswer)
+        matches: JSON.stringify(userAnswer) === JSON.stringify(correctAnswer),
+        answersObject: Object.keys(answers)
       });
       
-      if (JSON.stringify(userAnswer) === JSON.stringify(correctAnswer)) {
+      // Only count if user provided an answer for this question
+      if (userAnswer !== undefined && JSON.stringify(userAnswer) === JSON.stringify(correctAnswer)) {
         correctAnswers++;
       }
     });

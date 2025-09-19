@@ -646,6 +646,11 @@ export default function Learning() {
       });
       return await response.json();
     },
+    onSuccess: () => {
+      // Invalidate queries to update "What's Next" section in real-time
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/progress"] });
+    },
     onError: (error: any) => {
       console.error('Failed to update progress:', error);
     },

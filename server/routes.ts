@@ -1050,6 +1050,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add GET route for /api/lms/progress (query by enrollmentId and optionally lessonId)
+  app.get('/api/lms/progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId, lessonId } = req.query;
+      const userId = req.user.claims.sub;
+      
+      if (!enrollmentId) {
+        return res.status(400).json({ message: "enrollmentId is required" });
+      }
+      
+      // Verify enrollment ownership
+      const isOwner = await verifyEnrollmentOwnership(enrollmentId, userId);
+      if (!isOwner) {
+        return res.status(403).json({ message: "You can only view progress for your own enrollments" });
+      }
+      
+      if (lessonId) {
+        // Get specific lesson progress
+        const progress = await storage.getLessonProgress(enrollmentId, lessonId);
+        res.json(progress || { enrollmentId, lessonId, progressPercentage: 0, status: 'not_started' });
+      } else {
+        // Get all lesson progress for enrollment
+        const progress = await storage.getUserLessonProgress(enrollmentId);
+        res.json(progress);
+      }
+    } catch (error: any) {
+      console.error("Error fetching lesson progress:", error);
+      res.status(500).json({ message: "Failed to fetch lesson progress" });
+    }
+  });
+
+  // Add the route that the frontend expects (PATCH /api/lms/progress)
+  app.patch('/api/lms/progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId, lessonId, progressPercentage, lastPosition, timeSpent, status } = req.body;
+      const userId = req.user.claims.sub;
+      
+      // Verify enrollment ownership
+      const isOwner = await verifyEnrollmentOwnership(enrollmentId, userId);
+      if (!isOwner) {
+        return res.status(403).json({ message: "You can only update progress for your own enrollments" });
+      }
+      
+      const progressData = {
+        enrollmentId,
+        lessonId,
+        userId,
+        progressPercentage: progressPercentage || 0,
+        status: status || (progressPercentage >= 100 ? 'completed' : 'in_progress'),
+        timeSpent: timeSpent || 0,
+        lastPosition: lastPosition || 0,
+        completedAt: (status === 'completed' || progressPercentage >= 100) ? new Date() : null
+      };
+      
+      const progress = await storage.updateLessonProgress(progressData);
+      res.json(progress);
+    } catch (error: any) {
+      return handleValidationError(error, res, "update lesson progress");
+    }
+  });
+
   // Quizzes and Assessments
   app.get('/api/lms/lessons/:lessonId/quiz', isAuthenticated, async (req, res) => {
     try {
