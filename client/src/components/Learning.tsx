@@ -336,12 +336,12 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
       window.clearTimeout(loadingTimeoutRef.current);
     }
 
-    // Set loading timeout (15 seconds to account for retries)
+    // Set loading timeout (25 seconds to give more time for video to load)
     loadingTimeoutRef.current = window.setTimeout(() => {
       setError('Video loading timed out. Please check your connection or try refreshing.');
       setIsLoading(false);
       isLoadingVideoRef.current = false;
-    }, 15000);
+    }, 25000);
 
     // If player not initialized yet, wait for mount effect to handle initialization
     if (!vimeoPlayer.current) {
@@ -1769,7 +1769,7 @@ export default function Learning() {
                                         name={currentQuestion.id}
                                         value={optionIndex}
                                         checked={userAnswers[currentQuestion.id] === optionIndex}
-                                        onChange={(e) => updateQuizAnswer(currentQuestion.id, parseInt(e.target.value))}
+                                        onChange={(e) => updateQuizAnswer(currentQuestion.id, optionIndex)}
                                         className="h-4 w-4 text-primary"
                                         data-testid={`radio-question-${currentQuestionIndex}-option-${optionIndex}`}
                                       />
@@ -1796,7 +1796,7 @@ export default function Learning() {
                                       name={currentQuestion.id}
                                       value="0"
                                       checked={userAnswers[currentQuestion.id] === 0}
-                                      onChange={(e) => updateQuizAnswer(currentQuestion.id, parseInt(e.target.value))}
+                                      onChange={(e) => updateQuizAnswer(currentQuestion.id, 0)}
                                       className="sr-only"
                                       data-testid={`radio-question-${currentQuestionIndex}-true`}
                                     />
@@ -1815,7 +1815,7 @@ export default function Learning() {
                                       name={currentQuestion.id}
                                       value="1"
                                       checked={userAnswers[currentQuestion.id] === 1}
-                                      onChange={(e) => updateQuizAnswer(currentQuestion.id, parseInt(e.target.value))}
+                                      onChange={(e) => updateQuizAnswer(currentQuestion.id, 1)}
                                       className="sr-only"
                                       data-testid={`radio-question-${currentQuestionIndex}-false`}
                                     />
