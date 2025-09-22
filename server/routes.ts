@@ -1112,6 +1112,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dedicated route for sendBeacon progress updates with enhanced validation
+  app.post('/api/lms/progress-beacon', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId, lessonId, progressPercentage, lastPosition, timeSpent, status, durationSeconds } = req.body;
+      const userId = req.user.claims.sub;
+      
+      console.log(`Beacon progress update: ${progressPercentage}% for lesson ${lessonId} by user ${userId}`);
+      
+      // Verify enrollment ownership
+      const isOwner = await verifyEnrollmentOwnership(enrollmentId, userId);
+      if (!isOwner) {
+        return res.status(403).json({ message: "You can only update progress for your own enrollments" });
+      }
+      
+      // Enhanced validation for beacon updates (final save scenario)
+      let validatedStatus = status;
+      if (progressPercentage >= 90 && status === 'completed') {
+        // Perform server-side validation of completion eligibility
+        const validation = await storage.validateCompletionEligibility(enrollmentId, lessonId, {
+          progressPercentage,
+          timeSpent,
+          durationSeconds
+        });
+        
+        if (!validation.eligible) {
+          console.warn(`Beacon completion rejected: ${validation.reason}`);
+          // Still save progress but don't mark as completed
+          validatedStatus = 'in_progress';
+        }
+      }
+      
+      const progressData = {
+        enrollmentId,
+        lessonId,
+        userId,
+        progressPercentage: progressPercentage || 0,
+        status: validatedStatus || (progressPercentage >= 100 ? 'completed' : 'in_progress'),
+        timeSpent: timeSpent || 0,
+        lastPosition: lastPosition || 0,
+        durationSeconds: durationSeconds || null,
+        completedAt: (validatedStatus === 'completed' || progressPercentage >= 100) ? new Date() : null
+      };
+      
+      const progress = await storage.updateLessonProgress(progressData);
+      res.status(204).send(); // No content response for beacon
+    } catch (error: any) {
+      console.error('Beacon progress update failed:', error);
+      res.status(500).json({ message: "Failed to update progress via beacon" });
+    }
+  });
+
   // Manual lesson completion
   app.post('/api/lms/lessons/:lessonId/complete', isAuthenticated, async (req: any, res) => {
     try {

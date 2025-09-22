@@ -1618,6 +1618,47 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // Enhanced server-side validation for completion eligibility (security critical)
+  async validateCompletionEligibility(enrollmentId: string, lessonId: string, clientData: {
+    progressPercentage: number;
+    timeSpent: number;
+    durationSeconds?: number | null;
+  }): Promise<{ eligible: boolean; reason?: string }> {
+    try {
+      // Get stored lesson progress
+      const progress = await this.getLessonProgress(enrollmentId, lessonId);
+      
+      if (!progress) {
+        return { eligible: false, reason: "No progress found for this lesson" };
+      }
+
+      // Server-side 90% validation using stored progressPercentage (consistent with manual completion)
+      const storedProgress = progress.progressPercentage || 0;
+      if (storedProgress < 90) {
+        return { 
+          eligible: false, 
+          reason: `Insufficient watched coverage: ${storedProgress}% (need 90%+)` 
+        };
+      }
+
+      // Additional validation: check time spent vs duration ratio for reasonableness
+      if (clientData.durationSeconds && clientData.durationSeconds > 0) {
+        const minExpectedTime = Math.floor(clientData.durationSeconds * 0.5); // At least 50% of video duration in time
+        if (clientData.timeSpent < minExpectedTime) {
+          return { 
+            eligible: false, 
+            reason: `Insufficient viewing time: ${clientData.timeSpent}s vs expected ${minExpectedTime}s minimum` 
+          };
+        }
+      }
+
+      return { eligible: true };
+    } catch (error) {
+      console.error("Error validating completion eligibility:", error);
+      return { eligible: false, reason: "Server validation error" };
+    }
+  }
+
   // LMS - Certificates and Badges (stub implementations)
   async issueCertificate(certificate: InsertCertificate): Promise<Certificate> {
     const [created] = await db.insert(certificates).values(certificate).returning();

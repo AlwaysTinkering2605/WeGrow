@@ -135,6 +135,10 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   const [totalTimeSpent, setTotalTimeSpent] = useState<number>(0);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
   
+  // True watched coverage tracking (prevents scrub-ahead completion)
+  const [watchedIntervals, setWatchedIntervals] = useState<{start: number, end: number}[]>([]);
+  const [actualWatchedPercentage, setActualWatchedPercentage] = useState<number>(0);
+  
   const lastSavedProgress = useRef<number>(0);
   const loadingTimeoutRef = useRef<number | null>(null);
   const retryCountRef = useRef<number>(0);
@@ -146,8 +150,84 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   const isPlaying = useRef<boolean>(false);
   const accumulatedTime = useRef<number>(0);
   
-  // Flag to prevent multiple completion enabling calls
+  // Watched coverage tracking refs
+  const currentWatchStart = useRef<number>(0);
+  const previousPosition = useRef<number>(0);
+  
+  // Flag to prevent multiple completion enabling calls - now properly managed
   const hasReached90Percent = useRef<boolean>(false);
+  
+  // Utility function to merge overlapping intervals and calculate total watched time
+  const mergeIntervals = (intervals: {start: number, end: number}[]) => {
+    if (intervals.length === 0) return [];
+    
+    // Sort intervals by start time
+    const sorted = [...intervals].sort((a, b) => a.start - b.start);
+    const merged = [sorted[0]];
+    
+    for (let i = 1; i < sorted.length; i++) {
+      const current = sorted[i];
+      const last = merged[merged.length - 1];
+      
+      if (current.start <= last.end) {
+        // Overlapping intervals - merge them
+        last.end = Math.max(last.end, current.end);
+      } else {
+        // Non-overlapping - add as new interval
+        merged.push(current);
+      }
+    }
+    
+    return merged;
+  };
+  
+  // Calculate total watched time from intervals
+  const calculateWatchedTime = (intervals: {start: number, end: number}[], duration: number) => {
+    if (duration <= 0) return 0;
+    
+    const merged = mergeIntervals(intervals);
+    const totalWatched = merged.reduce((sum, interval) => sum + (interval.end - interval.start), 0);
+    return Math.min(totalWatched, duration); // Cap at video duration
+  };
+  
+  // Close current interval and add to watched intervals (prevents unbounded growth)
+  const closeCurrentInterval = (endTime: number) => {
+    if (currentWatchStart.current >= 0 && endTime > currentWatchStart.current) {
+      const start = currentWatchStart.current;
+      const end = endTime;
+      
+      setWatchedIntervals(prev => {
+        const newIntervals = [...prev, { start, end }];
+        return mergeIntervals(newIntervals); // Merge overlapping intervals to prevent growth
+      });
+    }
+    currentWatchStart.current = -1; // Reset
+  };
+
+  // Update completion eligibility based on current watched intervals
+  const updateCompletionEligibility = (duration: number) => {
+    if (duration <= 0) return;
+    
+    const totalWatched = calculateWatchedTime(watchedIntervals, duration);
+    const exactPercentage = (totalWatched / duration) * 100;
+    const displayPercentage = Math.floor(exactPercentage); // Use Math.floor to prevent 89.5% from passing as 90%
+    
+    setActualWatchedPercentage(displayPercentage);
+    
+    // Use precise threshold check with small epsilon for floating point safety
+    const newCanComplete = totalWatched >= (0.9 * duration) - 0.001;
+    if (newCanComplete !== canMarkComplete) {
+      setCanMarkComplete(newCanComplete);
+      hasReached90Percent.current = newCanComplete;
+      
+      console.log(`Watched coverage: ${displayPercentage}% (${Math.floor(totalWatched)}s/${Math.floor(duration)}s). Can complete: ${newCanComplete}`);
+      
+      // Notify parent about actual completion eligibility
+      if (onCompletionEligibilityChangeRef.current) {
+        onCompletionEligibilityChangeRef.current(newCanComplete, displayPercentage);
+      }
+    }
+  };
 
   // Store callbacks in refs to avoid effect dependencies
   const onProgressUpdateRef = useRef(onProgressUpdate);
@@ -189,26 +269,41 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
     // Update enhanced tracking state for test mode
     const simulatedDuration = 1800; // 30-minute duration
     const simulatedCurrentTime = (targetProgress / 100) * simulatedDuration;
+    const simulatedTimeSpent = Math.floor(simulatedCurrentTime * 0.8); // Simulate realistic viewing time
     
     setVideoDuration(simulatedDuration);
     setCurrentTime(simulatedCurrentTime);
     setWatchedPercentage(targetProgress);
     
-    // Implement 90% logic for test mode
-    if (targetProgress >= 90 && !hasReached90Percent.current) {
-      hasReached90Percent.current = true;
-      setCanMarkComplete(true);
-      console.log(`TEST MODE: 90% threshold reached! Video can now be manually completed. Progress: ${targetProgress}%`);
-      
-      // Notify parent component about completion eligibility in test mode
-      if (onCompletionEligibilityChangeRef.current) {
-        onCompletionEligibilityChangeRef.current(true, targetProgress);
-      }
+    // Simulate watched coverage for test mode (create realistic intervals)
+    const simulatedIntervals: {start: number, end: number}[] = [];
+    const watchedTime = (targetProgress / 100) * simulatedDuration;
+    
+    // Create realistic watch intervals (not just one continuous block)
+    let currentPos = 0;
+    while (currentPos < watchedTime) {
+      const intervalStart = currentPos;
+      const intervalLength = Math.min(300, watchedTime - currentPos); // Max 5-min chunks
+      const intervalEnd = intervalStart + intervalLength;
+      simulatedIntervals.push({ start: intervalStart, end: intervalEnd });
+      currentPos = intervalEnd + Math.random() * 60; // Small gaps between intervals
     }
     
-    // Always notify about current eligibility state for UI consistency
+    setWatchedIntervals(simulatedIntervals);
+    setActualWatchedPercentage(targetProgress);
+    setTotalTimeSpent(simulatedTimeSpent);
+    accumulatedTime.current = simulatedTimeSpent * 1000;
+    
+    // Implement robust 90% logic for test mode
+    const newCanComplete = targetProgress >= 90;
+    setCanMarkComplete(newCanComplete);
+    hasReached90Percent.current = newCanComplete;
+    
+    console.log(`TEST MODE: Simulated ${targetProgress}% watched coverage. Can complete: ${newCanComplete}`);
+    
+    // Notify parent component about completion eligibility in test mode
     if (onCompletionEligibilityChangeRef.current) {
-      onCompletionEligibilityChangeRef.current(targetProgress >= 90, targetProgress);
+      onCompletionEligibilityChangeRef.current(newCanComplete, targetProgress);
     }
     
     // Notify parent component about test mode progress
@@ -217,10 +312,113 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
     }
     
     if (onProgressUpdateRef.current) {
-      // This will trigger the mutation that updates server state
-      onProgressUpdateRef.current(targetProgress, simulatedCurrentTime, simulatedDuration);
+      // Include timeSpent in test mode simulation
+      onProgressUpdateRef.current(targetProgress, simulatedCurrentTime, simulatedDuration, simulatedTimeSpent);
     }
   };
+
+  // Initialize progress tracking from existing data
+  useEffect(() => {
+    const initializeProgress = async () => {
+      try {
+        // Fetch existing lesson progress to accumulate time properly
+        const response = await fetch(`/api/lms/progress?enrollmentId=${enrollmentId}&lessonId=${lessonId}`);
+        if (response.ok) {
+          const existingProgress = await response.json();
+          if (existingProgress?.timeSpent) {
+            // Initialize with existing time spent to accumulate across sessions
+            accumulatedTime.current = existingProgress.timeSpent * 1000; // Convert to milliseconds
+            setTotalTimeSpent(existingProgress.timeSpent);
+            console.log(`Initialized with existing timeSpent: ${existingProgress.timeSpent}s`);
+          }
+          
+          // Initialize watched intervals if we have position and duration data
+          if (existingProgress?.lastPosition && existingProgress?.durationSeconds) {
+            const existingWatchedPercent = existingProgress.progressPercentage || 0;
+            setActualWatchedPercentage(existingWatchedPercent);
+            
+            // Defer completion eligibility until video duration is fetched and coverage is recomputed
+            // This prevents brief moments where completion appears available before proper validation
+            console.log(`Restored progress data: ${existingWatchedPercent}% (eligibility will be validated once video loads)`);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch existing progress:', error);
+      }
+    };
+    
+    if (enrollmentId && lessonId) {
+      initializeProgress();
+    }
+  }, [enrollmentId, lessonId]);
+
+  // Session cleanup handlers to persist final progress using reliable methods
+  useEffect(() => {
+    const flushFinalProgressReliably = () => {
+      // Always flush progress - don't gate on playing state
+      if (videoDuration > 0) {
+        // Final time calculation if currently playing
+        if (isPlaying.current && currentWatchStart.current >= 0) {
+          const timeDelta = Date.now() - lastTimeUpdate.current;
+          accumulatedTime.current += timeDelta * playbackRate;
+          
+          // Close current interval if playing
+          closeCurrentInterval(currentTime);
+        }
+        
+        // Prepare final progress data (always send latest state)
+        const finalTimeSpent = Math.floor(accumulatedTime.current / 1000);
+        const progressData = {
+          enrollmentId,
+          lessonId,
+          progressPercentage: actualWatchedPercentage || watchedPercentage,
+          lastPosition: currentTime,
+          durationSeconds: videoDuration,
+          timeSpent: finalTimeSpent,
+          status: (actualWatchedPercentage || watchedPercentage) >= 90 ? 'completed' : 'in_progress'
+        };
+        
+        // Use navigator.sendBeacon for reliable final progress save with proper JSON payload
+        if (navigator.sendBeacon) {
+          const blob = new Blob([JSON.stringify(progressData)], { type: 'application/json' });
+          const success = navigator.sendBeacon('/api/lms/progress-beacon', blob);
+          console.log(`Session cleanup: Final progress sent via sendBeacon (${success ? 'success' : 'failed'}). Time spent: ${finalTimeSpent}s`);
+        } else {
+          // Fallback for browsers without sendBeacon
+          if (onProgressUpdateRef.current) {
+            onProgressUpdateRef.current(actualWatchedPercentage || watchedPercentage, currentTime, videoDuration, finalTimeSpent);
+          }
+        }
+      }
+    };
+
+    // Handle page hide (more reliable than beforeunload)
+    const handlePageHide = () => {
+      flushFinalProgressReliably();
+    };
+
+    // Handle tab visibility change (user switches tabs)
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Tab became hidden - flush progress reliably
+        flushFinalProgressReliably();
+      } else {
+        // Tab became visible - reset timing
+        lastTimeUpdate.current = Date.now();
+      }
+    };
+
+    // Use pagehide instead of beforeunload for better reliability
+    window.addEventListener('pagehide', handlePageHide);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      // Cleanup on unmount
+      flushFinalProgressReliably();
+      window.removeEventListener('pagehide', handlePageHide);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentTime, videoDuration, actualWatchedPercentage, watchedPercentage, playbackRate, enrollmentId, lessonId]);
 
   // Initialize player once on mount
   useEffect(() => {
@@ -308,76 +506,91 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
         // Guard against invalid duration
         if (duration <= 0) return;
         
-        // Step 4: Calculate the watched percentage
-        const watchedPercent = Math.round((seconds / duration) * 100);
-        
-        // Update current tracking state
+        // Step 4: Update current tracking state
         setCurrentTime(seconds);
-        setWatchedPercentage(watchedPercent);
+        previousPosition.current = seconds;
         
-        // Step 5: Implement the 90% watched logic
-        if (watchedPercent >= 90 && !hasReached90Percent.current) {
-          hasReached90Percent.current = true;
-          setCanMarkComplete(true);
-          console.log(`90% threshold reached! Video can now be manually completed. Progress: ${watchedPercent}%`);
-          
-          // Notify parent component about completion eligibility
-          if (onCompletionEligibilityChangeRef.current) {
-            onCompletionEligibilityChangeRef.current(true, watchedPercent);
-          }
-        } else if (watchedPercent < 90 && hasReached90Percent.current) {
-          // Handle case where user seeks backward below 90%
-          hasReached90Percent.current = false;
-          setCanMarkComplete(false);
-          
-          // Notify parent component
-          if (onCompletionEligibilityChangeRef.current) {
-            onCompletionEligibilityChangeRef.current(false, watchedPercent);
-          }
+        // Calculate simple position-based percentage for display
+        const positionPercent = Math.round((seconds / duration) * 100);
+        setWatchedPercentage(positionPercent);
+        
+        // Step 5: Update watched coverage (prevents scrub-ahead completion)
+        if (isPlaying.current && currentWatchStart.current >= 0) {
+          updateWatchedCoverage(seconds, duration);
         }
         
-        // Always notify about current eligibility state for UI consistency
-        if (onCompletionEligibilityChangeRef.current && watchedPercent !== lastSavedProgress.current) {
-          onCompletionEligibilityChangeRef.current(watchedPercent >= 90, watchedPercent);
-        }
-        
-        // Calculate actual time spent during playback
+        // Calculate actual time spent during playback with playback rate
         if (isPlaying.current) {
           const timeDelta = Date.now() - lastTimeUpdate.current;
-          accumulatedTime.current += timeDelta;
+          accumulatedTime.current += timeDelta * playbackRate; // Apply playback rate
           lastTimeUpdate.current = Date.now();
         }
         
         // Throttle progress updates: only save when progress increases by at least 1%
-        if (watchedPercent > lastSavedProgress.current) {
-          lastSavedProgress.current = watchedPercent;
+        if (positionPercent > lastSavedProgress.current) {
+          lastSavedProgress.current = positionPercent;
           
           // Update total time spent for display
           setTotalTimeSpent(Math.floor(accumulatedTime.current / 1000));
           
-          // Always call progress update for regular tracking (now includes duration and time tracking)
+          // Send progress update with ACTUAL watched coverage percentage, not position
           if (onProgressUpdateRef.current) {
-            onProgressUpdateRef.current(watchedPercent, seconds, duration, Math.floor(accumulatedTime.current / 1000));
+            onProgressUpdateRef.current(actualWatchedPercentage || positionPercent, seconds, duration, Math.floor(accumulatedTime.current / 1000));
           }
         }
       });
 
-      // Enhanced play/pause tracking for accurate time calculation
-      vimeoPlayer.current.on('play', () => {
+      // Enhanced play/pause tracking with watched coverage
+      vimeoPlayer.current.on('play', async () => {
         isPlaying.current = true;
         lastTimeUpdate.current = Date.now();
-        console.log('Video playback started');
+        
+        // Set watch start position for coverage tracking
+        try {
+          const currentTime = await vimeoPlayer.current!.getCurrentTime();
+          currentWatchStart.current = currentTime;
+          console.log(`Video playback started at ${Math.floor(currentTime)}s`);
+        } catch (error) {
+          console.warn('Failed to get current time on play:', error);
+        }
       });
 
-      vimeoPlayer.current.on('pause', () => {
+      vimeoPlayer.current.on('pause', async () => {
         if (isPlaying.current) {
           // Calculate time spent since last play
           const timeDelta = Date.now() - lastTimeUpdate.current;
-          accumulatedTime.current += timeDelta;
+          accumulatedTime.current += timeDelta * playbackRate; // Factor in playback rate
           setTotalTimeSpent(Math.floor(accumulatedTime.current / 1000));
-          console.log(`Video paused. Time spent: ${Math.floor(accumulatedTime.current / 1000)}s`);
+          
+          // Close current interval on pause (prevents unbounded growth)
+          try {
+            const currentTime = await vimeoPlayer.current!.getCurrentTime();
+            const duration = await vimeoPlayer.current!.getDuration();
+            closeCurrentInterval(currentTime);
+            updateCompletionEligibility(duration);
+            console.log(`Video paused at ${Math.floor(currentTime)}s. Total time spent: ${Math.floor(accumulatedTime.current / 1000)}s`);
+          } catch (error) {
+            console.warn('Failed to close interval on pause:', error);
+          }
         }
         isPlaying.current = false;
+        // currentWatchStart already reset by closeCurrentInterval
+      });
+      
+      // Handle seek events to prevent scrub-ahead completion
+      vimeoPlayer.current.on('seeked', async (data: { seconds: number; duration: number }) => {
+        const { seconds: seekTime, duration } = data;
+        console.log(`Video seeked to ${Math.floor(seekTime)}s`);
+        
+        // Close current interval before seek (prevents bridging intervals across seeks)
+        closeCurrentInterval(previousPosition.current);
+        
+        // Reset watch start to new position
+        currentWatchStart.current = seekTime;
+        previousPosition.current = seekTime;
+        
+        // Recalculate completion eligibility after seek using updated intervals
+        updateCompletionEligibility(duration);
       });
 
       // Track playback rate changes
@@ -2529,7 +2742,8 @@ export default function Learning() {
 
                       if (!isVideoCompleted) {
                         // Use enhanced tracking from VimeoPlayer for robust 90% logic
-                        const displayProgress = enhancedVideoProgress || videoProgress;
+                        const actualProgress = enhancedVideoProgress || videoProgress;
+                        const positionProgress = videoProgress;
                         const canManuallyComplete = canCompleteVideo;
                         
                         return (
@@ -2538,11 +2752,14 @@ export default function Learning() {
                               <Play className="w-8 h-8 mx-auto mb-2 text-primary" />
                               <p className="font-medium">Watch the video to continue</p>
                               <p className="text-sm text-muted-foreground">
-                                Progress: {displayProgress}% complete 
-                                {canManuallyComplete ? ' (can mark as complete)' : ' (need 90% to mark complete)'}
+                                Watched: {actualProgress}% of video content 
+                                {actualProgress !== positionProgress ? ` (position: ${positionProgress}%)` : ''}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {canManuallyComplete ? '✅ Can mark as complete (watched 90%+)' : '⏳ Need to watch 90% of content to complete'}
                               </p>
                             </div>
-                            <Progress value={displayProgress} className="w-full" />
+                            <Progress value={actualProgress} className="w-full" />
                             
                             <div className="flex items-center space-x-2 p-3 bg-muted rounded-lg">
                               <input
