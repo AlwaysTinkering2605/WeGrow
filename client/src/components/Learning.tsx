@@ -498,23 +498,23 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
           window.clearTimeout(loadingTimeoutRef.current);
           loadingTimeoutRef.current = null;
         }
-        
-        // Restore video position if we have a saved position
-        if (savedPosition.current > 0 && !hasRestoredPosition.current) {
-          try {
-            await vimeoPlayer.current!.setCurrentTime(savedPosition.current);
-            hasRestoredPosition.current = true;
-            console.log(`Restored video position to ${Math.floor(savedPosition.current)}s`);
-          } catch (error) {
-            console.warn('Failed to seek to saved position:', error);
-          }
-        }
+        console.log('Video loaded successfully');
       });
 
       vimeoPlayer.current.on('error', (error) => {
         console.error('Vimeo Player Error:', error);
         console.error('Failed Video ID:', videoId);
-        setError(`Failed to load video: ${error.message || 'Unknown error'}`);
+        
+        // Handle specific error types
+        if (error.name === 'PlaybackError') {
+          // Reset position on playback errors
+          savedPosition.current = 0;
+          hasRestoredPosition.current = false;
+          setError('Video playback error - please try refreshing the page');
+        } else {
+          setError(`Failed to load video: ${error.message || 'Unknown error'}`);
+        }
+        
         setIsLoading(false);
         if (loadingTimeoutRef.current) {
           window.clearTimeout(loadingTimeoutRef.current);
@@ -554,6 +554,22 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
           // Send duration to parent component
           if (onDurationReceivedRef.current) {
             onDurationReceivedRef.current(duration);
+          }
+          
+          // Restore video position now that we have duration
+          if (savedPosition.current > 0 && !hasRestoredPosition.current && duration > savedPosition.current) {
+            try {
+              await vimeoPlayer.current!.setCurrentTime(savedPosition.current);
+              hasRestoredPosition.current = true;
+              console.log(`Restored video position to ${Math.floor(savedPosition.current)}s (duration: ${Math.floor(duration)}s)`);
+            } catch (error) {
+              console.warn('Failed to seek to saved position:', error);
+              // Reset saved position if it's invalid
+              savedPosition.current = 0;
+            }
+          } else if (savedPosition.current >= duration) {
+            console.warn(`Saved position ${savedPosition.current}s is beyond video duration ${duration}s - resetting`);
+            savedPosition.current = 0;
           }
         }
         
