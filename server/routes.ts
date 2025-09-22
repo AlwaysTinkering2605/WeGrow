@@ -879,6 +879,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get lessons with query parameters (moduleId, courseVersionId, or all)
+  app.get('/api/lms/lessons', isAuthenticated, async (req, res) => {
+    try {
+      const { moduleId, courseVersionId } = req.query;
+      
+      if (moduleId) {
+        // Get lessons for a specific module
+        const lessons = await storage.getLessons(moduleId as string);
+        res.json(lessons);
+      } else if (courseVersionId) {
+        // Get lessons for a course version (through modules)
+        const modules = await storage.getCourseModules(courseVersionId as string);
+        const allLessons = [];
+        for (const module of modules) {
+          const lessons = await storage.getLessons(module.id);
+          allLessons.push(...lessons);
+        }
+        res.json(allLessons);
+      } else {
+        // Get all lessons (admin only)
+        res.status(400).json({ message: "moduleId or courseVersionId parameter required" });
+      }
+    } catch (error) {
+      console.error("Error fetching lessons:", error);
+      res.status(500).json({ message: "Failed to fetch lessons" });
+    }
+  });
+
   app.get('/api/lms/lessons/:id', isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;

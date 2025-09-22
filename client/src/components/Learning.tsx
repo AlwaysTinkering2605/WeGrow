@@ -1187,10 +1187,28 @@ export default function Learning() {
       });
       return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       // Invalidate queries to update "What's Next" section in real-time
       queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments/me"] });
       queryClient.invalidateQueries({ queryKey: ["/api/lms/progress"] });
+      
+      // Invalidate specific lesson progress queries
+      if (variables.enrollmentId && variables.lessonId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/lms/progress", variables.enrollmentId, variables.lessonId] });
+      }
+      
+      // Invalidate course queries to update lesson completion status
+      if (courseId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/lms/courses", courseId] });
+        queryClient.invalidateQueries({ queryKey: ["/api/lms/courses"] });
+      }
+      
+      // Invalidate enrollment queries to update course progress
+      if (variables.enrollmentId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments", variables.enrollmentId] });
+      }
+      
+      console.log(`Progress updated: ${variables.progressPercentage}% for lesson ${variables.lessonId}. Cache invalidated.`);
     },
     onError: (error: any) => {
       console.error('Failed to update progress:', error);
