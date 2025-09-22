@@ -2121,15 +2121,6 @@ export default function Learning() {
   // Lesson navigation functions
   const goToLesson = (lessonIndex: number) => {
     if (lessonIndex >= 0 && lessonIndex < availableLessons.length) {
-      // DEBUG: Log lesson selection details
-      const selectedLesson = availableLessons[lessonIndex];
-      console.log(`DEBUG: Navigating to lesson ${lessonIndex}:`, {
-        id: selectedLesson.id,
-        title: selectedLesson.title,
-        vimeoVideoId: selectedLesson.vimeoVideoId,
-        orderIndex: selectedLesson.orderIndex
-      });
-      
       // Check if the lesson is locked
       if (isLessonLocked(lessonIndex)) {
         // Find which specific requirement is missing for better messaging
