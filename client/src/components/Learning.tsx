@@ -106,7 +106,7 @@ const badgeSchema = z.object({
 });
 
 // Vimeo Player Component with Progress Tracking and Manual Completion
-function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComplete, onDurationReceived, onTestModeProgress, onCompletionEligibilityChange }: {
+function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComplete, onDurationReceived, onTestModeProgress, onCompletionEligibilityChange, onCompletionUpdate }: {
   videoId: string;
   enrollmentId: string;
   lessonId: string;
@@ -115,6 +115,7 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   onDurationReceived?: (duration: number) => void;
   onTestModeProgress?: (progress: number, isTestMode: boolean) => void;
   onCompletionEligibilityChange?: (canComplete: boolean, watchedPercent: number) => void;
+  onCompletionUpdate?: (progressData: { enrollmentId: string; lessonId: string; progressPercentage: number; lastPosition: number; timeSpent: number; status: string; }) => void;
 }) {
   const playerRef = useRef<HTMLDivElement>(null);
   const vimeoPlayer = useRef<Player | null>(null);
@@ -277,6 +278,7 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   const onCompleteRef = useRef(onComplete);
   const onDurationReceivedRef = useRef(onDurationReceived);
   const onCompletionEligibilityChangeRef = useRef(onCompletionEligibilityChange);
+  const onCompletionUpdateRef = useRef(onCompletionUpdate);
 
   // Update callback refs when props change
   useEffect(() => {
@@ -294,6 +296,10 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   useEffect(() => {
     onCompletionEligibilityChangeRef.current = onCompletionEligibilityChange;
   }, [onCompletionEligibilityChange]);
+  
+  useEffect(() => {
+    onCompletionUpdateRef.current = onCompletionUpdate;
+  }, [onCompletionUpdate]);
 
   // Test mode functions
   const startTestMode = () => {
@@ -426,6 +432,21 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
           const blob = new Blob([JSON.stringify(progressData)], { type: 'application/json' });
           const success = navigator.sendBeacon('/api/lms/progress-beacon', blob);
           console.log(`Session cleanup: Final progress sent via sendBeacon (${success ? 'success' : 'failed'}). Time spent: ${finalTimeSpent}s`);
+          
+          // OPTION 1: Dual update for completion - trigger immediate UI update when video completes
+          if (success && progressData.status === 'completed' && progressData.progressPercentage >= 90) {
+            console.log('Video completed - triggering immediate UI update via callback');
+            if (onCompletionUpdateRef.current) {
+              onCompletionUpdateRef.current({
+                enrollmentId: progressData.enrollmentId,
+                lessonId: progressData.lessonId,
+                progressPercentage: progressData.progressPercentage,
+                lastPosition: progressData.lastPosition,
+                timeSpent: progressData.timeSpent,
+                status: 'completed'
+              });
+            }
+          }
         } else {
           // Fallback for browsers without sendBeacon
           if (onProgressUpdateRef.current) {
@@ -2317,6 +2338,18 @@ export default function Learning() {
                             setCanCompleteVideo(canComplete);
                             setEnhancedVideoProgress(watchedPercent);
                             console.log(`Completion eligibility updated: canComplete=${canComplete}, progress=${watchedPercent}%`);
+                          }}
+                          onCompletionUpdate={(progressData) => {
+                            // OPTION 1: Dual update - immediately update UI when video completes
+                            console.log('Completion update received - triggering mutation for immediate UI update');
+                            updateProgressMutation.mutate({
+                              enrollmentId: progressData.enrollmentId,
+                              lessonId: progressData.lessonId,
+                              progressPercentage: progressData.progressPercentage,
+                              lastPosition: progressData.lastPosition,
+                              timeSpent: progressData.timeSpent,
+                              status: progressData.status
+                            });
                           }}
                         />
                       ) : (
