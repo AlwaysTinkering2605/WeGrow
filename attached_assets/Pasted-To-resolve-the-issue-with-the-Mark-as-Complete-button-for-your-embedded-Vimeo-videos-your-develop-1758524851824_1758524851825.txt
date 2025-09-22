@@ -1,0 +1,38 @@
+To resolve the issue with the "Mark as Complete" button for your embedded Vimeo videos, your developer will need to implement a solution using the Vimeo Player API. Here is a breakdown of the necessary steps to accurately track when a student has watched at least 90% of a lesson video.
+
+1. Initialize the Vimeo Player
+
+First, ensure that the Vimeo Player API script is included on your lesson page. This will allow your Learning Management System (LMS) to communicate with the embedded Vimeo player. Your developer will need to target the specific <iframe> that contains the Vimeo video and create a new Vimeo.Player object for it.
+
+2. Retrieve the Video's Total Duration
+
+To calculate 90% of the video's length, you first need to know its total duration. This can be achieved by calling the getDuration() method on the player object. This method returns a promise that resolves with the duration of the video in seconds. This value should be stored in a variable.
+
+3. Monitor Video Playback Progress
+
+The Vimeo Player API provides events that are triggered during video playback. The timeupdate event is ideal for this scenario as it fires frequently while the video is playing and provides the current playback time. Your developer should add an event listener for this timeupdate event.[1][2]
+
+4. Calculate the Watched Percentage
+
+Inside the timeupdate event listener, your developer will have access to the current playback time in seconds through the data object passed by the event. With both the current time and the total duration, they can calculate the percentage of the video that has been watched using the formula: (currentTime / totalDuration) * 100.
+
+5. Implement the 90% Watched Logic
+
+Within the same event listener, after calculating the watched percentage, your developer should add a conditional check to see if this percentage is greater than or equal to 90.
+
+6. Enable the "Mark as Complete" Button
+
+Once the 90% threshold is reached, the code should then enable the "Mark as Complete" button, making it clickable for the student. To prevent the code from running unnecessarily after the button is enabled, it's a good practice to either remove the timeupdate event listener or use a boolean flag to ensure the button-enabling logic is only executed once.
+
+By following these steps, your developer can leverage the Vimeo Player API to accurately track video progress and ensure the "Mark as Complete" button is only enabled when a student has viewed the required portion of the lesson.
+
+Sources
+help
+stackoverflow.com
+articulate.com
+Google Search Suggestions
+Display of Search Suggestions is required when using Grounding with Google Search. Learn more
+Vimeo Player API track video progress
+Vimeo Player API events
+Vimeo Player API get duration
+Vimeo Player API getCurrentTime
