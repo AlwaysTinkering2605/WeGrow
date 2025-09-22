@@ -204,6 +204,45 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
     currentWatchStart.current = -1; // Reset
   };
 
+  // Update watched coverage during playback (this was missing!)
+  const updateWatchedCoverage = (currentTime: number, duration: number) => {
+    if (currentWatchStart.current >= 0 && currentTime > currentWatchStart.current) {
+      // Update the current interval end time (extends the interval as video plays)
+      const start = currentWatchStart.current;
+      const end = currentTime;
+      
+      // Replace the last interval if it's the current watching interval
+      setWatchedIntervals(prev => {
+        const otherIntervals = prev.slice(0, -1);
+        const newIntervals = [...otherIntervals, { start, end }];
+        const merged = mergeIntervals(newIntervals);
+        
+        // Update completion eligibility with new intervals
+        const totalWatched = calculateWatchedTime(merged, duration);
+        const exactPercentage = (totalWatched / duration) * 100;
+        const displayPercentage = Math.floor(exactPercentage);
+        
+        setActualWatchedPercentage(displayPercentage);
+        
+        // Check if we've reached 90% with precise threshold
+        const newCanComplete = totalWatched >= (0.9 * duration) - 0.001;
+        if (newCanComplete !== canMarkComplete) {
+          setCanMarkComplete(newCanComplete);
+          hasReached90Percent.current = newCanComplete;
+          
+          console.log(`Watched coverage: ${displayPercentage}% (${Math.floor(totalWatched)}s/${Math.floor(duration)}s). Can complete: ${newCanComplete}`);
+          
+          // Notify parent about completion eligibility
+          if (onCompletionEligibilityChangeRef.current) {
+            onCompletionEligibilityChangeRef.current(newCanComplete, displayPercentage);
+          }
+        }
+        
+        return merged;
+      });
+    }
+  };
+
   // Update completion eligibility based on current watched intervals
   const updateCompletionEligibility = (duration: number) => {
     if (duration <= 0) return;
@@ -332,14 +371,29 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
             console.log(`Initialized with existing timeSpent: ${existingProgress.timeSpent}s`);
           }
           
-          // Initialize watched intervals if we have position and duration data
+          // Restore video position and progress data
           if (existingProgress?.lastPosition && existingProgress?.durationSeconds) {
             const existingWatchedPercent = existingProgress.progressPercentage || 0;
             setActualWatchedPercentage(existingWatchedPercent);
             
-            // Defer completion eligibility until video duration is fetched and coverage is recomputed
-            // This prevents brief moments where completion appears available before proper validation
-            console.log(`Restored progress data: ${existingWatchedPercent}% (eligibility will be validated once video loads)`);
+            // Seek to saved position when video is ready
+            const seekToSavedPosition = async () => {
+              if (vimeoPlayer.current && existingProgress.lastPosition > 0) {
+                try {
+                  await vimeoPlayer.current.setCurrentTime(existingProgress.lastPosition);
+                  console.log(`Restored video position to ${Math.floor(existingProgress.lastPosition)}s`);
+                } catch (error) {
+                  console.warn('Failed to seek to saved position:', error);
+                }
+              }
+            };
+            
+            // Wait for video to be loaded before seeking
+            if (vimeoPlayer.current) {
+              vimeoPlayer.current.on('loaded', seekToSavedPosition);
+            }
+            
+            console.log(`Restored progress data: ${existingWatchedPercent}% at position ${Math.floor(existingProgress.lastPosition)}s`);
           }
         }
       } catch (error) {
