@@ -145,6 +145,10 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   const maxRetries = 3;
   const isLoadingVideoRef = useRef<boolean>(false);
   
+  // Store saved position for restoration
+  const savedPosition = useRef<number>(0);
+  const hasRestoredPosition = useRef<boolean>(false);
+  
   // Enhanced tracking refs for time calculation
   const lastTimeUpdate = useRef<number>(Date.now());
   const isPlaying = useRef<boolean>(false);
@@ -371,29 +375,14 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
             console.log(`Initialized with existing timeSpent: ${existingProgress.timeSpent}s`);
           }
           
-          // Restore video position and progress data
+          // Store saved position for restoration when video loads
           if (existingProgress?.lastPosition && existingProgress?.durationSeconds) {
             const existingWatchedPercent = existingProgress.progressPercentage || 0;
             setActualWatchedPercentage(existingWatchedPercent);
+            savedPosition.current = existingProgress.lastPosition;
+            hasRestoredPosition.current = false;
             
-            // Seek to saved position when video is ready
-            const seekToSavedPosition = async () => {
-              if (vimeoPlayer.current && existingProgress.lastPosition > 0) {
-                try {
-                  await vimeoPlayer.current.setCurrentTime(existingProgress.lastPosition);
-                  console.log(`Restored video position to ${Math.floor(existingProgress.lastPosition)}s`);
-                } catch (error) {
-                  console.warn('Failed to seek to saved position:', error);
-                }
-              }
-            };
-            
-            // Wait for video to be loaded before seeking
-            if (vimeoPlayer.current) {
-              vimeoPlayer.current.on('loaded', seekToSavedPosition);
-            }
-            
-            console.log(`Restored progress data: ${existingWatchedPercent}% at position ${Math.floor(existingProgress.lastPosition)}s`);
+            console.log(`Saved progress data: ${existingWatchedPercent}% at position ${Math.floor(existingProgress.lastPosition)}s`);
           }
         }
       } catch (error) {
@@ -503,11 +492,22 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
       vimeoPlayer.current = new Player(playerRef.current, playerOptions);
 
       // Set up event listeners for progress tracking
-      vimeoPlayer.current.on('loaded', () => {
+      vimeoPlayer.current.on('loaded', async () => {
         setIsLoading(false);
         if (loadingTimeoutRef.current) {
           window.clearTimeout(loadingTimeoutRef.current);
           loadingTimeoutRef.current = null;
+        }
+        
+        // Restore video position if we have a saved position
+        if (savedPosition.current > 0 && !hasRestoredPosition.current) {
+          try {
+            await vimeoPlayer.current!.setCurrentTime(savedPosition.current);
+            hasRestoredPosition.current = true;
+            console.log(`Restored video position to ${Math.floor(savedPosition.current)}s`);
+          } catch (error) {
+            console.warn('Failed to seek to saved position:', error);
+          }
         }
       });
 
@@ -2262,14 +2262,14 @@ export default function Learning() {
                             // Enhanced progress updates with accurate time tracking
                             const enrollmentId = courseDetails?.enrollment?.id;
                             if (enrollmentId && progress > 0 && currentLesson?.id) {
-                              updateLessonProgressMutation.mutate({
+                              updateProgressMutation.mutate({
                                 enrollmentId,
                                 lessonId: currentLesson.id,
-                                progress: progress,
+                                progressPercentage: progress,
                                 lastPosition: timePosition,
-                                durationSeconds: duration ? Math.floor(duration) : undefined,
-                                timeSpent: timeSpent || 0 // Enhanced: Include actual time spent watching
+                                timeSpent: timeSpent || 0
                               });
+                              console.log(`Progress updated: ${progress}% at ${Math.floor(timePosition)}s (${timeSpent}s watched)`);
                             }
                           }}
                           onDurationReceived={(duration) => {
