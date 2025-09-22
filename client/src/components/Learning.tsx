@@ -110,7 +110,7 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   videoId: string;
   enrollmentId: string;
   lessonId: string;
-  onProgressUpdate?: (progress: number, timePosition: number, duration?: number) => void;
+  onProgressUpdate?: (progress: number, timePosition: number, duration?: number, timeSpent?: number) => void;
   onComplete?: () => void;
   onDurationReceived?: (duration: number) => void;
   onTestModeProgress?: (progress: number, isTestMode: boolean) => void;
@@ -130,11 +130,21 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   const [watchedPercentage, setWatchedPercentage] = useState<number>(0);
   const [canMarkComplete, setCanMarkComplete] = useState<boolean>(false);
   
+  // Enhanced time tracking for better persistence
+  const [sessionStartTime, setSessionStartTime] = useState<number>(Date.now());
+  const [totalTimeSpent, setTotalTimeSpent] = useState<number>(0);
+  const [playbackRate, setPlaybackRate] = useState<number>(1);
+  
   const lastSavedProgress = useRef<number>(0);
   const loadingTimeoutRef = useRef<number | null>(null);
   const retryCountRef = useRef<number>(0);
   const maxRetries = 3;
   const isLoadingVideoRef = useRef<boolean>(false);
+  
+  // Enhanced tracking refs for time calculation
+  const lastTimeUpdate = useRef<number>(Date.now());
+  const isPlaying = useRef<boolean>(false);
+  const accumulatedTime = useRef<number>(0);
   
   // Flag to prevent multiple completion enabling calls
   const hasReached90Percent = useRef<boolean>(false);
@@ -331,19 +341,62 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
           onCompletionEligibilityChangeRef.current(watchedPercent >= 90, watchedPercent);
         }
         
+        // Calculate actual time spent during playback
+        if (isPlaying.current) {
+          const timeDelta = Date.now() - lastTimeUpdate.current;
+          accumulatedTime.current += timeDelta;
+          lastTimeUpdate.current = Date.now();
+        }
+        
         // Throttle progress updates: only save when progress increases by at least 1%
         if (watchedPercent > lastSavedProgress.current) {
           lastSavedProgress.current = watchedPercent;
           
-          // Always call progress update for regular tracking (now includes duration)
+          // Update total time spent for display
+          setTotalTimeSpent(Math.floor(accumulatedTime.current / 1000));
+          
+          // Always call progress update for regular tracking (now includes duration and time tracking)
           if (onProgressUpdateRef.current) {
-            onProgressUpdateRef.current(watchedPercent, seconds, duration);
+            onProgressUpdateRef.current(watchedPercent, seconds, duration, Math.floor(accumulatedTime.current / 1000));
           }
         }
       });
 
+      // Enhanced play/pause tracking for accurate time calculation
+      vimeoPlayer.current.on('play', () => {
+        isPlaying.current = true;
+        lastTimeUpdate.current = Date.now();
+        console.log('Video playback started');
+      });
+
+      vimeoPlayer.current.on('pause', () => {
+        if (isPlaying.current) {
+          // Calculate time spent since last play
+          const timeDelta = Date.now() - lastTimeUpdate.current;
+          accumulatedTime.current += timeDelta;
+          setTotalTimeSpent(Math.floor(accumulatedTime.current / 1000));
+          console.log(`Video paused. Time spent: ${Math.floor(accumulatedTime.current / 1000)}s`);
+        }
+        isPlaying.current = false;
+      });
+
+      // Track playback rate changes
+      vimeoPlayer.current.on('playbackratechange', (data: { playbackRate: number }) => {
+        setPlaybackRate(data.playbackRate);
+        console.log(`Playback rate changed to: ${data.playbackRate}x`);
+      });
+
       // Track video completion
       vimeoPlayer.current.on('ended', () => {
+        // Final time calculation when video ends
+        if (isPlaying.current) {
+          const timeDelta = Date.now() - lastTimeUpdate.current;
+          accumulatedTime.current += timeDelta;
+          setTotalTimeSpent(Math.floor(accumulatedTime.current / 1000));
+        }
+        isPlaying.current = false;
+        console.log(`Video ended. Total time spent: ${Math.floor(accumulatedTime.current / 1000)}s`);
+        
         if (onCompleteRef.current) {
           onCompleteRef.current();
         }
@@ -1232,13 +1285,14 @@ export default function Learning() {
 
   // LESSON PROGRESS MUTATION
   const updateLessonProgressMutation = useMutation({
-    mutationFn: async ({ enrollmentId, lessonId, progress, lastPosition, status, durationSeconds }: { 
+    mutationFn: async ({ enrollmentId, lessonId, progress, lastPosition, status, durationSeconds, timeSpent }: { 
       enrollmentId: string; 
       lessonId: string; 
       progress: number; 
       lastPosition?: number;
       status?: string;
       durationSeconds?: number;
+      timeSpent?: number;
     }) => {
       const response = await apiRequest("PATCH", "/api/lms/progress", {
         enrollmentId,
@@ -1247,7 +1301,7 @@ export default function Learning() {
         lastPosition: lastPosition || 0,
         durationSeconds: durationSeconds || null,
         status: status || (progress >= 100 ? "completed" : "in_progress"),
-        timeSpent: 0 // Will be calculated separately for video
+        timeSpent: timeSpent || 0 // Enhanced: Use actual time spent watching
       });
       return await response.json();
     },
@@ -1919,8 +1973,8 @@ export default function Learning() {
                           videoId={currentLesson.vimeoVideoId}
                           enrollmentId={courseDetails?.enrollment?.id || ''}
                           lessonId={currentLesson.id}
-                          onProgressUpdate={(progress, timePosition, duration) => {
-                            // Save progress updates (already throttled by VimeoPlayer)
+                          onProgressUpdate={(progress, timePosition, duration, timeSpent) => {
+                            // Enhanced progress updates with accurate time tracking
                             const enrollmentId = courseDetails?.enrollment?.id;
                             if (enrollmentId && progress > 0 && currentLesson?.id) {
                               updateLessonProgressMutation.mutate({
@@ -1928,7 +1982,8 @@ export default function Learning() {
                                 lessonId: currentLesson.id,
                                 progress: progress,
                                 lastPosition: timePosition,
-                                durationSeconds: duration ? Math.floor(duration) : undefined
+                                durationSeconds: duration ? Math.floor(duration) : undefined,
+                                timeSpent: timeSpent || 0 // Enhanced: Include actual time spent watching
                               });
                             }
                           }}
