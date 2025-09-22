@@ -1106,11 +1106,40 @@ export default function Learning() {
         title: "Quiz Submitted",
         description: `Quiz completed! Score: ${result.score}% ${result.passed ? '✅ Passed' : '❌ Failed'}`,
       });
-      // Invalidate all relevant caches to ensure status updates
-      queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/lms/progress"] });
+      
+      // Invalidate the exact cache keys that the lesson page reads from
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments/me"] });
       if (courseId) {
-        queryClient.invalidateQueries({ queryKey: [`/api/lms/courses/${courseId}`] });
+        // Use array segments to match the courseDetails query
+        queryClient.invalidateQueries({ queryKey: ["/api/lms/courses", courseId] });
+        
+        // Also immediately update the course details cache to show quiz as passed
+        queryClient.setQueryData(["/api/lms/courses", courseId], (oldData: any) => {
+          if (!oldData) return oldData;
+          
+          // Find and update the current lesson's quiz status
+          const updatedLessons = oldData.lessons?.map((lesson: any) => {
+            if (lesson.quiz?.quiz?.id === result.quizId) {
+              return {
+                ...lesson,
+                quiz: {
+                  ...lesson.quiz,
+                  latestAttempt: {
+                    ...result,
+                    passed: result.passed,
+                    score: result.score
+                  }
+                }
+              };
+            }
+            return lesson;
+          });
+          
+          return {
+            ...oldData,
+            lessons: updatedLessons
+          };
+        });
       }
     },
     onError: (error: any) => {
@@ -1144,9 +1173,11 @@ export default function Learning() {
       return await response.json();
     },
     onSuccess: () => {
-      // Invalidate enrollment queries to refresh progress
-      queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/lms/progress"] });
+      // Invalidate the exact cache keys that the lesson page reads from
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments/me"] });
+      if (courseId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/lms/courses", courseId] });
+      }
     },
     onError: (error: any) => {
       console.error("Failed to update lesson progress:", error);
@@ -1170,9 +1201,38 @@ export default function Learning() {
           title: "Lesson Completed! ✅",
           description: result.message,
         });
-        // Invalidate enrollment queries to refresh progress
-        queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/lms/progress"] });
+        
+        // Invalidate the exact cache keys that the lesson page reads from
+        queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments/me"] });
+        if (courseId) {
+          queryClient.invalidateQueries({ queryKey: ["/api/lms/courses", courseId] });
+          
+          // Immediately update the course details cache to show lesson as completed
+          queryClient.setQueryData(["/api/lms/courses", courseId], (oldData: any) => {
+            if (!oldData) return oldData;
+            
+            // Find and update the current lesson's progress status
+            const updatedLessons = oldData.lessons?.map((lesson: any) => {
+              if (lesson.id === result.lessonId) {
+                return {
+                  ...lesson,
+                  progress: {
+                    ...lesson.progress,
+                    status: 'completed',
+                    progressPercentage: 100,
+                    completionMethod: 'manual'
+                  }
+                };
+              }
+              return lesson;
+            });
+            
+            return {
+              ...oldData,
+              lessons: updatedLessons
+            };
+          });
+        }
       } else {
         toast({
           title: "Cannot Complete Lesson",
