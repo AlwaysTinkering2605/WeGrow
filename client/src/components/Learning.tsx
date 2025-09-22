@@ -474,7 +474,17 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
         height: 360,
         responsive: true,
         controls: true,
-        autopause: false
+        autopause: false,
+        background: false,    // Prevent auto-loop
+        muted: false,         // Allow audio
+        transparent: false,   // Solid background
+        speed: true,          // Allow speed controls
+        title: false,         // Hide title overlay (like badge=0)
+        byline: false,        // Hide author info
+        portrait: false,      // Hide author portrait
+        playsinline: true,    // Mobile compatibility
+        dnt: true,           // Do not track for privacy
+        pip: false           // Disable picture-in-picture
       };
 
       // If we have a videoId on mount, initialize with it
