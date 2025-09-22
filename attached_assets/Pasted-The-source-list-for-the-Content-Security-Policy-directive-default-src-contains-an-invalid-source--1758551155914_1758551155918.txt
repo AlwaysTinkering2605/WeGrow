@@ -1,0 +1,1778 @@
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+30The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+30The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+_app-d3eb5572b16fc4e1.js:28 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@#//////////////
+   ///////////////////////////
+      /////////////////////
+      
+CareerCompass:1 The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.Understand this error
+CareerCompass:1 The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?Understand this error
+CareerCompass:1 The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.Understand this error
+_app-d3eb5572b16fc4e1.js:28 [LaunchDarkly] LaunchDarkly client initialized
+20Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.Understand this error
+framework-7de58e1d68fc43f7.js:1 Unrecognized feature: 'ambient-light-sensor'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+framework-7de58e1d68fc43f7.js:1 Unrecognized feature: 'battery'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+framework-7de58e1d68fc43f7.js:1 Unrecognized feature: 'execution-while-not-rendered'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+framework-7de58e1d68fc43f7.js:1 Unrecognized feature: 'execution-while-out-of-viewport'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+framework-7de58e1d68fc43f7.js:1 Unrecognized feature: 'layout-animations'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+framework-7de58e1d68fc43f7.js:1 Unrecognized feature: 'legacy-image-formats'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+framework-7de58e1d68fc43f7.js:1 Unrecognized feature: 'navigation-override'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+framework-7de58e1d68fc43f7.js:1 Unrecognized feature: 'oversized-images'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+framework-7de58e1d68fc43f7.js:1 Unrecognized feature: 'publickey-credentials'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+framework-7de58e1d68fc43f7.js:1 Unrecognized feature: 'speaker-selection'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+framework-7de58e1d68fc43f7.js:1 Unrecognized feature: 'unoptimized-images'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+framework-7de58e1d68fc43f7.js:1 Unrecognized feature: 'unsized-media'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+framework-7de58e1d68fc43f7.js:1 Unrecognized feature: 'pointer-lock'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+framework-7de58e1d68fc43f7.js:1 Allow attribute will take precedence over 'allowfullscreen'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+framework-7de58e1d68fc43f7.js:1 Allow attribute will take precedence over 'allowpaymentrequest'.
+_ @ framework-7de58e1d68fc43f7.js:1Understand this warning
+CareerCompass:1 Unchecked runtime.lastError: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was receivedUnderstand this error
+CareerCompass:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+4CareerCompass:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was receivedUnderstand this error
+9CareerCompass:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was receivedUnderstand this error
+_app-d3eb5572b16fc4e1.js:28 task queue exceeded allotted deadline by 48ms
+(anonymous) @ _app-d3eb5572b16fc4e1.js:28Understand this warning
+18CareerCompass:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was receivedUnderstand this error
+_app-d3eb5572b16fc4e1.js:28 Disconnection timed out.
+(anonymous) @ _app-d3eb5572b16fc4e1.js:28Understand this error
+CareerCompass:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was receivedUnderstand this error
+graphql:1  Failed to load resource: the server responded with a status of 400 ()Understand this error
+graphql:1  Failed to load resource: the server responded with a status of 400 ()Understand this error
+graphql:1  Failed to load resource: the server responded with a status of 400 ()Understand this error
+18CareerCompass:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was receivedUnderstand this error
+workspace_iframe.html?initialPath=%2F&id=%3Ar261%3A:32 Unrecognized feature: 'ambient-light-sensor'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar261%3A:32 Unrecognized feature: 'battery'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar261%3A:32 Unrecognized feature: 'execution-while-not-rendered'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar261%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar261%3A:32 Unrecognized feature: 'layout-animations'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar261%3A:32 Unrecognized feature: 'legacy-image-formats'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar261%3A:32 Unrecognized feature: 'navigation-override'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar261%3A:32 Unrecognized feature: 'oversized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar261%3A:32 Unrecognized feature: 'publickey-credentials'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar261%3A:32 Unrecognized feature: 'speaker-selection'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar261%3A:32 Unrecognized feature: 'unoptimized-images'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar261%3A:32 Unrecognized feature: 'unsized-media'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar261%3A:32 Allow attribute will take precedence over 'allowfullscreen'.Understand this warning
+workspace_iframe.html?initialPath=%2F&id=%3Ar261%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.Understand this warning
+Console.js:61 Initializing Vimeo player with video ID: 1119689619
+Console.js:61 Parsed video ID number: 1119689619
+Console.js:61 Video loaded successfully
+Console.js:61 Successfully loaded video 1119689619
+Console.js:61 Video playback started at 0s
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 0s
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 0s
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 1s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 1s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 1s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 1% at 1s (1s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 1s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 2s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 2s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 2s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 2s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 3s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 3s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 3s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 3s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 4s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 4s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 2% at 4s (4s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 4s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 5s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 5s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 5s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 5s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 6s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 6s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 6s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 6s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 7s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 3% at 7s (7s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 7s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 7s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 7s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 8s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 8s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 8s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 9s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 9s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 9s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 9s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 10s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 4% at 9s (10s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 10s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 10s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 10s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 11s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 11s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 11s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 11s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 12s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 12s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 12s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 13s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 5% at 12s (13s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 13s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 13s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 13s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 14s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 14s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 14s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 14s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 15s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 15s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 15s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 6% at 15s (15s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 15s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 16s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 16s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 16s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 17s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 17s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 17s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 17s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 18s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 18s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 18s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 7% at 18s (18s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 18s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 19s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 19s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 19s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 19s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 20s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 20s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 20s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 20s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 21s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 8% at 21s (21s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 21s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 21s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 22s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 22s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 22s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 22s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 23s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 23s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 23s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 23s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 24s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 9% at 24s (24s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 24s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 24s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 24s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 25s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 25s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 25s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 26s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 26s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 26s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 26s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 10% at 26s (27s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 27s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 27s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 27s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 27s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 28s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 28s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 28s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 28s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 29s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 29s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 29s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 11% at 29s (30s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 30s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 30s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 30s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 30s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 31s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 31s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 31s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 31s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 32s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 32s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 32s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 12% at 32s (32s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 32s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 33s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 33s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 33s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 34s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 34s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 34s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 34s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 35s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 35s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 13% at 35s (35s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 35s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 35s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 36s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 36s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 36s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 36s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 37s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 37s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 37s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 37s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 38s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 14% at 38s (38s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 38s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 38s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 39s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 39s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 39s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 39s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 40s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 40s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 40s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 40s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 15% at 40s (41s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 41s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 41s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 41s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 41s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 42s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 42s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 42s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 43s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 43s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 43s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 43s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 16% at 43s (44s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 44s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 44s
+progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 44s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 44s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 45s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 45s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 45s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 45s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 46s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 46s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 46s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 17% at 46s (47s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 47s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 47s
+7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 47s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 47s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 48s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 48s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 48s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 48s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 49s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 49s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 18% at 49s (49s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 49s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 49s
+7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 50s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 50s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 50s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 51s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 51s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 51s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 51s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 52s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 52s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 19% at 52s (52s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 52s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 52s
+7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress:1  Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 53s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 53s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 53s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 53s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 54s
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+progress-beacon:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 20% at 55s (55s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 55s
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 56s
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 56s
+injected.js:278  PATCH https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress 400 (Bad Request)
+window.fetch @ Network.js:219
+apply @ injected.js:278
+apiRequest @ queryClient.ts:15
+mutationFn @ Learning.tsx:1206
+fn @ @tanstack_react-query.js?v=ed0c890d:1189
+run @ @tanstack_react-query.js?v=ed0c890d:494
+start @ @tanstack_react-query.js?v=ed0c890d:536
+execute @ @tanstack_react-query.js?v=ed0c890d:1225
+await in execute
+mutate @ @tanstack_react-query.js?v=ed0c890d:2630
+(anonymous) @ @tanstack_react-query.js?v=ed0c890d:3295
+onProgressUpdate @ Learning.tsx:2291
+(anonymous) @ Learning.tsx:618
+(anonymous) @ @vimeo_player.js?v=ed0c890d:1112
+processData @ @vimeo_player.js?v=ed0c890d:1109
+_this._onMessage @ @vimeo_player.js?v=ed0c890d:1861Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61
+onError @ Learning.tsx:1240
+execute @ @tanstack_react-query.js?v=ed0c890d:1254
+await in execute
+mutate @ @tanstack_react-query.js?v=ed0c890d:2630
+(anonymous) @ @tanstack_react-query.js?v=ed0c890d:3295
+onProgressUpdate @ Learning.tsx:2291
+(anonymous) @ Learning.tsx:618
+(anonymous) @ @vimeo_player.js?v=ed0c890d:1112
+processData @ @vimeo_player.js?v=ed0c890d:1109
+_this._onMessage @ @vimeo_player.js?v=ed0c890d:1861Understand this error
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 56s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 56s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 57s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 57s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 57s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 58s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 21% at 57s (58s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 58s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 58s
+injected.js:278  PATCH https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress 400 (Bad Request)
+window.fetch @ Network.js:219
+apply @ injected.js:278
+apiRequest @ queryClient.ts:15
+mutationFn @ Learning.tsx:1206
+fn @ @tanstack_react-query.js?v=ed0c890d:1189
+run @ @tanstack_react-query.js?v=ed0c890d:494
+start @ @tanstack_react-query.js?v=ed0c890d:536
+execute @ @tanstack_react-query.js?v=ed0c890d:1225
+await in execute
+mutate @ @tanstack_react-query.js?v=ed0c890d:2630
+(anonymous) @ @tanstack_react-query.js?v=ed0c890d:3295
+onProgressUpdate @ Learning.tsx:2291
+(anonymous) @ Learning.tsx:618
+(anonymous) @ @vimeo_player.js?v=ed0c890d:1112
+processData @ @vimeo_player.js?v=ed0c890d:1109
+_this._onMessage @ @vimeo_player.js?v=ed0c890d:1861Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61
+onError @ Learning.tsx:1240
+execute @ @tanstack_react-query.js?v=ed0c890d:1254
+await in execute
+mutate @ @tanstack_react-query.js?v=ed0c890d:2630
+(anonymous) @ @tanstack_react-query.js?v=ed0c890d:3295
+onProgressUpdate @ Learning.tsx:2291
+(anonymous) @ Learning.tsx:618
+(anonymous) @ @vimeo_player.js?v=ed0c890d:1112
+processData @ @vimeo_player.js?v=ed0c890d:1109
+_this._onMessage @ @vimeo_player.js?v=ed0c890d:1861Understand this error
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 58s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 59s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 59s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 59s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 59s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 60s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 60s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 60s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 22% at 60s (60s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 60s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 61s
+injected.js:278  PATCH https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress 400 (Bad Request)
+window.fetch @ Network.js:219
+apply @ injected.js:278
+apiRequest @ queryClient.ts:15
+mutationFn @ Learning.tsx:1206
+fn @ @tanstack_react-query.js?v=ed0c890d:1189
+run @ @tanstack_react-query.js?v=ed0c890d:494
+start @ @tanstack_react-query.js?v=ed0c890d:536
+execute @ @tanstack_react-query.js?v=ed0c890d:1225
+await in execute
+mutate @ @tanstack_react-query.js?v=ed0c890d:2630
+(anonymous) @ @tanstack_react-query.js?v=ed0c890d:3295
+onProgressUpdate @ Learning.tsx:2291
+(anonymous) @ Learning.tsx:618
+(anonymous) @ @vimeo_player.js?v=ed0c890d:1112
+processData @ @vimeo_player.js?v=ed0c890d:1109
+_this._onMessage @ @vimeo_player.js?v=ed0c890d:1861Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61
+onError @ Learning.tsx:1240
+execute @ @tanstack_react-query.js?v=ed0c890d:1254
+await in execute
+mutate @ @tanstack_react-query.js?v=ed0c890d:2630
+(anonymous) @ @tanstack_react-query.js?v=ed0c890d:3295
+onProgressUpdate @ Learning.tsx:2291
+(anonymous) @ Learning.tsx:618
+(anonymous) @ @vimeo_player.js?v=ed0c890d:1112
+processData @ @vimeo_player.js?v=ed0c890d:1109
+_this._onMessage @ @vimeo_player.js?v=ed0c890d:1861Understand this error
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 61s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 61s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 61s
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 62s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 62s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 62s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 63s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 63s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 63s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Progress updated: 23% at 63s (63s watched)
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 63s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 64s
+injected.js:278  PATCH https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress 400 (Bad Request)
+window.fetch @ Network.js:219
+apply @ injected.js:278
+apiRequest @ queryClient.ts:15
+mutationFn @ Learning.tsx:1206
+fn @ @tanstack_react-query.js?v=ed0c890d:1189
+run @ @tanstack_react-query.js?v=ed0c890d:494
+start @ @tanstack_react-query.js?v=ed0c890d:536
+execute @ @tanstack_react-query.js?v=ed0c890d:1225
+await in execute
+mutate @ @tanstack_react-query.js?v=ed0c890d:2630
+(anonymous) @ @tanstack_react-query.js?v=ed0c890d:3295
+onProgressUpdate @ Learning.tsx:2291
+(anonymous) @ Learning.tsx:618
+(anonymous) @ @vimeo_player.js?v=ed0c890d:1112
+processData @ @vimeo_player.js?v=ed0c890d:1109
+_this._onMessage @ @vimeo_player.js?v=ed0c890d:1861Understand this error
+Console.js:61 Failed to update progress: Error: 400: {"message":"Invalid data provided for update lesson progress","errors":[{"code":"invalid_type","expected":"integer","received":"float","message":"Expected integer, received float","path":["lastPosition"]}]}
+    at throwIfResNotOk (queryClient.ts:6:11)
+    at async apiRequest (queryClient.ts:22:3)
+    at async Object.mutationFn (Learning.tsx:1206:24)
+Mt.forEach.n.<computed> @ Console.js:61
+onError @ Learning.tsx:1240
+execute @ @tanstack_react-query.js?v=ed0c890d:1254
+await in execute
+mutate @ @tanstack_react-query.js?v=ed0c890d:2630
+(anonymous) @ @tanstack_react-query.js?v=ed0c890d:3295
+onProgressUpdate @ Learning.tsx:2291
+(anonymous) @ Learning.tsx:618
+(anonymous) @ @vimeo_player.js?v=ed0c890d:1112
+processData @ @vimeo_player.js?v=ed0c890d:1109
+_this._onMessage @ @vimeo_player.js?v=ed0c890d:1861Understand this error
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 64s
+Console.js:61 Video duration retrieved: 281 seconds
+Console.js:61 Video duration received: 281s
+Console.js:61 Session cleanup: Final progress sent via sendBeacon (success). Time spent: 64s
+Console.js:61 Video paused at 64s. Total time spent: 64s
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error
+Learning.tsx:427  POST https://7505318c-4aa6-4107-882d-1ad7a33e8618-00-3bg239jkgxu8o.janeway.replit.dev/api/lms/progress-beacon 500 (Internal Server Error)
+flushFinalProgressReliably @ Learning.tsx:427
+(anonymous) @ Learning.tsx:460
+safelyCallDestroy @ chunk-RPCDYKBN.js?v=ed0c890d:16748
+commitHookEffectListUnmount @ chunk-RPCDYKBN.js?v=ed0c890d:16875
+commitPassiveUnmountOnFiber @ chunk-RPCDYKBN.js?v=ed0c890d:18232
+commitPassiveUnmountEffects_complete @ chunk-RPCDYKBN.js?v=ed0c890d:18213
+commitPassiveUnmountEffects_begin @ chunk-RPCDYKBN.js?v=ed0c890d:18204
+commitPassiveUnmountEffects @ chunk-RPCDYKBN.js?v=ed0c890d:18169
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=ed0c890d:19489
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=ed0c890d:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=ed0c890d:19328
+workLoop @ chunk-RPCDYKBN.js?v=ed0c890d:197
+flushWork @ chunk-RPCDYKBN.js?v=ed0c890d:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=ed0c890d:384Understand this error

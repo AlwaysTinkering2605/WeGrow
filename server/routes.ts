@@ -1175,11 +1175,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         enrollmentId,
         lessonId,
         userId,
-        progressPercentage: progressPercentage || 0,
+        progressPercentage: Math.floor(progressPercentage || 0),
         status: validatedStatus || (progressPercentage >= 100 ? 'completed' : 'in_progress'),
-        timeSpent: timeSpent || 0,
-        lastPosition: lastPosition || 0,
-        durationSeconds: durationSeconds || null,
+        timeSpent: Math.floor(timeSpent || 0),
+        lastPosition: Math.floor(lastPosition || 0),
+        durationSeconds: durationSeconds ? Math.floor(durationSeconds) : null,
         completedAt: (validatedStatus === 'completed' || progressPercentage >= 100) ? new Date() : null
       };
       

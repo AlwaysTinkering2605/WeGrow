@@ -615,7 +615,7 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
           
           // Send progress update with ACTUAL watched coverage percentage, not position
           if (onProgressUpdateRef.current) {
-            onProgressUpdateRef.current(actualWatchedPercentage || positionPercent, seconds, duration, Math.floor(accumulatedTime.current / 1000));
+            onProgressUpdateRef.current(actualWatchedPercentage || positionPercent, Math.floor(seconds), duration, Math.floor(accumulatedTime.current / 1000));
           }
         }
       });
