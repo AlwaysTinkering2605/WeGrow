@@ -122,11 +122,21 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   const [isCompleted, setIsCompleted] = useState(false);
   const [testMode, setTestMode] = useState(false);
   const [simulatedProgress, setSimulatedProgress] = useState(0);
+  
+  // Enhanced tracking state for proper 90% logic
+  const [videoDuration, setVideoDuration] = useState<number>(0);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [watchedPercentage, setWatchedPercentage] = useState<number>(0);
+  const [canMarkComplete, setCanMarkComplete] = useState<boolean>(false);
+  
   const lastSavedProgress = useRef<number>(0);
   const loadingTimeoutRef = useRef<number | null>(null);
   const retryCountRef = useRef<number>(0);
   const maxRetries = 3;
   const isLoadingVideoRef = useRef<boolean>(false);
+  
+  // Flag to prevent multiple completion enabling calls
+  const hasReached90Percent = useRef<boolean>(false);
 
   // Store callbacks in refs to avoid effect dependencies
   const onProgressUpdateRef = useRef(onProgressUpdate);
@@ -160,17 +170,29 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
     setSimulatedProgress(targetProgress);
     console.log(`Simulating progress: ${targetProgress}%`);
     
+    // Update enhanced tracking state for test mode
+    const simulatedDuration = 1800; // 30-minute duration
+    const simulatedCurrentTime = (targetProgress / 100) * simulatedDuration;
+    
+    setVideoDuration(simulatedDuration);
+    setCurrentTime(simulatedCurrentTime);
+    setWatchedPercentage(targetProgress);
+    
+    // Implement 90% logic for test mode
+    if (targetProgress >= 90 && !hasReached90Percent.current) {
+      hasReached90Percent.current = true;
+      setCanMarkComplete(true);
+      console.log(`TEST MODE: 90% threshold reached! Video can now be manually completed. Progress: ${targetProgress}%`);
+    }
+    
     // Notify parent component about test mode progress
     if (onTestModeProgress) {
       onTestModeProgress(targetProgress, true);
     }
     
     if (onProgressUpdateRef.current) {
-      // Simulate 30-minute duration (1800 seconds)
-      const duration = 1800;
-      const timePosition = (targetProgress / 100) * duration;
       // This will trigger the mutation that updates server state
-      onProgressUpdateRef.current(targetProgress, timePosition, duration);
+      onProgressUpdateRef.current(targetProgress, simulatedCurrentTime, simulatedDuration);
     }
   };
 
@@ -235,7 +257,7 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
         setIsLoading(false);
       });
 
-      // Track progress with throttling to avoid API spam
+      // Enhanced progress tracking with robust 90% logic
       vimeoPlayer.current.on('timeupdate', async (data) => {
         const { seconds, duration } = data;
         
@@ -246,23 +268,41 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
           loadingTimeoutRef.current = null;
         }
         
-        // Send duration to parent component on first update
-        if (onDurationReceivedRef.current) {
-          onDurationReceivedRef.current(duration);
+        // Step 2: Retrieve and store the video's total duration
+        if (duration > 0 && videoDuration !== duration) {
+          setVideoDuration(duration);
+          console.log(`Video duration retrieved: ${duration} seconds`);
+          
+          // Send duration to parent component
+          if (onDurationReceivedRef.current) {
+            onDurationReceivedRef.current(duration);
+          }
         }
         
         // Guard against invalid duration
         if (duration <= 0) return;
         
-        const progress = Math.round((seconds / duration) * 100);
+        // Step 4: Calculate the watched percentage
+        const watchedPercent = Math.round((seconds / duration) * 100);
+        
+        // Update current tracking state
+        setCurrentTime(seconds);
+        setWatchedPercentage(watchedPercent);
+        
+        // Step 5: Implement the 90% watched logic
+        if (watchedPercent >= 90 && !hasReached90Percent.current) {
+          hasReached90Percent.current = true;
+          setCanMarkComplete(true);
+          console.log(`90% threshold reached! Video can now be manually completed. Progress: ${watchedPercent}%`);
+        }
         
         // Throttle progress updates: only save when progress increases by at least 1%
-        if (progress > lastSavedProgress.current) {
-          lastSavedProgress.current = progress;
+        if (watchedPercent > lastSavedProgress.current) {
+          lastSavedProgress.current = watchedPercent;
           
           // Always call progress update for regular tracking (now includes duration)
           if (onProgressUpdateRef.current) {
-            onProgressUpdateRef.current(progress, seconds, duration);
+            onProgressUpdateRef.current(watchedPercent, seconds, duration);
           }
         }
       });

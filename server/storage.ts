@@ -1584,11 +1584,9 @@ export class DatabaseStorage implements IStorage {
         return { success: false, message: "No progress found for this lesson. Please watch some of the video first." };
       }
 
-      // Calculate watched percentage from lastPosition and durationSeconds
-      let watchedPercent = 0;
-      if (progress.durationSeconds && progress.durationSeconds > 0 && progress.lastPosition !== null) {
-        watchedPercent = Math.floor((progress.lastPosition / progress.durationSeconds) * 100);
-      }
+      // Use the consistent progressPercentage field that the frontend displays
+      // This ensures frontend and backend validation are always aligned
+      const watchedPercent = progress.progressPercentage || 0;
 
       // Check if watched at least 90%
       if (watchedPercent < 90) {
