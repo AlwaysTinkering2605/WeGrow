@@ -106,7 +106,7 @@ const badgeSchema = z.object({
 });
 
 // Vimeo Player Component with Progress Tracking and Manual Completion
-function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComplete, onDurationReceived, onTestModeProgress }: {
+function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComplete, onDurationReceived, onTestModeProgress, onCompletionEligibilityChange }: {
   videoId: string;
   enrollmentId: string;
   lessonId: string;
@@ -114,6 +114,7 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   onComplete?: () => void;
   onDurationReceived?: (duration: number) => void;
   onTestModeProgress?: (progress: number, isTestMode: boolean) => void;
+  onCompletionEligibilityChange?: (canComplete: boolean, watchedPercent: number) => void;
 }) {
   const playerRef = useRef<HTMLDivElement>(null);
   const vimeoPlayer = useRef<Player | null>(null);
@@ -142,6 +143,7 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   const onProgressUpdateRef = useRef(onProgressUpdate);
   const onCompleteRef = useRef(onComplete);
   const onDurationReceivedRef = useRef(onDurationReceived);
+  const onCompletionEligibilityChangeRef = useRef(onCompletionEligibilityChange);
 
   // Update callback refs when props change
   useEffect(() => {
@@ -155,6 +157,10 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   useEffect(() => {
     onDurationReceivedRef.current = onDurationReceived;
   }, [onDurationReceived]);
+  
+  useEffect(() => {
+    onCompletionEligibilityChangeRef.current = onCompletionEligibilityChange;
+  }, [onCompletionEligibilityChange]);
 
   // Test mode functions
   const startTestMode = () => {
@@ -183,6 +189,16 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
       hasReached90Percent.current = true;
       setCanMarkComplete(true);
       console.log(`TEST MODE: 90% threshold reached! Video can now be manually completed. Progress: ${targetProgress}%`);
+      
+      // Notify parent component about completion eligibility in test mode
+      if (onCompletionEligibilityChangeRef.current) {
+        onCompletionEligibilityChangeRef.current(true, targetProgress);
+      }
+    }
+    
+    // Always notify about current eligibility state for UI consistency
+    if (onCompletionEligibilityChangeRef.current) {
+      onCompletionEligibilityChangeRef.current(targetProgress >= 90, targetProgress);
     }
     
     // Notify parent component about test mode progress
@@ -294,6 +310,25 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
           hasReached90Percent.current = true;
           setCanMarkComplete(true);
           console.log(`90% threshold reached! Video can now be manually completed. Progress: ${watchedPercent}%`);
+          
+          // Notify parent component about completion eligibility
+          if (onCompletionEligibilityChangeRef.current) {
+            onCompletionEligibilityChangeRef.current(true, watchedPercent);
+          }
+        } else if (watchedPercent < 90 && hasReached90Percent.current) {
+          // Handle case where user seeks backward below 90%
+          hasReached90Percent.current = false;
+          setCanMarkComplete(false);
+          
+          // Notify parent component
+          if (onCompletionEligibilityChangeRef.current) {
+            onCompletionEligibilityChangeRef.current(false, watchedPercent);
+          }
+        }
+        
+        // Always notify about current eligibility state for UI consistency
+        if (onCompletionEligibilityChangeRef.current && watchedPercent !== lastSavedProgress.current) {
+          onCompletionEligibilityChangeRef.current(watchedPercent >= 90, watchedPercent);
         }
         
         // Throttle progress updates: only save when progress increases by at least 1%
@@ -542,6 +577,10 @@ export default function Learning() {
   // Test mode state for manual completion testing
   const [testModeProgress, setTestModeProgress] = useState<number>(0);
   const [isInTestMode, setIsInTestMode] = useState<boolean>(false);
+  
+  // Enhanced completion eligibility tracking from VimeoPlayer
+  const [canCompleteVideo, setCanCompleteVideo] = useState<boolean>(false);
+  const [enhancedVideoProgress, setEnhancedVideoProgress] = useState<number>(0);
   
   // Track which course is currently being enrolled to prevent shared loading state
   const [enrollingCourseId, setEnrollingCourseId] = useState<string | null>(null);
@@ -1907,6 +1946,12 @@ export default function Learning() {
                             setIsInTestMode(isTestMode);
                             console.log(`Test mode progress: ${progress}%`);
                           }}
+                          onCompletionEligibilityChange={(canComplete, watchedPercent) => {
+                            // Enhanced tracking: Use actual video tracking for completion eligibility
+                            setCanCompleteVideo(canComplete);
+                            setEnhancedVideoProgress(watchedPercent);
+                            console.log(`Completion eligibility updated: canComplete=${canComplete}, progress=${watchedPercent}%`);
+                          }}
                         />
                       ) : (
                         <div className="aspect-video bg-black rounded-lg overflow-hidden relative flex items-center justify-center">
@@ -2428,7 +2473,9 @@ export default function Learning() {
                       }
 
                       if (!isVideoCompleted) {
-                        const canManuallyComplete = videoProgress >= 90;
+                        // Use enhanced tracking from VimeoPlayer for robust 90% logic
+                        const displayProgress = enhancedVideoProgress || videoProgress;
+                        const canManuallyComplete = canCompleteVideo;
                         
                         return (
                           <div className="space-y-3">
@@ -2436,11 +2483,11 @@ export default function Learning() {
                               <Play className="w-8 h-8 mx-auto mb-2 text-primary" />
                               <p className="font-medium">Watch the video to continue</p>
                               <p className="text-sm text-muted-foreground">
-                                Progress: {videoProgress}% complete 
-                                {videoProgress >= 90 ? ' (can mark as complete)' : ' (need 90% to mark complete)'}
+                                Progress: {displayProgress}% complete 
+                                {canManuallyComplete ? ' (can mark as complete)' : ' (need 90% to mark complete)'}
                               </p>
                             </div>
-                            <Progress value={videoProgress} className="w-full" />
+                            <Progress value={displayProgress} className="w-full" />
                             
                             <div className="flex items-center space-x-2 p-3 bg-muted rounded-lg">
                               <input
