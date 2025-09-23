@@ -1,0 +1,69 @@
+Of course. Here is a brief for your software developer outlining the requested enhancements for your Apex Learning Management System (LMS).
+
+Project Brief: LMS Feature Enhancement - External Training & Rich Content
+Date: September 23, 2025
+To: Lead Developer
+From: Graham Paisley
+1. Overview
+This brief outlines two major feature enhancements for the Apex LMS. The goal is to evolve the platform into a comprehensive training record system and increase the quality and variety of internal course content.
+External Training Tracking: Introduce the capability to log and manage training that occurs outside of the Apex LMS (e.g., classroom courses, workshops, conferences). This will ensure that our training matrix and employee learning paths are complete and accurate.
+Enhanced Lesson Content: Expand the lesson creation functionality beyond the current Vimeo video link to include a rich text editor and support for other key content formats, enabling more dynamic and engaging learning experiences.
+
+2. Feature 1: External Training Management
+Objective: To create a new "External Course" type that allows administrators to log training events that are not hosted within the LMS.
+Modifications to Course Creation & Management:
+Introduce "Course Type":
+In the "Create New Course" modal, add a new mandatory field: Course Type.
+The options should be: Internal (default) and External.
+
+
+Conditional Form for "External" Type:
+When a user selects External as the Course Type, the form should adapt to hide irrelevant fields (like "Vimeo Video ID") and show the following new fields for accurately tracking the training:
+Training Provider: (Text Input) The name of the company or institution that provided the training.
+Training Format: (Dropdown) Options should include: Classroom, Virtual Classroom, Conference, Workshop, Webinar.
+Accreditation: (Text Input/Tags) To note accreditations like "CPD Certified".
+Accreditation Units: (Number Input) To record the number of points or hours (e.g., 16 CPD hours).
+Start Date: (Date Picker)
+Completion Date: (Date Picker)
+Duration (Hours): (Number Input)
+Cost: (Number Input, with currency selection)
+Proof of Completion: (File Upload) Allow admins to upload a certificate or other proof (e.g., PDF, JPG).
+
+
+
+
+User & Record Management:
+Admin Workflow: For external courses, the workflow is not about user self-enrollment and progression. Instead, an administrator will manually assign a completed external course to a user's record, including the specific Completion Date.
+UI/UX: On the main "Course Management" dashboard, external courses should be clearly distinguished from internal ones using a tag or icon for easy identification.
+
+3. Feature 2: Enhanced Internal Lesson Formats
+Objective: To move beyond the single Vimeo video link per lesson and empower course creators with a flexible, multi-format lesson builder.
+Modifications to Lesson Creation:
+Introduce "Content Type" Selector:
+In the "Create New Lesson" modal, replace the Vimeo Video ID field with a dropdown menu labeled Lesson Content Type.
+The form should dynamically display the relevant input fields based on the selected content type.
+
+
+Supported Content Types:
+Rich Text:
+Implement a full-featured WYSIWYG (What You See Is What You Get) editor.
+It should support standard text formatting (bold, italic, lists, headings), inline image uploads, table creation, and hyperlinks.
+
+
+Video:
+Retain the existing Vimeo Video ID functionality.
+This should now be one of several options in the Lesson Content Type dropdown.
+
+
+PDF / Document Viewer:
+Allow the creator to upload a file (PDF, DOCX, PPTX).
+The lesson page should render the document in an embedded viewer for the user.
+
+
+
+User Experience:
+The student-facing lesson page must be updated to seamlessly display these different content types. The core layout (progress bar, course info, navigation) should remain consistent, with the central content area adapting to show the rich text, video, PDF.
+4. Summary & Next Steps
+This project involves significant updates to both the backend data models and the frontend user interface. The database schema will need to be altered to accommodate the new fields for external courses and the varied content types for lessons.
+Please review this brief and provide an estimate of the required development effort. I am available to discuss these requirements in more detail at your convenience.
+

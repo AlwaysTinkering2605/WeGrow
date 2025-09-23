@@ -36,6 +36,9 @@ export const companyValueEnum = pgEnum("company_value", ["excellence", "teamwork
 
 // LMS-specific enums
 export const lessonTypeEnum = pgEnum("lesson_type", ["video", "quiz", "document", "link"]);
+export const contentTypeEnum = pgEnum("content_type", ["rich_text", "video", "pdf_document"]);
+export const courseTypeEnum = pgEnum("course_type", ["internal", "external"]);
+export const trainingFormatEnum = pgEnum("training_format", ["classroom", "virtual_classroom", "conference", "workshop", "webinar"]);
 export const enrollmentStatusEnum = pgEnum("enrollment_status", ["enrolled", "in_progress", "completed", "expired"]);
 export const lessonStatusEnum = pgEnum("lesson_status", ["not_started", "in_progress", "completed"]);
 export const completionMethodEnum = pgEnum("completion_method", ["manual", "quiz", "auto"]);
@@ -249,6 +252,22 @@ export const courses = pgTable("courses", {
   currentVersionId: varchar("current_version_id"),
   isPublished: boolean("is_published").default(false),
   createdBy: varchar("created_by").notNull(),
+  
+  // Course type fields
+  courseType: courseTypeEnum("course_type").default("internal").notNull(),
+  
+  // External training fields (only used when courseType = 'external')
+  trainingProvider: varchar("training_provider"), // Company/institution providing training
+  trainingFormat: trainingFormatEnum("training_format"), // classroom, virtual, etc.
+  accreditation: varchar("accreditation"), // CPD Certified, etc.
+  accreditationUnits: integer("accreditation_units"), // Number of CPD hours/points
+  startDate: timestamp("start_date"), // Training start date
+  completionDate: timestamp("completion_date"), // Training completion date
+  durationHours: integer("duration_hours"), // Duration in hours
+  cost: integer("cost"), // Cost in cents to avoid decimal issues
+  currency: varchar("currency").default("GBP"), // Currency code
+  proofOfCompletionUrl: varchar("proof_of_completion_url"), // URL to uploaded certificate/proof
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -283,9 +302,15 @@ export const lessons = pgTable("lessons", {
   description: text("description"),
   type: lessonTypeEnum("type").notNull(),
   orderIndex: integer("order_index").notNull(),
+  
+  // Enhanced content type fields
+  contentType: contentTypeEnum("content_type").default("video"), // rich_text, video, pdf_document
+  richTextContent: text("rich_text_content"), // HTML content for rich text lessons
   vimeoVideoId: varchar("vimeo_video_id"), // For video lessons
+  pdfContentUrl: varchar("pdf_content_url"), // URL to uploaded PDF document
+  
   estimatedDuration: integer("estimated_duration"), // seconds
-  resourceUrl: varchar("resource_url"), // For documents/links
+  resourceUrl: varchar("resource_url"), // For documents/links (legacy)
   isRequired: boolean("is_required").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
