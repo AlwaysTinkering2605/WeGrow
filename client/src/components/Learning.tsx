@@ -137,6 +137,7 @@ const badgeSchema = z.object({
   name: z.string().min(1, "Badge name is required"),
   description: z.string().min(10, "Description is required"),
   criteria: z.string().min(10, "Achievement criteria required"),
+  courseIds: z.array(z.string()).optional().default([]),
   icon: z.string().optional(),
   color: z.string().default("#3B82F6"),
 });
@@ -1179,6 +1180,7 @@ export default function Learning() {
       name: "",
       description: "",
       criteria: "",
+      courseIds: [],
       icon: "",
       color: "#3B82F6",
     },
@@ -5755,6 +5757,55 @@ export default function Learning() {
                                       {...field}
                                       data-testid="textarea-badge-criteria"
                                     />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createBadgeForm.control}
+                              name="courseIds"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Required Courses (Optional)</FormLabel>
+                                  <FormDescription>
+                                    Select courses that must be completed to automatically earn this badge. Leave empty for manual-only badges.
+                                  </FormDescription>
+                                  <FormControl>
+                                    <div className="space-y-2" data-testid="multiselect-badge-courses">
+                                      {coursesData && coursesData.length > 0 ? (
+                                        <div className="border rounded-md p-3 max-h-40 overflow-y-auto">
+                                          {coursesData.map((course) => (
+                                            <div key={course.id} className="flex items-center space-x-2">
+                                              <input
+                                                type="checkbox"
+                                                id={`course-${course.id}`}
+                                                checked={field.value?.includes(course.id) || false}
+                                                onChange={(e) => {
+                                                  const currentValues = field.value || [];
+                                                  if (e.target.checked) {
+                                                    field.onChange([...currentValues, course.id]);
+                                                  } else {
+                                                    field.onChange(currentValues.filter(id => id !== course.id));
+                                                  }
+                                                }}
+                                                className="rounded"
+                                              />
+                                              <label
+                                                htmlFor={`course-${course.id}`}
+                                                className="text-sm cursor-pointer flex-1"
+                                              >
+                                                {course.title}
+                                              </label>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div className="text-sm text-muted-foreground">
+                                          No courses available. Create courses first to set badge requirements.
+                                        </div>
+                                      )}
+                                    </div>
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>

@@ -27,6 +27,7 @@ import {
   certificates,
   badges,
   userBadges,
+  badgeCourseRequirements,
   trainingRequirements,
   pdpCourseLinks,
   type User,
@@ -240,8 +241,11 @@ export interface IStorage {
   getUserCertificates(userId: string): Promise<Certificate[]>;
   getCertificate(certificateId: string): Promise<Certificate | undefined>;
   
-  createBadge(badge: InsertBadge): Promise<Badge>;
+  createBadge(badge: InsertBadge, courseIds?: string[]): Promise<Badge>;
   getBadges(): Promise<Badge[]>;
+  getBadgeCourseRequirements(badgeId: string): Promise<string[]>;
+  checkBadgeEligibility(userId: string, badgeId: string): Promise<boolean>;
+  awardBadgeIfEligible(userId: string, badgeId: string, courseVersionId?: string): Promise<UserBadge | null>;
   awardUserBadge(userBadge: InsertUserBadge): Promise<UserBadge>;
   getUserBadges(userId: string): Promise<UserBadge[]>;
 
@@ -1723,13 +1727,83 @@ export class DatabaseStorage implements IStorage {
     return certificate;
   }
 
-  async createBadge(badge: InsertBadge): Promise<Badge> {
+  async createBadge(badge: InsertBadge, courseIds?: string[]): Promise<Badge> {
     const [created] = await db.insert(badges).values(badge).returning();
+    
+    // Add course requirements if provided
+    if (courseIds && courseIds.length > 0) {
+      const requirements = courseIds.map(courseId => ({
+        badgeId: created.id,
+        courseId: courseId
+      }));
+      await db.insert(badgeCourseRequirements).values(requirements);
+    }
+    
     return created;
   }
 
   async getBadges(): Promise<Badge[]> {
     return await db.select().from(badges);
+  }
+
+  async getBadgeCourseRequirements(badgeId: string): Promise<string[]> {
+    const requirements = await db
+      .select()
+      .from(badgeCourseRequirements)
+      .where(eq(badgeCourseRequirements.badgeId, badgeId));
+    return requirements.map(req => req.courseId);
+  }
+
+  async checkBadgeEligibility(userId: string, badgeId: string): Promise<boolean> {
+    // Get required courses for this badge
+    const requiredCourseIds = await this.getBadgeCourseRequirements(badgeId);
+    
+    if (requiredCourseIds.length === 0) {
+      return false; // No automatic assignment for badges without course requirements
+    }
+    
+    // Check if user has completed all required courses
+    for (const courseId of requiredCourseIds) {
+      const enrollment = await db
+        .select()
+        .from(enrollments)
+        .where(and(
+          eq(enrollments.userId, userId),
+          eq(enrollments.courseId, courseId),
+          eq(enrollments.status, "completed")
+        ))
+        .limit(1);
+      
+      if (enrollment.length === 0) {
+        return false; // User hasn't completed this required course
+      }
+    }
+    
+    // Check if user already has this badge
+    const existingBadge = await db
+      .select()
+      .from(userBadges)
+      .where(and(
+        eq(userBadges.userId, userId),
+        eq(userBadges.badgeId, badgeId)
+      ))
+      .limit(1);
+    
+    return existingBadge.length === 0; // Eligible if they don't already have it
+  }
+
+  async awardBadgeIfEligible(userId: string, badgeId: string, courseVersionId?: string): Promise<UserBadge | null> {
+    if (await this.checkBadgeEligibility(userId, badgeId)) {
+      const userBadge = await this.awardUserBadge({
+        userId,
+        badgeId,
+        awardedBy: "system",
+        reason: "Automatic award for course completion",
+        courseVersionId
+      });
+      return userBadge;
+    }
+    return null;
   }
 
   async awardUserBadge(userBadge: InsertUserBadge): Promise<UserBadge> {

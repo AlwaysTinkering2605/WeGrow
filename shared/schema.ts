@@ -440,6 +440,14 @@ export const userBadges = pgTable("user_badges", {
   courseVersionId: varchar("course_version_id"), // If earned from course completion
 });
 
+// Badge course requirements - defines which courses are needed to earn a badge
+export const badgeCourseRequirements = pgTable("badge_course_requirements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  badgeId: varchar("badge_id").notNull(),
+  courseId: varchar("course_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Training requirements - maps roles to required courses
 export const trainingRequirements = pgTable("training_requirements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -841,6 +849,11 @@ export const insertBadgeSchema = createInsertSchema(badges).omit({
   createdAt: true,
 });
 
+export const insertBadgeCourseRequirementSchema = createInsertSchema(badgeCourseRequirements).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertUserBadgeSchema = createInsertSchema(userBadges).omit({
   id: true,
   awardedAt: true,
@@ -914,6 +927,7 @@ export type InsertQuizAttempt = z.infer<typeof insertQuizAttemptSchema>;
 export type InsertTrainingRecord = z.infer<typeof insertTrainingRecordSchema>;
 export type InsertCertificate = z.infer<typeof insertCertificateSchema>;
 export type InsertBadge = z.infer<typeof insertBadgeSchema>;
+export type InsertBadgeCourseRequirement = z.infer<typeof insertBadgeCourseRequirementSchema>;
 export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
 export type InsertTrainingRequirement = z.infer<typeof insertTrainingRequirementSchema>;
 export type InsertPdpCourseLink = z.infer<typeof insertPdpCourseLinkSchema>;

@@ -1364,6 +1364,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const progress = await storage.updateLessonProgress(progressData);
+      
+      // Check for automatic badge assignment when lesson is completed
+      if (progressData.status === 'completed') {
+        try {
+          // Get all badges and check eligibility for each
+          const badges = await storage.getBadges();
+          for (const badge of badges) {
+            await storage.awardBadgeIfEligible(userId, badge.id, enrollmentId);
+          }
+        } catch (error) {
+          console.error("Error checking badge eligibility:", error);
+          // Don't fail the lesson completion if badge check fails
+        }
+      }
+      
       res.status(204).send(); // No content response for beacon
     } catch (error: any) {
       console.error('Beacon progress update failed:', error);
@@ -1517,6 +1532,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching badges:", error);
       res.status(500).json({ message: "Failed to fetch badges" });
+    }
+  });
+
+  app.get('/api/lms/admin/badges/:badgeId/requirements', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { badgeId } = req.params;
+      const courseIds = await storage.getBadgeCourseRequirements(badgeId);
+      res.json({ courseIds });
+    } catch (error) {
+      console.error("Error fetching badge requirements:", error);
+      res.status(500).json({ message: "Failed to fetch badge requirements" });
     }
   });
 
@@ -2028,8 +2054,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin Badge Management
   app.post('/api/lms/admin/badges', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
     try {
-      const badgeData = insertBadgeSchema.parse(req.body);
-      const badge = await storage.createBadge(badgeData);
+      const { courseIds, ...badgeData } = req.body;
+      const validatedBadgeData = insertBadgeSchema.parse(badgeData);
+      
+      // Validate courseIds
+      const validatedCourseIds = z.array(z.string()).optional().default([]).parse(courseIds);
+      
+      // Create badge with optional course requirements
+      const badge = await storage.createBadge(validatedBadgeData, validatedCourseIds);
       res.json(badge);
     } catch (error: any) {
       return handleValidationError(error, res, "create badge");
