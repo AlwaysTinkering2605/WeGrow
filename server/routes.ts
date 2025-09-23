@@ -45,7 +45,7 @@ const assignExternalCourseCompletionSchema = z.object({
 });
 
 // Enhanced lesson content schemas - extending shared schema as per project guidelines
-// Fix: Omit server-derived fields before extending to prevent validation errors
+// Include necessary fields for validation
 const createLessonSchema = insertLessonSchema.omit({
   moduleId: true,
   type: true,
@@ -64,9 +64,9 @@ const createLessonSchema = insertLessonSchema.omit({
   if (data.contentType === "video" || !data.contentType) {
     return data.vimeoVideoId !== undefined && data.vimeoVideoId !== null && String(data.vimeoVideoId).length > 0;
   } else if (data.contentType === "rich_text") {
-    return data.richText !== undefined && data.richText !== null && String(data.richText).length > 0;
+    return data.richTextContent !== undefined && data.richTextContent !== null && String(data.richTextContent).length > 0;
   } else if (data.contentType === "pdf_document") {
-    return data.pdfContent !== undefined && data.pdfContent !== null && String(data.pdfContent).length > 0;
+    return data.pdfContentUrl !== undefined && data.pdfContentUrl !== null && String(data.pdfContentUrl).length > 0;
   }
   return false;
 }, {
@@ -87,9 +87,9 @@ const updateLessonSchema = insertLessonSchema.partial().omit({
     if (data.contentType === "video") {
       return data.vimeoVideoId !== undefined && data.vimeoVideoId !== null && String(data.vimeoVideoId).length > 0;
     } else if (data.contentType === "rich_text") {
-      return data.richText !== undefined && data.richText !== null && String(data.richText).length > 0;
+      return data.richTextContent !== undefined && data.richTextContent !== null && String(data.richTextContent).length > 0;
     } else if (data.contentType === "pdf_document") {
-      return data.pdfContent !== undefined && data.pdfContent !== null && String(data.pdfContent).length > 0;
+      return data.pdfContentUrl !== undefined && data.pdfContentUrl !== null && String(data.pdfContentUrl).length > 0;
     }
   }
   return true; // Allow partial updates without content type change
@@ -1738,9 +1738,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (validatedData.contentType === "video") {
         lessonData.vimeoVideoId = validatedData.vimeoVideoId;
       } else if (validatedData.contentType === "rich_text") {
-        lessonData.richText = validatedData.richText;
+        lessonData.richTextContent = validatedData.richTextContent;
       } else if (validatedData.contentType === "pdf_document") {
-        lessonData.pdfContent = validatedData.pdfContent;
+        lessonData.pdfContentUrl = validatedData.pdfContentUrl;
       }
       
       const lesson = await storage.createLesson(lessonData);

@@ -105,15 +105,15 @@ const lessonSchema = insertLessonSchema.extend({
     return data.vimeoVideoId && data.vimeoVideoId.length > 0;
   }
   if (data.contentType === "rich_text") {
-    return data.richTextContent && data.richTextContent.length > 0;
+    return data.richTextContent && data.richTextContent.trim().length > 0;
   }
   if (data.contentType === "pdf_document") {
     return data.pdfContentUrl && data.pdfContentUrl.length > 0;
   }
   return true;
 }, {
-  message: "Content is required for the selected content type",
-  path: ["contentType"],
+  message: "Please provide content for the selected content type",
+  path: ["richTextContent"], // This will be dynamically set based on content type
 });
 
 const quizSchema = z.object({
@@ -1090,6 +1090,7 @@ export default function Learning() {
     defaultValues: {
       title: "",
       description: "",
+      type: "video",
       contentType: "video",
       // Content fields
       vimeoVideoId: "",
@@ -1106,6 +1107,7 @@ export default function Learning() {
     defaultValues: {
       title: "",
       description: "",
+      type: "video",
       contentType: "video",
       // Content fields
       vimeoVideoId: "",
