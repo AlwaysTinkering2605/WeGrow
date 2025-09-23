@@ -63,8 +63,27 @@ const courseSchema = z.object({
   targetRole: z.string().optional(),
   estimatedHours: z.coerce.number().min(0.5).max(100),
   difficulty: z.enum(["Beginner", "Intermediate", "Advanced"]),
+  // Course type field
+  courseType: z.enum(["internal", "external"]).default("internal"),
+  // Internal course fields
   vimeoVideoId: z.string().optional(),
+  // External course fields (conditional)
+  trainingProvider: z.string().optional(),
+  trainingFormat: z.enum(["online", "in_person", "hybrid"]).optional(),
+  accreditation: z.string().optional(),
+  externalCourseUrl: z.string().url().optional().or(z.literal("")),
+  certificationRequirements: z.string().optional(),
+  renewalPeriodMonths: z.coerce.number().min(1).max(120).optional(),
   isPublished: z.boolean().default(false),
+}).refine((data) => {
+  // Validate external course required fields
+  if (data.courseType === "external") {
+    return data.trainingProvider && data.trainingProvider.length > 0;
+  }
+  return true;
+}, {
+  message: "Training provider is required for external courses",
+  path: ["trainingProvider"],
 });
 
 // Import the proper lesson schema from shared
@@ -989,8 +1008,11 @@ export default function Learning() {
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
   const [editingQuestionIndex, setEditingQuestionIndex] = useState<number>(-1);
 
+  // Define proper form type
+  type CourseForm = z.infer<typeof courseSchema>;
+
   // Form instances for admin operations
-  const createCourseForm = useForm({
+  const createCourseForm = useForm<CourseForm>({
     resolver: zodResolver(courseSchema),
     defaultValues: {
       title: "",
@@ -998,10 +1020,19 @@ export default function Learning() {
       category: "",
       targetRole: "",
       estimatedHours: 1,
-      difficulty: "Beginner" as const,
+      difficulty: "Beginner",
+      courseType: "internal",
+      // Internal course fields
       vimeoVideoId: "",
+      // External course fields
+      trainingProvider: "",
+      trainingFormat: "online",
+      accreditation: "",
+      externalCourseUrl: "",
+      certificationRequirements: "",
+      renewalPeriodMonths: 12,
       isPublished: false,
-    },
+    } satisfies CourseForm,
   });
 
   const updateCourseForm = useForm({
@@ -3087,6 +3118,32 @@ export default function Learning() {
                     })}
                     className="space-y-6"
                   >
+                    {/* Course Type Selector */}
+                    <FormField
+                      control={createCourseForm.control}
+                      name="courseType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Course Type</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-course-type">
+                                <SelectValue placeholder="Select course type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="internal">Internal Course (Created in-house)</SelectItem>
+                              <SelectItem value="external">External Course (Third-party training)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Internal courses are created and managed within your organization. External courses are provided by third-party training providers.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
                         control={createCourseForm.control}
@@ -3213,26 +3270,166 @@ export default function Learning() {
                         )}
                       />
                     </div>
-                    <FormField
-                      control={createCourseForm.control}
-                      name="vimeoVideoId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Vimeo Video ID (Optional)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="e.g., 123456789"
-                              {...field}
-                              data-testid="input-vimeo-id"
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Enter the Vimeo video ID for the main course video. You can add more lessons later.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+
+                    {/* Conditional Fields based on Course Type */}
+                    {createCourseForm.watch("courseType") === "internal" && (
+                      <FormField
+                        control={createCourseForm.control}
+                        name="vimeoVideoId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Vimeo Video ID (Optional)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="e.g., 123456789"
+                                {...field}
+                                data-testid="input-vimeo-id"
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Enter the Vimeo video ID for the main course video. You can add more lessons later.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+
+                    {/* External Course Fields */}
+                    {createCourseForm.watch("courseType") === "external" && (
+                      <div className="space-y-4 border-t pt-4">
+                        <h3 className="text-lg font-semibold text-foreground">External Training Details</h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={createCourseForm.control}
+                            name="trainingProvider"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Training Provider *</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="e.g., IOSH, NEBOSH, BSI"
+                                    {...field}
+                                    data-testid="input-training-provider"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={createCourseForm.control}
+                            name="trainingFormat"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Training Format</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-training-format">
+                                      <SelectValue placeholder="Select format" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="online">Online</SelectItem>
+                                    <SelectItem value="in_person">In-Person</SelectItem>
+                                    <SelectItem value="hybrid">Hybrid</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={createCourseForm.control}
+                            name="accreditation"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Accreditation</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="e.g., CPD Certified, ISO Accredited"
+                                    {...field}
+                                    data-testid="input-accreditation"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={createCourseForm.control}
+                            name="renewalPeriodMonths"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Renewal Period (Months)</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number"
+                                    min="1"
+                                    max="120"
+                                    placeholder="12"
+                                    {...field}
+                                    onChange={(e) => field.onChange(parseInt(e.target.value) || 12)}
+                                    data-testid="input-renewal-period"
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  How often does this certification need to be renewed?
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <FormField
+                          control={createCourseForm.control}
+                          name="externalCourseUrl"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Course URL (Optional)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="url"
+                                  placeholder="https://training-provider.com/course"
+                                  {...field}
+                                  data-testid="input-external-course-url"
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                Link to the external training course or provider website
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={createCourseForm.control}
+                          name="certificationRequirements"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Certification Requirements</FormLabel>
+                              <FormControl>
+                                <Textarea 
+                                  placeholder="Describe what's required to complete this external training (e.g., attend all sessions, pass final exam, submit portfolio)"
+                                  className="min-h-[80px]"
+                                  {...field}
+                                  data-testid="textarea-certification-requirements"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    )}
                     <div className="flex justify-end space-x-2">
                       <Button 
                         type="button" 
