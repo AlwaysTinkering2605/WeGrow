@@ -1585,39 +1585,80 @@ export class DatabaseStorage implements IStorage {
 
   async completeLessonManually(enrollmentId: string, lessonId: string): Promise<{ success: boolean; message: string }> {
     try {
+      // Get lesson details to check content type
+      const lesson = await this.getLesson(lessonId);
+      if (!lesson) {
+        return { success: false, message: "Lesson not found." };
+      }
+
       // Get current lesson progress
       const progress = await this.getLessonProgress(enrollmentId, lessonId);
       
-      if (!progress) {
-        return { success: false, message: "No progress found for this lesson. Please watch some of the video first." };
+      // Handle different content types appropriately
+      if (lesson.contentType === 'video') {
+        // For video lessons, require existing progress and 90% completion
+        if (!progress) {
+          return { success: false, message: "No progress found for this lesson. Please watch some of the video first." };
+        }
+
+        // Use the consistent progressPercentage field that the frontend displays
+        const watchedPercent = progress.progressPercentage || 0;
+
+        // Check if watched at least 90%
+        if (watchedPercent < 90) {
+          return { 
+            success: false, 
+            message: `You need to watch at least 90% of the video to complete this lesson. Currently watched: ${watchedPercent}%` 
+          };
+        }
+
+        // Update existing progress to completed
+        await db
+          .update(lessonProgress)
+          .set({
+            status: "completed",
+            progressPercentage: 100,
+            completionMethod: "manual",
+            completedAt: new Date(),
+            updatedAt: new Date()
+          })
+          .where(and(
+            eq(lessonProgress.enrollmentId, enrollmentId),
+            eq(lessonProgress.lessonId, lessonId)
+          ));
+
+      } else {
+        // For rich text and PDF lessons, allow completion without prior progress
+        if (progress) {
+          // Update existing progress
+          await db
+            .update(lessonProgress)
+            .set({
+              status: "completed",
+              progressPercentage: 100,
+              completionMethod: "manual",
+              completedAt: new Date(),
+              updatedAt: new Date()
+            })
+            .where(and(
+              eq(lessonProgress.enrollmentId, enrollmentId),
+              eq(lessonProgress.lessonId, lessonId)
+            ));
+        } else {
+          // Create new progress record for rich text/PDF lessons
+          await db
+            .insert(lessonProgress)
+            .values({
+              enrollmentId,
+              lessonId,
+              status: "completed",
+              progressPercentage: 100,
+              completionMethod: "manual",
+              timeSpent: 0,
+              completedAt: new Date(),
+            });
+        }
       }
-
-      // Use the consistent progressPercentage field that the frontend displays
-      // This ensures frontend and backend validation are always aligned
-      const watchedPercent = progress.progressPercentage || 0;
-
-      // Check if watched at least 90%
-      if (watchedPercent < 90) {
-        return { 
-          success: false, 
-          message: `You need to watch at least 90% of the video to complete this lesson. Currently watched: ${watchedPercent}%` 
-        };
-      }
-
-      // Update lesson to completed with manual completion method
-      await db
-        .update(lessonProgress)
-        .set({
-          status: "completed",
-          progressPercentage: 100,
-          completionMethod: "manual",
-          completedAt: new Date(),
-          updatedAt: new Date()
-        })
-        .where(and(
-          eq(lessonProgress.enrollmentId, enrollmentId),
-          eq(lessonProgress.lessonId, lessonId)
-        ));
 
       return { success: true, message: "Lesson marked as complete!" };
     } catch (error) {
