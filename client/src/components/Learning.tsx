@@ -1122,16 +1122,12 @@ export default function Learning() {
   // Effect to populate edit lesson form when editingLesson changes
   useEffect(() => {
     if (editingLesson) {
-      // Debug: Log the lesson data to see what fields we have
-      console.log("DEBUG: editingLesson data:", editingLesson);
-      console.log("DEBUG: editingLesson keys:", Object.keys(editingLesson));
-      
       editLessonForm.reset({
         title: editingLesson.title || "",
         description: editingLesson.description || "",
         type: editingLesson.type || "video",
-        contentType: editingLesson.contentType || "video", // Critical: Set content type
-        // Content fields based on content type
+        contentType: editingLesson.contentType || "video",
+        // Content fields - ensure all are properly populated
         vimeoVideoId: editingLesson.vimeoVideoId || "",
         richTextContent: editingLesson.richTextContent || "",
         pdfContentUrl: editingLesson.pdfContentUrl || "",
@@ -1139,8 +1135,6 @@ export default function Learning() {
         estimatedDuration: editingLesson.estimatedDuration || 1800,
         isRequired: editingLesson.isRequired ?? true,
       });
-      
-      console.log("DEBUG: Form values after reset:", editLessonForm.getValues());
     }
   }, [editingLesson, editLessonForm]);
 
@@ -4593,6 +4587,31 @@ export default function Learning() {
                             }
                             updateLessonMutation.mutate({ lessonId: editingLesson.id, lessonData: data });
                           })} className="space-y-4">
+                            
+                            {/* Content Type Selector */}
+                            <FormField
+                              control={editLessonForm.control}
+                              name="contentType"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Content Type</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-edit-content-type">
+                                        <SelectValue placeholder="Select content type" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="video">🎥 Video Content (Vimeo)</SelectItem>
+                                      <SelectItem value="rich_text">📝 Rich Text Content</SelectItem>
+                                      <SelectItem value="pdf_document">📄 PDF Document</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
                             <FormField
                               control={editLessonForm.control}
                               name="title"
@@ -4606,26 +4625,93 @@ export default function Learning() {
                                 </FormItem>
                               )}
                             />
-                            <FormField
-                              control={editLessonForm.control}
-                              name="vimeoVideoId"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Vimeo Video ID</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      placeholder="e.g., 123456789" 
-                                      {...field} 
-                                      data-testid="input-edit-lesson-vimeo-id"
-                                    />
-                                  </FormControl>
-                                  <FormDescription>
-                                    Find the Video ID from your Vimeo URL: vimeo.com/[VIDEO_ID]
-                                  </FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
+
+                            {/* Conditional Content Fields */}
+                            {editLessonForm.watch("contentType") === "video" && (
+                              <FormField
+                                control={editLessonForm.control}
+                                name="vimeoVideoId"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Vimeo Video ID</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        placeholder="e.g., 123456789" 
+                                        {...field} 
+                                        value={field.value || ''}
+                                        data-testid="input-edit-lesson-vimeo-id"
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      Find the Video ID from your Vimeo URL: vimeo.com/[VIDEO_ID]
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {editLessonForm.watch("contentType") === "rich_text" && (
+                              <FormField
+                                control={editLessonForm.control}
+                                name="richTextContent"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Rich Text Content</FormLabel>
+                                    <FormControl>
+                                      <div data-testid="editor-edit-lesson-content">
+                                        <ReactQuill
+                                          theme="snow"
+                                          value={field.value || ''}
+                                          onChange={field.onChange}
+                                          placeholder="Enter your lesson content using the rich text editor..."
+                                          modules={{
+                                            toolbar: [
+                                              [{ 'header': [1, 2, 3, false] }],
+                                              ['bold', 'italic', 'underline', 'strike'],
+                                              [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                                              ['link', 'blockquote', 'code-block'],
+                                              ['clean']
+                                            ],
+                                          }}
+                                          formats={[
+                                            'header', 'bold', 'italic', 'underline', 'strike',
+                                            'list', 'bullet', 'link', 'blockquote', 'code-block'
+                                          ]}
+                                          style={{ minHeight: '200px' }}
+                                        />
+                                      </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {editLessonForm.watch("contentType") === "pdf_document" && (
+                              <FormField
+                                control={editLessonForm.control}
+                                name="pdfContentUrl"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>PDF Document URL</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        placeholder="https://example.com/document.pdf"
+                                        {...field}
+                                        value={field.value || ''}
+                                        data-testid="input-edit-lesson-pdf-url"
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      Direct URL to the PDF document for this lesson
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+                            
                             <FormField
                               control={editLessonForm.control}
                               name="description"
@@ -4636,6 +4722,7 @@ export default function Learning() {
                                     <Textarea 
                                       placeholder="Brief description of lesson content and learning objectives"
                                       {...field}
+                                      value={field.value || ''}
                                       data-testid="input-edit-lesson-description"
                                     />
                                   </FormControl>
@@ -4673,10 +4760,10 @@ export default function Learning() {
                                     <FormControl>
                                       <Input 
                                         type="number" 
-                                        min="1" 
-                                        max="300"
+                                        min="60" 
+                                        max="18000"
                                         {...field}
-                                        value={field.value || 30}
+                                        value={field.value || 1800}
                                         onChange={(e) => field.onChange(parseInt(e.target.value))}
                                         data-testid="input-edit-lesson-duration"
                                       />
