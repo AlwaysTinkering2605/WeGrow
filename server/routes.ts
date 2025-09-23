@@ -1788,22 +1788,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // CRITICAL: Clear all previous content fields when changing type to prevent stale data
         updateData.vimeoVideoId = null;
-        updateData.richText = null;
-        updateData.pdfContent = null;
+        updateData.richTextContent = null;
+        updateData.pdfContentUrl = null;
         
         // Set the appropriate content field based on type
         if (validatedData.contentType === "video") {
           updateData.vimeoVideoId = validatedData.vimeoVideoId;
         } else if (validatedData.contentType === "rich_text") {
-          updateData.richText = validatedData.richText;
+          updateData.richTextContent = validatedData.richTextContent;
         } else if (validatedData.contentType === "pdf_document") {
-          updateData.pdfContent = validatedData.pdfContent;
+          updateData.pdfContentUrl = validatedData.pdfContentUrl;
         }
       } else {
         // Handle legacy updates that don't specify content type
         if (validatedData.vimeoVideoId !== undefined) updateData.vimeoVideoId = validatedData.vimeoVideoId;
-        if (validatedData.richText !== undefined) updateData.richText = validatedData.richText;
-        if (validatedData.pdfContent !== undefined) updateData.pdfContent = validatedData.pdfContent;
+        if (validatedData.richTextContent !== undefined) updateData.richTextContent = validatedData.richTextContent;
+        if (validatedData.pdfContentUrl !== undefined) updateData.pdfContentUrl = validatedData.pdfContentUrl;
       }
       
       const lesson = await storage.updateLesson(lessonId, updateData);
