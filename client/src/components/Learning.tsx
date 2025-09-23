@@ -54,6 +54,9 @@ import {
   Circle,
   Lock
 } from "lucide-react";
+import { insertLessonSchema } from "@shared/schema";
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 // Form Schemas for Admin Interface
 const courseSchema = z.object({
@@ -86,17 +89,31 @@ const courseSchema = z.object({
   path: ["trainingProvider"],
 });
 
-// Import the proper lesson schema from shared
-import { insertLessonSchema } from "@shared/schema";
 
 // Extend the insert schema for client-side validation
 const lessonSchema = insertLessonSchema.extend({
   // Override to make these coercible from form inputs
   orderIndex: z.coerce.number().min(1),
   estimatedDuration: z.coerce.number().min(60).max(18000), // 1 minute to 5 hours in seconds
-  type: z.enum(["video", "document", "link", "quiz"]).default("video"),
+  // Content type validation (matches backend enum)
+  contentType: z.enum(["video", "rich_text", "pdf_document"]).default("video"),
 }).omit({
   moduleId: true, // Will be provided by the courseId context
+}).refine((data) => {
+  // Validate content-specific required fields
+  if (data.contentType === "video") {
+    return data.vimeoVideoId && data.vimeoVideoId.length > 0;
+  }
+  if (data.contentType === "rich_text") {
+    return data.richTextContent && data.richTextContent.length > 0;
+  }
+  if (data.contentType === "pdf_document") {
+    return data.pdfContentUrl && data.pdfContentUrl.length > 0;
+  }
+  return true;
+}, {
+  message: "Content is required for the selected content type",
+  path: ["contentType"],
 });
 
 const quizSchema = z.object({
@@ -123,6 +140,9 @@ const badgeSchema = z.object({
   icon: z.string().optional(),
   color: z.string().default("#3B82F6"),
 });
+
+// Type definitions for form schemas
+type LessonFormType = z.infer<typeof lessonSchema>;
 
 // Vimeo Player Component with Progress Tracking and Manual Completion
 function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComplete, onDurationReceived, onTestModeProgress, onCompletionEligibilityChange, onCompletionUpdate }: {
@@ -1065,30 +1085,36 @@ export default function Learning() {
     }
   }, [selectedCourseForEdit, updateCourseForm]);
 
-  const createLessonForm = useForm({
+  const createLessonForm = useForm<LessonFormType>({
     resolver: zodResolver(lessonSchema),
     defaultValues: {
       title: "",
       description: "",
+      contentType: "video",
+      // Content fields
       vimeoVideoId: "",
-      type: "video" as const,
+      richTextContent: "",
+      pdfContentUrl: "",
       orderIndex: 1,
       estimatedDuration: 1800, // 30 minutes in seconds
       isRequired: true,
-    },
+    } satisfies LessonFormType,
   });
 
-  const editLessonForm = useForm({
+  const editLessonForm = useForm<LessonFormType>({
     resolver: zodResolver(lessonSchema),
     defaultValues: {
       title: "",
       description: "",
+      contentType: "video",
+      // Content fields
       vimeoVideoId: "",
-      type: "video" as const,
+      richTextContent: "",
+      pdfContentUrl: "",
       orderIndex: 1,
       estimatedDuration: 1800, // 30 minutes in seconds
       isRequired: true,
-    },
+    } satisfies LessonFormType,
   });
 
   // Effect to populate edit lesson form when editingLesson changes
@@ -4182,10 +4208,10 @@ export default function Learning() {
                           Add New Lesson
                         </Button>
                       </DialogTrigger>
-                      <DialogContent>
+                      <DialogContent className="max-w-2xl">
                         <DialogHeader>
                           <DialogTitle>Create New Lesson</DialogTitle>
-                          <DialogDescription>Add a video lesson to your course curriculum</DialogDescription>
+                          <DialogDescription>Add a lesson with video, rich text, or PDF content to your course curriculum</DialogDescription>
                         </DialogHeader>
                         <Form {...createLessonForm}>
                           <form onSubmit={createLessonForm.handleSubmit((data) => {
@@ -4214,6 +4240,31 @@ export default function Learning() {
                                 </SelectContent>
                               </Select>
                             </div>
+                            
+                            {/* Content Type Selector */}
+                            <FormField
+                              control={createLessonForm.control}
+                              name="contentType"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Content Type</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-content-type">
+                                        <SelectValue placeholder="Select content type" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="video">🎥 Video Content (Vimeo)</SelectItem>
+                                      <SelectItem value="rich_text">📝 Rich Text Content</SelectItem>
+                                      <SelectItem value="pdf_document">📄 PDF Document</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
                             <FormField
                               control={createLessonForm.control}
                               name="title"
@@ -4227,19 +4278,79 @@ export default function Learning() {
                                 </FormItem>
                               )}
                             />
-                            <FormField
-                              control={createLessonForm.control}
-                              name="vimeoVideoId"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Vimeo Video ID</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="123456789" {...field} data-testid="input-lesson-vimeo" />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
+                            {/* Conditional Content Fields */}
+                            {createLessonForm.watch("contentType") === "video" && (
+                              <FormField
+                                control={createLessonForm.control}
+                                name="vimeoVideoId"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Vimeo Video ID</FormLabel>
+                                    <FormControl>
+                                      <Input placeholder="123456789" {...field} data-testid="input-lesson-vimeo" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {createLessonForm.watch("contentType") === "rich_text" && (
+                              <FormField
+                                control={createLessonForm.control}
+                                name="richTextContent"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Rich Text Content</FormLabel>
+                                    <FormControl>
+                                      <div data-testid="editor-lesson-content">
+                                        <ReactQuill
+                                          theme="snow"
+                                          value={field.value || ''}
+                                          onChange={field.onChange}
+                                          placeholder="Enter your lesson content using the rich text editor..."
+                                          modules={{
+                                            toolbar: [
+                                              [{ 'header': [1, 2, 3, false] }],
+                                              ['bold', 'italic', 'underline', 'strike'],
+                                              [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                                              ['link', 'blockquote', 'code-block'],
+                                              ['clean']
+                                            ],
+                                          }}
+                                          formats={[
+                                            'header', 'bold', 'italic', 'underline', 'strike',
+                                            'list', 'bullet', 'link', 'blockquote', 'code-block'
+                                          ]}
+                                          style={{ minHeight: '200px' }}
+                                        />
+                                      </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {createLessonForm.watch("contentType") === "pdf_document" && (
+                              <FormField
+                                control={createLessonForm.control}
+                                name="pdfContentUrl"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>PDF Document URL</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        placeholder="https://example.com/document.pdf or upload via Object Storage" 
+                                        {...field} 
+                                        data-testid="input-lesson-pdf" 
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
                             <div className="grid grid-cols-2 gap-4">
                               <FormField
                                 control={createLessonForm.control}
