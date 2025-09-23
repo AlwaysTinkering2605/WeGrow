@@ -1125,8 +1125,12 @@ export default function Learning() {
       editLessonForm.reset({
         title: editingLesson.title || "",
         description: editingLesson.description || "",
-        vimeoVideoId: editingLesson.vimeoVideoId || "",
         type: editingLesson.type || "video",
+        contentType: editingLesson.contentType || "video", // Critical: Set content type
+        // Content fields based on content type
+        vimeoVideoId: editingLesson.vimeoVideoId || "",
+        richTextContent: editingLesson.richTextContent || "",
+        pdfContentUrl: editingLesson.pdfContentUrl || "",
         orderIndex: editingLesson.orderIndex || 1,
         estimatedDuration: editingLesson.estimatedDuration || 1800,
         isRequired: editingLesson.isRequired ?? true,
