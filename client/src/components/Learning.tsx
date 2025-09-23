@@ -2437,13 +2437,9 @@ export default function Learning() {
                                 // Mark rich text lesson as completed
                                 const enrollmentId = courseDetails?.enrollment?.id;
                                 if (enrollmentId && currentLesson?.id) {
-                                  updateProgressMutation.mutate({
+                                  completeLessonManuallyMutation.mutate({
                                     enrollmentId,
-                                    lessonId: currentLesson.id,
-                                    progressPercentage: 100,
-                                    lastPosition: 0,
-                                    timeSpent: 0,
-                                    status: 'completed'
+                                    lessonId: currentLesson.id
                                   });
                                 }
                               }}
@@ -2480,13 +2476,9 @@ export default function Learning() {
                                   // Mark PDF lesson as completed after viewing
                                   const enrollmentId = courseDetails?.enrollment?.id;
                                   if (enrollmentId && currentLesson?.id) {
-                                    updateProgressMutation.mutate({
+                                    completeLessonManuallyMutation.mutate({
                                       enrollmentId,
-                                      lessonId: currentLesson.id,
-                                      progressPercentage: 100,
-                                      lastPosition: 0,
-                                      timeSpent: 0,
-                                      status: 'completed'
+                                      lessonId: currentLesson.id
                                     });
                                   }
                                 }}
