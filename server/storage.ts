@@ -284,6 +284,14 @@ export interface IStorage {
   
   // LMS - Data Migration
   migrateLegacyCourses(): Promise<{ fixed: number; total: number }>;
+  
+  // LMS - External Course Management
+  assignExternalCourseCompletion(
+    userId: string, 
+    courseId: string, 
+    completionDate: Date, 
+    assignedBy: string
+  ): Promise<{ enrollment: Enrollment; trainingRecord: TrainingRecord }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1828,9 +1836,25 @@ export class DatabaseStorage implements IStorage {
       thumbnailUrl: courses.thumbnailUrl,
       currentVersionId: courses.currentVersionId,
       isPublished: courses.isPublished,
+      createdBy: courses.createdBy,
+      
+      // Course type fields
+      courseType: courses.courseType,
+      
+      // External training fields
+      trainingProvider: courses.trainingProvider,
+      trainingFormat: courses.trainingFormat,
+      accreditation: courses.accreditation,
+      accreditationUnits: courses.accreditationUnits,
+      startDate: courses.startDate,
+      completionDate: courses.completionDate,
+      durationHours: courses.durationHours,
+      cost: courses.cost,
+      currency: courses.currency,
+      proofOfCompletionUrl: courses.proofOfCompletionUrl,
+      
       createdAt: courses.createdAt,
       updatedAt: courses.updatedAt,
-      createdBy: courses.createdBy,
       enrollmentCount: sql<number>`(
         SELECT COUNT(*)::int 
         FROM ${enrollments} e
@@ -2185,6 +2209,139 @@ export class DatabaseStorage implements IStorage {
       fixed: fixedCount,
       total: coursesWithoutVersions.length
     };
+  }
+
+  // LMS - External Course Management Implementation
+  async assignExternalCourseCompletion(
+    userId: string, 
+    courseId: string, 
+    completionDate: Date, 
+    assignedBy: string
+  ): Promise<{ enrollment: Enrollment; trainingRecord: TrainingRecord }> {
+    return await db.transaction(async (tx) => {
+      // Verify that the course exists and is external
+      const [course] = await tx.select().from(courses).where(eq(courses.id, courseId));
+      if (!course) {
+        throw new Error("Course not found");
+      }
+      if (course.courseType !== "external") {
+        throw new Error("This method can only be used for external courses");
+      }
+
+      // Verify that the user exists
+      const [user] = await tx.select().from(users).where(eq(users.id, userId));
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Get course version using currentVersionId for consistency
+      let courseVersion: any;
+      if (course.currentVersionId) {
+        // Use the current version if it exists
+        [courseVersion] = await tx.select()
+          .from(courseVersions)
+          .where(eq(courseVersions.id, course.currentVersionId));
+        
+        if (!courseVersion) {
+          throw new Error("Course currentVersionId references a non-existent version");
+        }
+      } else {
+        // Create a course version for the external course since none exists
+        [courseVersion] = await tx.insert(courseVersions).values({
+          courseId: courseId,
+          version: "1.0",
+          changelog: "External course version",
+          publishedBy: assignedBy,
+          publishedAt: new Date(),
+          isActive: true
+        }).returning();
+        
+        // CRITICAL: Update the course to set currentVersionId for consistency
+        await tx
+          .update(courses)
+          .set({ currentVersionId: courseVersion.id })
+          .where(eq(courses.id, courseId));
+      }
+
+      // Check if enrollment already exists
+      let [existingEnrollment] = await tx.select()
+        .from(enrollments)
+        .where(and(
+          eq(enrollments.userId, userId),
+          eq(enrollments.courseVersionId, courseVersion.id)
+        ));
+
+      let enrollment: Enrollment;
+      if (existingEnrollment) {
+        // Update existing enrollment to completed
+        [enrollment] = await tx
+          .update(enrollments)
+          .set({
+            status: "completed",
+            completedAt: completionDate,
+            progress: 100,
+            startedAt: existingEnrollment.startedAt || completionDate
+          })
+          .where(eq(enrollments.id, existingEnrollment.id))
+          .returning();
+      } else {
+        // Create new enrollment as completed
+        [enrollment] = await tx.insert(enrollments).values({
+          userId: userId,
+          courseVersionId: courseVersion.id,
+          status: "completed",
+          enrolledAt: completionDate,
+          startedAt: completionDate,
+          completedAt: completionDate,
+          progress: 100
+        }).returning();
+      }
+
+      // Check for existing training record at course level to ensure idempotency 
+      // Use course-level idempotency (not version-level) to prevent duplicates across versions
+      let [existingTrainingRecord] = await tx
+        .select({
+          id: trainingRecords.id,
+          courseVersionId: trainingRecords.courseVersionId,
+          enrollmentId: trainingRecords.enrollmentId
+        })
+        .from(trainingRecords)
+        .innerJoin(courseVersions, eq(trainingRecords.courseVersionId, courseVersions.id))
+        .where(and(
+          eq(trainingRecords.userId, userId),
+          eq(courseVersions.courseId, courseId)
+        ))
+        .limit(1);
+
+      let trainingRecord: TrainingRecord;
+      if (existingTrainingRecord) {
+        // Update existing training record to current version and date
+        [trainingRecord] = await tx
+          .update(trainingRecords)
+          .set({
+            courseVersionId: courseVersion.id, // Update to current version
+            enrollmentId: enrollment.id, // Update to current enrollment
+            completedAt: completionDate,
+            signedOffBy: assignedBy,
+            effectivenessCheck: "External course completion manually assigned by administrator (updated)"
+          })
+          .where(eq(trainingRecords.id, existingTrainingRecord.id))
+          .returning();
+      } else {
+        // Create new immutable training record
+        [trainingRecord] = await tx.insert(trainingRecords).values({
+          userId: userId,
+          courseVersionId: courseVersion.id,
+          enrollmentId: enrollment.id,
+          completedAt: completionDate,
+          finalScore: 100, // External courses are considered 100% completed
+          signedOffBy: assignedBy,
+          effectivenessCheck: "External course completion manually assigned by administrator"
+        }).returning();
+      }
+
+      return { enrollment, trainingRecord };
+    });
   }
 }
 

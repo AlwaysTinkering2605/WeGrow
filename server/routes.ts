@@ -32,6 +32,17 @@ import {
   insertTrainingRequirementSchema,
   insertPdpCourseLinkSchema,
 } from "@shared/schema";
+import { z } from "zod";
+
+// External course completion assignment schema
+const assignExternalCourseCompletionSchema = z.object({
+  userId: z.string().min(1, "User ID is required"),
+  completionDate: z.string().refine((dateStr) => {
+    const date = new Date(dateStr);
+    return !isNaN(date.getTime());
+  }, "Invalid date format"),
+  proofOfCompletionUrl: z.string().url().optional(), // For future file upload support
+});
 
 // Authorization helper functions
 function requireRole(allowedRoles: string[]) {
@@ -1839,6 +1850,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching admin analytics:", error);
       res.status(500).json({ message: "Failed to fetch admin analytics" });
+    }
+  });
+
+  // External Course Management - Manually assign completed external course to user
+  app.post('/api/lms/admin/external-courses/:courseId/assign-completion', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { courseId } = req.params;
+      const assignedBy = req.user.claims.sub;
+
+      // Use Zod schema validation as per project guidelines
+      const validatedData = assignExternalCourseCompletionSchema.parse(req.body);
+      const completionDateObj = new Date(validatedData.completionDate);
+
+      const result = await storage.assignExternalCourseCompletion(
+        validatedData.userId, 
+        courseId, 
+        completionDateObj, 
+        assignedBy
+      );
+
+      res.json({
+        message: "External course completion assigned successfully",
+        enrollment: result.enrollment,
+        trainingRecord: result.trainingRecord
+      });
+    } catch (error: any) {
+      return handleValidationError(error, res, "assign external course completion");
     }
   });
 
