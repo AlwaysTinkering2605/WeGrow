@@ -1122,6 +1122,10 @@ export default function Learning() {
   // Effect to populate edit lesson form when editingLesson changes
   useEffect(() => {
     if (editingLesson) {
+      // Debug: Log the lesson data to see what fields we have
+      console.log("DEBUG: editingLesson data:", editingLesson);
+      console.log("DEBUG: editingLesson keys:", Object.keys(editingLesson));
+      
       editLessonForm.reset({
         title: editingLesson.title || "",
         description: editingLesson.description || "",
@@ -1135,6 +1139,8 @@ export default function Learning() {
         estimatedDuration: editingLesson.estimatedDuration || 1800,
         isRequired: editingLesson.isRequired ?? true,
       });
+      
+      console.log("DEBUG: Form values after reset:", editLessonForm.getValues());
     }
   }, [editingLesson, editLessonForm]);
 
