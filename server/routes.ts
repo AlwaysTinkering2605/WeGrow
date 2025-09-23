@@ -44,6 +44,59 @@ const assignExternalCourseCompletionSchema = z.object({
   proofOfCompletionUrl: z.string().url().optional(), // For future file upload support
 });
 
+// Enhanced lesson content schemas - extending shared schema as per project guidelines
+// Fix: Omit server-derived fields before extending to prevent validation errors
+const createLessonSchema = insertLessonSchema.omit({
+  moduleId: true,
+  type: true,
+  orderIndex: true,
+  estimatedDuration: true,
+  id: true,
+  createdAt: true,
+}).extend({
+  // Frontend fields that need transformation
+  order: z.number().int().positive().optional().default(1),
+  estimatedMinutes: z.number().positive().optional().default(30),
+  // Override contentType to use correct enum values
+  contentType: z.enum(["video", "rich_text", "pdf_document"]).optional().default("video"),
+}).refine((data) => {
+  // Ensure required content field is provided based on content type
+  if (data.contentType === "video" || !data.contentType) {
+    return data.vimeoVideoId !== undefined && data.vimeoVideoId !== null && String(data.vimeoVideoId).length > 0;
+  } else if (data.contentType === "rich_text") {
+    return data.richText !== undefined && data.richText !== null && String(data.richText).length > 0;
+  } else if (data.contentType === "pdf_document") {
+    return data.pdfContent !== undefined && data.pdfContent !== null && String(data.pdfContent).length > 0;
+  }
+  return false;
+}, {
+  message: "Content field is required based on the selected content type",
+});
+
+const updateLessonSchema = insertLessonSchema.partial().omit({
+  id: true,
+}).extend({
+  // Frontend fields that need transformation
+  order: z.number().int().positive().optional(),
+  estimatedMinutes: z.number().positive().optional(),
+  // Override contentType to use correct enum values
+  contentType: z.enum(["video", "rich_text", "pdf_document"]).optional(),
+}).refine((data) => {
+  // If contentType is being updated, ensure the corresponding content field is provided
+  if (data.contentType) {
+    if (data.contentType === "video") {
+      return data.vimeoVideoId !== undefined && data.vimeoVideoId !== null && String(data.vimeoVideoId).length > 0;
+    } else if (data.contentType === "rich_text") {
+      return data.richText !== undefined && data.richText !== null && String(data.richText).length > 0;
+    } else if (data.contentType === "pdf_document") {
+      return data.pdfContent !== undefined && data.pdfContent !== null && String(data.pdfContent).length > 0;
+    }
+  }
+  return true; // Allow partial updates without content type change
+}, {
+  message: "Content field is required when updating content type",
+});
+
 // Authorization helper functions
 function requireRole(allowedRoles: string[]) {
   return async (req: any, res: any, next: any) => {
@@ -1520,6 +1573,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { courseId } = req.params;
       
+      // Use Zod schema validation as per project guidelines
+      const validatedData = createLessonSchema.parse(req.body);
+      
       // Get the course to find its current version ID
       const course = await storage.getCourse(courseId);
       if (!course) {
@@ -1541,22 +1597,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Transform frontend lesson data to match database schema
-      const lessonData = {
+      // Map content type to lesson type correctly
+      let lessonType: "video" | "document";
+      if (validatedData.contentType === "video") {
+        lessonType = "video";
+      } else {
+        // rich_text and pdf_document are both document types
+        lessonType = "document";
+      }
+
+      // Transform validated data to match database schema with enhanced content types
+      const lessonData: any = {
         moduleId: defaultModule.id,
-        title: req.body.title,
-        description: req.body.description || "",
-        type: "video" as const, // Default to video type
-        orderIndex: req.body.order || 1,
-        vimeoVideoId: req.body.vimeoVideoId,
-        estimatedDuration: req.body.estimatedMinutes ? req.body.estimatedMinutes * 60 : 1800, // Convert minutes to seconds
+        title: validatedData.title,
+        description: validatedData.description || "",
+        contentType: validatedData.contentType, // Support video, rich_text, pdf_document
+        type: lessonType, // Map content type to appropriate lesson type
+        orderIndex: validatedData.order,
+        estimatedDuration: validatedData.estimatedMinutes * 60, // Convert minutes to seconds
         isRequired: true
       };
+
+      // Add content based on content type
+      if (validatedData.contentType === "video") {
+        lessonData.vimeoVideoId = validatedData.vimeoVideoId;
+      } else if (validatedData.contentType === "rich_text") {
+        lessonData.richText = validatedData.richText;
+      } else if (validatedData.contentType === "pdf_document") {
+        lessonData.pdfContent = validatedData.pdfContent;
+      }
       
       const lesson = await storage.createLesson(lessonData);
       res.json(lesson);
     } catch (error: any) {
-      console.error("Error creating lesson:", error);
       return handleValidationError(error, res, "create lesson");
     }
   });
@@ -1566,27 +1639,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { lessonId } = req.params;
       
+      // Use Zod schema validation as per project guidelines
+      const validatedData = updateLessonSchema.parse(req.body);
+      
       // Verify the lesson exists
       const existingLesson = await storage.getLesson(lessonId);
       if (!existingLesson) {
         return res.status(404).json({ message: "Lesson not found" });
       }
       
-      // Transform frontend lesson data to match database schema
+      // Transform validated data to match database schema with enhanced content types
       const updateData: any = {};
       
-      if (req.body.title !== undefined) updateData.title = req.body.title;
-      if (req.body.description !== undefined) updateData.description = req.body.description;
-      if (req.body.vimeoVideoId !== undefined) updateData.vimeoVideoId = req.body.vimeoVideoId;
-      if (req.body.order !== undefined) updateData.orderIndex = req.body.order;
-      if (req.body.estimatedMinutes !== undefined) {
-        updateData.estimatedDuration = req.body.estimatedMinutes * 60; // Convert minutes to seconds
+      if (validatedData.title !== undefined) updateData.title = validatedData.title;
+      if (validatedData.description !== undefined) updateData.description = validatedData.description;
+      if (validatedData.order !== undefined) updateData.orderIndex = validatedData.order;
+      if (validatedData.estimatedMinutes !== undefined) {
+        updateData.estimatedDuration = validatedData.estimatedMinutes * 60; // Convert minutes to seconds
+      }
+      
+      // Handle content type updates with proper type mapping
+      if (validatedData.contentType !== undefined) {
+        updateData.contentType = validatedData.contentType;
+        
+        // Map content type to lesson type correctly
+        if (validatedData.contentType === "video") {
+          updateData.type = "video";
+        } else {
+          // rich_text and pdf_document are both document types
+          updateData.type = "document";
+        }
+        
+        // CRITICAL: Clear all previous content fields when changing type to prevent stale data
+        updateData.vimeoVideoId = null;
+        updateData.richText = null;
+        updateData.pdfContent = null;
+        
+        // Set the appropriate content field based on type
+        if (validatedData.contentType === "video") {
+          updateData.vimeoVideoId = validatedData.vimeoVideoId;
+        } else if (validatedData.contentType === "rich_text") {
+          updateData.richText = validatedData.richText;
+        } else if (validatedData.contentType === "pdf_document") {
+          updateData.pdfContent = validatedData.pdfContent;
+        }
+      } else {
+        // Handle legacy updates that don't specify content type
+        if (validatedData.vimeoVideoId !== undefined) updateData.vimeoVideoId = validatedData.vimeoVideoId;
+        if (validatedData.richText !== undefined) updateData.richText = validatedData.richText;
+        if (validatedData.pdfContent !== undefined) updateData.pdfContent = validatedData.pdfContent;
       }
       
       const lesson = await storage.updateLesson(lessonId, updateData);
       res.json(lesson);
     } catch (error: any) {
-      console.error("Error updating lesson:", error);
       return handleValidationError(error, res, "update lesson");
     }
   });
