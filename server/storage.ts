@@ -1159,7 +1159,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLessons(moduleId: string): Promise<Lesson[]> {
-    return await db.select().from(lessons).where(eq(lessons.moduleId, moduleId));
+    return await db.select().from(lessons).where(eq(lessons.moduleId, moduleId)).orderBy(lessons.orderIndex);
   }
 
   async getLesson(lessonId: string): Promise<Lesson | undefined> {

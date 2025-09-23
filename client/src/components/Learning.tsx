@@ -91,9 +91,9 @@ const courseSchema = z.object({
 
 
 // Extend the insert schema for client-side validation
-const lessonSchema = insertLessonSchema.extend({
+const lessonSchema = insertLessonSchema.omit({ orderIndex: true }).extend({
   // Override to make these coercible from form inputs
-  orderIndex: z.coerce.number().min(1),
+  order: z.coerce.number().min(1),
   estimatedDuration: z.coerce.number().min(60).max(18000), // 1 minute to 5 hours in seconds
   // Content type validation (matches backend enum)
   contentType: z.enum(["video", "rich_text", "pdf_document"]).default("video"),
@@ -1096,7 +1096,7 @@ export default function Learning() {
       vimeoVideoId: "",
       richTextContent: "",
       pdfContentUrl: "",
-      orderIndex: 1,
+      order: 1,
       estimatedDuration: 1800, // 30 minutes in seconds
       isRequired: true,
     } satisfies LessonFormType,
@@ -1113,7 +1113,7 @@ export default function Learning() {
       vimeoVideoId: "",
       richTextContent: "",
       pdfContentUrl: "",
-      orderIndex: 1,
+      order: 1,
       estimatedDuration: 1800, // 30 minutes in seconds
       isRequired: true,
     } satisfies LessonFormType,
@@ -1131,7 +1131,7 @@ export default function Learning() {
         vimeoVideoId: editingLesson.vimeoVideoId || "",
         richTextContent: editingLesson.richTextContent || "",
         pdfContentUrl: editingLesson.pdfContentUrl || "",
-        orderIndex: editingLesson.orderIndex || 1,
+        order: editingLesson.orderIndex || 1,
         estimatedDuration: editingLesson.estimatedDuration || 1800,
         isRequired: editingLesson.isRequired ?? true,
       });
@@ -1192,7 +1192,7 @@ export default function Learning() {
       options: ["", ""],
       correctAnswers: [],
       explanation: "",
-      orderIndex: 1,
+      order: 1,
     },
   });
 
@@ -4500,7 +4500,7 @@ export default function Learning() {
                             <div className="grid grid-cols-2 gap-4">
                               <FormField
                                 control={createLessonForm.control}
-                                name="orderIndex"
+                                name="order"
                                 render={({ field }) => (
                                   <FormItem>
                                     <FormLabel>Lesson Order</FormLabel>
@@ -4725,7 +4725,7 @@ export default function Learning() {
                             <div className="flex space-x-4">
                               <FormField
                                 control={editLessonForm.control}
-                                name="orderIndex"
+                                name="order"
                                 render={({ field }) => (
                                   <FormItem className="flex-1">
                                     <FormLabel>Lesson Order</FormLabel>
