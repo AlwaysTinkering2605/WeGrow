@@ -2354,9 +2354,9 @@ export default function Learning() {
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <div className="aspect-video bg-black rounded-lg overflow-hidden relative">
-                      {/* Enhanced Vimeo Video Integration */}
-                      {currentLesson?.vimeoVideoId ? (
+                    {/* Enhanced Multi-Content Type Support */}
+                    {currentLesson?.contentType === 'video' && currentLesson?.vimeoVideoId ? (
+                      <div className="aspect-video bg-black rounded-lg overflow-hidden relative">
                         <VimeoPlayer
                           key={`${currentLesson.id}-${currentLesson.vimeoVideoId}`}
                           videoId={currentLesson.vimeoVideoId}
@@ -2409,16 +2409,108 @@ export default function Learning() {
                             });
                           }}
                         />
-                      ) : (
-                        <div className="aspect-video bg-black rounded-lg overflow-hidden relative flex items-center justify-center">
-                          <div className="text-center text-white">
-                            <Play className="w-16 h-16 mx-auto mb-4 opacity-75" />
-                            <p className="text-lg">Video content coming soon</p>
-                            <p className="text-sm opacity-75">Course material will be available shortly</p>
+                      </div>
+                    ) : currentLesson?.contentType === 'rich_text' && currentLesson?.richTextContent ? (
+                      <div className="bg-white dark:bg-gray-900 rounded-lg border min-h-96 p-6">
+                        <div 
+                          className="prose prose-lg max-w-none dark:prose-invert"
+                          dangerouslySetInnerHTML={{ __html: currentLesson.richTextContent }}
+                          data-testid="content-rich-text"
+                        />
+                        {/* Auto-mark rich text lessons as completed when viewed */}
+                        <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+                              <span className="text-green-800 dark:text-green-200 font-medium">
+                                Lesson content viewed
+                              </span>
+                            </div>
+                            <Button
+                              onClick={() => {
+                                // Mark rich text lesson as completed
+                                const enrollmentId = courseDetails?.enrollment?.id;
+                                if (enrollmentId && currentLesson?.id) {
+                                  updateProgressMutation.mutate({
+                                    enrollmentId,
+                                    lessonId: currentLesson.id,
+                                    progressPercentage: 100,
+                                    lastPosition: 0,
+                                    timeSpent: 0,
+                                    status: 'completed'
+                                  });
+                                }
+                              }}
+                              size="sm"
+                              data-testid="button-complete-rich-text"
+                            >
+                              Mark Complete
+                            </Button>
                           </div>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ) : currentLesson?.contentType === 'pdf_document' && currentLesson?.pdfContentUrl ? (
+                      <div className="bg-gray-100 dark:bg-gray-800 rounded-lg min-h-96">
+                        <div className="p-6 border-b">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <FileText className="w-6 h-6 text-blue-600 mr-2" />
+                              <div>
+                                <h3 className="font-semibold">PDF Document</h3>
+                                <p className="text-sm text-muted-foreground">Click to view or download the lesson material</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => window.open(currentLesson.pdfContentUrl, '_blank')}
+                                data-testid="button-view-pdf"
+                              >
+                                <FileText className="w-4 h-4 mr-2" />
+                                View PDF
+                              </Button>
+                              <Button
+                                onClick={() => {
+                                  // Mark PDF lesson as completed after viewing
+                                  const enrollmentId = courseDetails?.enrollment?.id;
+                                  if (enrollmentId && currentLesson?.id) {
+                                    updateProgressMutation.mutate({
+                                      enrollmentId,
+                                      lessonId: currentLesson.id,
+                                      progressPercentage: 100,
+                                      lastPosition: 0,
+                                      timeSpent: 0,
+                                      status: 'completed'
+                                    });
+                                  }
+                                }}
+                                size="sm"
+                                data-testid="button-complete-pdf"
+                              >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Mark Complete
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-6">
+                          <iframe
+                            src={`${currentLesson.pdfContentUrl}#toolbar=1&navpanes=1&scrollbar=1`}
+                            className="w-full h-96 border rounded"
+                            title="PDF Viewer"
+                            data-testid="iframe-pdf-viewer"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="aspect-video bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden relative flex items-center justify-center">
+                        <div className="text-center text-muted-foreground">
+                          <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-75" />
+                          <p className="text-lg">No content available</p>
+                          <p className="text-sm opacity-75">This lesson doesn't have any content yet</p>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -4118,10 +4210,23 @@ export default function Learning() {
                                       {lesson.courseName}
                                     </Badge>
                                   )}
-                                  {lesson.vimeoVideoId && (
-                                    <Badge variant="secondary" className="text-xs">
+                                  {/* Content Type Badges */}
+                                  {lesson.contentType === 'video' && (
+                                    <Badge variant="secondary" className="text-xs" data-testid={`badge-content-video-${lesson.id}`}>
                                       <Video className="w-3 h-3 mr-1" />
                                       Video
+                                    </Badge>
+                                  )}
+                                  {lesson.contentType === 'rich_text' && (
+                                    <Badge variant="default" className="text-xs" data-testid={`badge-content-richtext-${lesson.id}`}>
+                                      <FileText className="w-3 h-3 mr-1" />
+                                      Rich Text
+                                    </Badge>
+                                  )}
+                                  {lesson.contentType === 'pdf_document' && (
+                                    <Badge variant="outline" className="text-xs" data-testid={`badge-content-pdf-${lesson.id}`}>
+                                      <FileText className="w-3 h-3 mr-1" />
+                                      PDF
                                     </Badge>
                                   )}
                                   {lesson.hasQuiz && (
@@ -4143,10 +4248,23 @@ export default function Learning() {
                                       {lesson.estimatedMinutes} min
                                     </span>
                                   )}
-                                  {lesson.vimeoVideoId && (
+                                  {/* Content Type Metadata */}
+                                  {lesson.contentType === 'video' && lesson.vimeoVideoId && (
                                     <span className="flex items-center">
                                       <PlayCircle className="w-4 h-4 mr-1" />
-                                      ID: {lesson.vimeoVideoId}
+                                      Video ID: {lesson.vimeoVideoId}
+                                    </span>
+                                  )}
+                                  {lesson.contentType === 'rich_text' && (
+                                    <span className="flex items-center">
+                                      <FileText className="w-4 h-4 mr-1" />
+                                      Rich Text Content
+                                    </span>
+                                  )}
+                                  {lesson.contentType === 'pdf_document' && (
+                                    <span className="flex items-center">
+                                      <FileText className="w-4 h-4 mr-1" />
+                                      PDF Document
                                     </span>
                                   )}
                                   <span className="flex items-center">
