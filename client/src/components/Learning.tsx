@@ -3866,18 +3866,48 @@ export default function Learning() {
                       {adminCourses.map((course: any) => (
                         <div key={course.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors" data-testid={`admin-course-${course.id}`}>
                           <div className="flex items-center space-x-4">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                              <GraduationCap className="w-6 h-6 text-white" />
+                            {/* Dynamic icon based on course type */}
+                            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                              course.courseType === 'external' 
+                                ? 'bg-gradient-to-br from-orange-500 to-red-600' 
+                                : 'bg-gradient-to-br from-blue-500 to-purple-600'
+                            }`}>
+                              {course.courseType === 'external' ? (
+                                <Building className="w-6 h-6 text-white" />
+                              ) : (
+                                <GraduationCap className="w-6 h-6 text-white" />
+                              )}
                             </div>
                             <div>
-                              <h3 className="font-semibold">{course.title}</h3>
+                              <div className="flex items-center space-x-2 mb-1">
+                                <h3 className="font-semibold">{course.title}</h3>
+                                {/* Course Type Badge */}
+                                <Badge 
+                                  variant={course.courseType === 'external' ? "destructive" : "default"}
+                                  className="text-xs"
+                                  data-testid={`badge-course-type-${course.id}`}
+                                >
+                                  {course.courseType === 'external' ? 'External' : 'Internal'}
+                                </Badge>
+                              </div>
                               <div className="flex items-center space-x-4 mt-1">
                                 <span className="text-sm text-muted-foreground">
                                   {course.category} • {course.estimatedHours}h • {course.enrollmentCount || 0} enrolled
+                                  {/* Show training provider for external courses */}
+                                  {course.courseType === 'external' && course.trainingProvider && (
+                                    ` • Provider: ${course.trainingProvider}`
+                                  )}
                                 </span>
                                 <Badge variant={course.isPublished ? "default" : "secondary"}>
                                   {course.isPublished ? "Published" : "Draft"}
                                 </Badge>
+                                {/* Additional badge for external courses with certification */}
+                                {course.courseType === 'external' && course.accreditation && (
+                                  <Badge variant="outline" className="text-xs">
+                                    <ShieldCheck className="w-3 h-3 mr-1" />
+                                    Certified
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                           </div>
