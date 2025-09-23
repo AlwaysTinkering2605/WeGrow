@@ -154,6 +154,131 @@ export class ObjectStorageService {
     });
   }
 
+  // Enhanced file upload methods for LMS functionality
+  
+  // Sanitize filename to prevent security issues
+  private sanitizeFilename(filename: string): string {
+    // Remove path traversal attempts and dangerous characters
+    return filename
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .replace(/\.{2,}/g, '.')
+      .substring(0, 100); // Limit length
+  }
+
+  // Validate file type and size
+  private validateFileUpload(filename: string, fileType: 'pdf' | 'certificate', maxSizeBytes: number = 10 * 1024 * 1024): void {
+    const extension = filename.toLowerCase().split('.').pop();
+    
+    if (fileType === 'pdf' && extension !== 'pdf') {
+      throw new Error('Only PDF files are allowed for this upload type');
+    }
+    
+    if (fileType === 'certificate' && !['pdf', 'jpg', 'jpeg', 'png'].includes(extension || '')) {
+      throw new Error('Only PDF, JPG, JPEG, or PNG files are allowed for certificates');
+    }
+  }
+
+  // Get upload URL for completion certificates (private storage)
+  async getCertificateUploadURL(originalFilename: string, userId: string): Promise<{ uploadURL: string, objectPath: string }> {
+    this.validateFileUpload(originalFilename, 'certificate');
+    
+    const sanitizedFilename = this.sanitizeFilename(originalFilename);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const uniqueFilename = `cert_${userId}_${timestamp}_${sanitizedFilename}`;
+    
+    const privateObjectDir = this.getPrivateObjectDir();
+    const fullPath = `${privateObjectDir}/certificates/${uniqueFilename}`;
+    
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    
+    const uploadURL = await signObjectURL({
+      bucketName,
+      objectName,
+      method: "PUT",
+      ttlSec: 900,
+    });
+    
+    return {
+      uploadURL,
+      objectPath: `/objects/certificates/${uniqueFilename}`
+    };
+  }
+
+  // Get upload URL for lesson PDF documents (public storage)
+  async getLessonPDFUploadURL(originalFilename: string, lessonId: string): Promise<{ uploadURL: string, objectPath: string }> {
+    this.validateFileUpload(originalFilename, 'pdf');
+    
+    const sanitizedFilename = this.sanitizeFilename(originalFilename);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const uniqueFilename = `lesson_${lessonId}_${timestamp}_${sanitizedFilename}`;
+    
+    const publicObjectSearchPaths = this.getPublicObjectSearchPaths();
+    const publicPath = publicObjectSearchPaths[0]; // Use first public path
+    const fullPath = `${publicPath}/lessons/${uniqueFilename}`;
+    
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    
+    const uploadURL = await signObjectURL({
+      bucketName,
+      objectName,
+      method: "PUT",
+      ttlSec: 900,
+    });
+    
+    return {
+      uploadURL,
+      objectPath: `/public/lessons/${uniqueFilename}`
+    };
+  }
+
+  // Get file download URL with appropriate permissions
+  async getFileDownloadURL(objectPath: string, userId?: string): Promise<string> {
+    // For public files, generate a direct access URL
+    if (objectPath.startsWith('/public/')) {
+      const publicObjectSearchPaths = this.getPublicObjectSearchPaths();
+      const publicPath = publicObjectSearchPaths[0];
+      const filename = objectPath.replace('/public/', '');
+      const fullPath = `${publicPath}/${filename}`;
+      
+      const { bucketName, objectName } = parseObjectPath(fullPath);
+      
+      return signObjectURL({
+        bucketName,
+        objectName,
+        method: "GET",
+        ttlSec: 3600, // 1 hour access
+      });
+    }
+    
+    // For private files, check permissions and generate signed URL
+    if (objectPath.startsWith('/objects/')) {
+      const objectFile = await this.getObjectEntityFile(objectPath);
+      
+      // Check if user has access (simplified - could be enhanced with more granular permissions)
+      const hasAccess = await this.canAccessObjectEntity({
+        userId,
+        objectFile,
+        requestedPermission: ObjectPermission.READ,
+      });
+      
+      if (!hasAccess) {
+        throw new Error('Access denied to this file');
+      }
+      
+      const [metadata] = await objectFile.getMetadata();
+      const { bucketName, objectName } = parseObjectPath(`/${metadata.bucket}/${metadata.name}`);
+      
+      return signObjectURL({
+        bucketName,
+        objectName,
+        method: "GET",
+        ttlSec: 3600, // 1 hour access
+      });
+    }
+    
+    throw new Error('Invalid object path format');
+  }
+
   // Gets the object entity file from the object path.
   async getObjectEntityFile(objectPath: string): Promise<File> {
     if (!objectPath.startsWith("/objects/")) {

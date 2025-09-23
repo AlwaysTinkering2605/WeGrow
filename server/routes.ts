@@ -562,6 +562,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Enhanced file upload endpoints for LMS functionality
+
+  // Upload completion certificate for external courses
+  app.post('/api/lms/upload/certificate', isAuthenticated, async (req: any, res) => {
+    try {
+      const { filename } = req.body;
+      const userId = req.user.claims.sub;
+      
+      if (!filename) {
+        return res.status(400).json({ message: "Filename is required" });
+      }
+      
+      const objectStorageService = new ObjectStorageService();
+      const result = await objectStorageService.getCertificateUploadURL(filename, userId);
+      
+      res.json({
+        uploadURL: result.uploadURL,
+        objectPath: result.objectPath,
+        message: "Certificate upload URL generated successfully"
+      });
+    } catch (error: any) {
+      console.error("Error getting certificate upload URL:", error);
+      res.status(400).json({ message: error.message || "Failed to get certificate upload URL" });
+    }
+  });
+
+  // Finalize certificate upload - establish ownership/ACL after successful upload
+  app.post('/api/lms/upload/certificate/finalize', isAuthenticated, async (req: any, res) => {
+    try {
+      const { objectPath } = req.body;
+      const userId = req.user.claims.sub;
+      
+      if (!objectPath) {
+        return res.status(400).json({ message: "objectPath is required" });
+      }
+      
+      // Verify the object path belongs to this user (security check)
+      if (!objectPath.includes(`cert_${userId}_`)) {
+        return res.status(403).json({ message: "Access denied - certificate does not belong to you" });
+      }
+      
+      const objectStorageService = new ObjectStorageService();
+      
+      // Set ACL policy to grant the uploader access to their certificate
+      const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(objectPath, {
+        visibility: 'private',
+        ownerUserId: userId
+      });
+      
+      res.json({
+        objectPath: normalizedPath,
+        message: "Certificate upload finalized successfully - access permissions established"
+      });
+    } catch (error: any) {
+      console.error("Error finalizing certificate upload:", error);
+      res.status(400).json({ message: error.message || "Failed to finalize certificate upload" });
+    }
+  });
+
+  // Upload PDF document for lesson content
+  app.post('/api/lms/upload/lesson-pdf', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { filename, lessonId } = req.body;
+      
+      if (!filename || !lessonId) {
+        return res.status(400).json({ message: "Filename and lessonId are required" });
+      }
+      
+      // Verify the lesson exists
+      const lesson = await storage.getLesson(lessonId);
+      if (!lesson) {
+        return res.status(404).json({ message: "Lesson not found" });
+      }
+      
+      const objectStorageService = new ObjectStorageService();
+      const result = await objectStorageService.getLessonPDFUploadURL(filename, lessonId);
+      
+      res.json({
+        uploadURL: result.uploadURL,
+        objectPath: result.objectPath,
+        message: "Lesson PDF upload URL generated successfully"
+      });
+    } catch (error: any) {
+      console.error("Error getting lesson PDF upload URL:", error);
+      res.status(400).json({ message: error.message || "Failed to get lesson PDF upload URL" });
+    }
+  });
+
+  // Get file download URL (with permission checking)
+  app.get('/api/lms/files/download', isAuthenticated, async (req: any, res) => {
+    try {
+      const { objectPath } = req.query;
+      const userId = req.user.claims.sub;
+      
+      if (!objectPath) {
+        return res.status(400).json({ message: "objectPath parameter is required" });
+      }
+      
+      const objectStorageService = new ObjectStorageService();
+      const downloadURL = await objectStorageService.getFileDownloadURL(objectPath as string, userId);
+      
+      res.json({
+        downloadURL,
+        message: "File download URL generated successfully"
+      });
+    } catch (error: any) {
+      console.error("Error getting file download URL:", error);
+      
+      if (error.message === 'Access denied to this file') {
+        return res.status(403).json({ message: "Access denied to this file" });
+      }
+      
+      res.status(400).json({ message: error.message || "Failed to get file download URL" });
+    }
+  });
+
   app.put('/api/profile-images', isAuthenticated, async (req: any, res) => {
     try {
       if (!req.body.profileImageURL) {
