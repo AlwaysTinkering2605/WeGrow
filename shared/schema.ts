@@ -575,8 +575,9 @@ export const learningPathStepProgress = pgTable("learning_path_step_progress", {
 export const competencyLibrary = pgTable("competency_library", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   competencyId: varchar("competency_id").notNull(), // Links to existing competencies table
-  requiredForRoles: text("required_for_roles").array(), // Array of role names
-  requiredForTeams: text("required_for_teams").array(), // Array of team IDs
+  parentCompetencyLibraryId: varchar("parent_competency_library_id"), // Self-referential FK for hierarchy
+  hierarchyLevel: integer("hierarchy_level").default(0), // 0=root, 1=child, 2=grandchild, etc.
+  sortOrder: integer("sort_order").default(0), // Order within same level
   proficiencyLevels: jsonb("proficiency_levels"), // Define skill levels (basic, intermediate, advanced)
   assessmentCriteria: text("assessment_criteria"), // How competency is measured
   renewalPeriodDays: integer("renewal_period_days"), // Days until renewal required
@@ -586,7 +587,25 @@ export const competencyLibrary = pgTable("competency_library", {
   createdBy: varchar("created_by").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  foreignKey({
+    columns: [table.competencyId],
+    foreignColumns: [competencies.id],
+    name: "competency_library_competency_fk"
+  }),
+  foreignKey({
+    columns: [table.parentCompetencyLibraryId],
+    foreignColumns: [table.id],
+    name: "competency_library_parent_fk"
+  }),
+  foreignKey({
+    columns: [table.createdBy],
+    foreignColumns: [users.id],
+    name: "competency_library_created_by_fk"
+  }),
+  index("competency_library_hierarchy_idx").on(table.parentCompetencyLibraryId, table.hierarchyLevel, table.sortOrder),
+  index("competency_library_competency_idx").on(table.competencyId),
+]);
 
 // Role Competency Mappings - define which competencies are required for which roles
 export const roleCompetencyMappings = pgTable("role_competency_mappings", {
@@ -601,7 +620,111 @@ export const roleCompetencyMappings = pgTable("role_competency_mappings", {
   createdBy: varchar("created_by").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  foreignKey({
+    columns: [table.competencyLibraryId],
+    foreignColumns: [competencyLibrary.id],
+    name: "role_competency_mappings_competency_fk"
+  }),
+  foreignKey({
+    columns: [table.teamId],
+    foreignColumns: [teams.id],
+    name: "role_competency_mappings_team_fk"
+  }),
+  foreignKey({
+    columns: [table.createdBy],
+    foreignColumns: [users.id],
+    name: "role_competency_mappings_created_by_fk"
+  }),
+  index("role_competency_mappings_role_idx").on(table.role, table.teamId),
+  unique("role_competency_mappings_unique").on(table.role, table.competencyLibraryId, table.teamId),
+]);
+
+// Competency Status History - immutable audit trail for ISO 9001:2015 compliance
+export const competencyStatusHistory = pgTable("competency_status_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  competencyLibraryId: varchar("competency_library_id").notNull(),
+  previousStatus: varchar("previous_status"), // Previous status before change
+  newStatus: varchar("new_status").notNull(), // "not_started", "in_progress", "competent", "expired", "non_compliant"
+  statusChangeReason: text("status_change_reason"), // Why status changed
+  assessmentScore: integer("assessment_score"), // Score achieved if applicable
+  assessmentMethod: varchar("assessment_method"), // "quiz", "practical", "observation", "documentation"
+  assessorId: varchar("assessor_id"), // Who validated the competency
+  evidenceIds: text("evidence_ids").array(), // Links to evidence records
+  complianceNotes: text("compliance_notes"), // Auditor notes
+  externalReference: varchar("external_reference"), // External training reference
+  changedBy: varchar("changed_by").notNull(), // User who made the change
+  changedAt: timestamp("changed_at").defaultNow().notNull(),
+}, (table) => [
+  foreignKey({
+    columns: [table.userId],
+    foreignColumns: [users.id],
+    name: "competency_status_history_user_fk"
+  }),
+  foreignKey({
+    columns: [table.competencyLibraryId],
+    foreignColumns: [competencyLibrary.id],
+    name: "competency_status_history_competency_fk"
+  }),
+  foreignKey({
+    columns: [table.assessorId],
+    foreignColumns: [users.id],
+    name: "competency_status_history_assessor_fk"
+  }),
+  foreignKey({
+    columns: [table.changedBy],
+    foreignColumns: [users.id],
+    name: "competency_status_history_changed_by_fk"
+  }),
+  index("competency_status_history_user_idx").on(table.userId, table.competencyLibraryId),
+  index("competency_status_history_changed_at_idx").on(table.changedAt),
+]);
+
+// Competency Evidence Records - immutable evidence storage for audit compliance
+export const competencyEvidenceRecords = pgTable("competency_evidence_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  competencyLibraryId: varchar("competency_library_id").notNull(),
+  evidenceType: varchar("evidence_type").notNull(), // "certificate", "assessment", "practical_observation", "training_record", "external_course"
+  evidenceTitle: varchar("evidence_title").notNull(),
+  evidenceDescription: text("evidence_description"),
+  evidenceUrl: varchar("evidence_url"), // Link to stored evidence file
+  evidenceMetadata: jsonb("evidence_metadata"), // File info, scores, etc.
+  issuedBy: varchar("issued_by"), // Organization/person who issued evidence
+  issuedDate: timestamp("issued_date"),
+  expiryDate: timestamp("expiry_date"),
+  verifiedBy: varchar("verified_by"), // User who verified this evidence
+  verifiedAt: timestamp("verified_at"),
+  verificationNotes: text("verification_notes"),
+  isValid: boolean("is_valid").default(true),
+  uploadedBy: varchar("uploaded_by").notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+}, (table) => [
+  foreignKey({
+    columns: [table.userId],
+    foreignColumns: [users.id],
+    name: "competency_evidence_user_fk"
+  }),
+  foreignKey({
+    columns: [table.competencyLibraryId],
+    foreignColumns: [competencyLibrary.id],
+    name: "competency_evidence_competency_fk"
+  }),
+  foreignKey({
+    columns: [table.verifiedBy],
+    foreignColumns: [users.id],
+    name: "competency_evidence_verified_by_fk"
+  }),
+  foreignKey({
+    columns: [table.uploadedBy],
+    foreignColumns: [users.id],
+    name: "competency_evidence_uploaded_by_fk"
+  }),
+  index("competency_evidence_user_idx").on(table.userId, table.competencyLibraryId),
+  index("competency_evidence_type_idx").on(table.evidenceType),
+  index("competency_evidence_expiry_idx").on(table.expiryDate),
+]);
 
 // Automation Rules - rules engine for path assignment
 export const automationRules = pgTable("automation_rules", {
@@ -876,12 +999,20 @@ export const competencyLibraryRelations = relations(competencyLibrary, ({ one, m
     fields: [competencyLibrary.competencyId],
     references: [competencies.id],
   }),
+  parentCompetency: one(competencyLibrary, {
+    fields: [competencyLibrary.parentCompetencyLibraryId],
+    references: [competencyLibrary.id],
+    relationName: "parentChild",
+  }),
+  childCompetencies: many(competencyLibrary, { relationName: "parentChild" }),
   creator: one(users, {
     fields: [competencyLibrary.createdBy],
     references: [users.id],
   }),
   roleMappings: many(roleCompetencyMappings),
   trainingMatrixRecords: many(trainingMatrixRecords),
+  statusHistory: many(competencyStatusHistory),
+  evidenceRecords: many(competencyEvidenceRecords),
 }));
 
 export const roleCompetencyMappingsRelations = relations(roleCompetencyMappings, ({ one }) => ({
@@ -919,6 +1050,48 @@ export const trainingMatrixRecordsRelations = relations(trainingMatrixRecords, (
     fields: [trainingMatrixRecords.updatedBy],
     references: [users.id],
     relationName: "updatedMatrixRecords",
+  }),
+}));
+
+export const competencyStatusHistoryRelations = relations(competencyStatusHistory, ({ one }) => ({
+  user: one(users, {
+    fields: [competencyStatusHistory.userId],
+    references: [users.id],
+  }),
+  competencyLibraryItem: one(competencyLibrary, {
+    fields: [competencyStatusHistory.competencyLibraryId],
+    references: [competencyLibrary.id],
+  }),
+  assessor: one(users, {
+    fields: [competencyStatusHistory.assessorId],
+    references: [users.id],
+    relationName: "assessedCompetencies",
+  }),
+  changedByUser: one(users, {
+    fields: [competencyStatusHistory.changedBy],
+    references: [users.id],
+    relationName: "competencyStatusChanges",
+  }),
+}));
+
+export const competencyEvidenceRecordsRelations = relations(competencyEvidenceRecords, ({ one }) => ({
+  user: one(users, {
+    fields: [competencyEvidenceRecords.userId],
+    references: [users.id],
+  }),
+  competencyLibraryItem: one(competencyLibrary, {
+    fields: [competencyEvidenceRecords.competencyLibraryId],
+    references: [competencyLibrary.id],
+  }),
+  verifiedByUser: one(users, {
+    fields: [competencyEvidenceRecords.verifiedBy],
+    references: [users.id],
+    relationName: "verifiedEvidenceRecords",
+  }),
+  uploadedByUser: one(users, {
+    fields: [competencyEvidenceRecords.uploadedBy],
+    references: [users.id],
+    relationName: "uploadedEvidenceRecords",
   }),
 }));
 
@@ -1205,6 +1378,16 @@ export const insertTrainingMatrixRecordSchema = createInsertSchema(trainingMatri
   updatedAt: true,
 });
 
+export const insertCompetencyStatusHistorySchema = createInsertSchema(competencyStatusHistory).omit({
+  id: true,
+  changedAt: true,
+});
+
+export const insertCompetencyEvidenceRecordSchema = createInsertSchema(competencyEvidenceRecords).omit({
+  id: true,
+  uploadedAt: true,
+});
+
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -1276,6 +1459,8 @@ export type CompetencyLibraryItem = typeof competencyLibrary.$inferSelect;
 export type RoleCompetencyMapping = typeof roleCompetencyMappings.$inferSelect;
 export type AutomationRule = typeof automationRules.$inferSelect;
 export type TrainingMatrixRecord = typeof trainingMatrixRecords.$inferSelect;
+export type CompetencyStatusHistory = typeof competencyStatusHistory.$inferSelect;
+export type CompetencyEvidenceRecord = typeof competencyEvidenceRecords.$inferSelect;
 
 export type InsertLearningPath = z.infer<typeof insertLearningPathSchema>;
 export type InsertLearningPathStep = z.infer<typeof insertLearningPathStepSchema>;
@@ -1285,3 +1470,5 @@ export type InsertCompetencyLibraryItem = z.infer<typeof insertCompetencyLibrary
 export type InsertRoleCompetencyMapping = z.infer<typeof insertRoleCompetencyMappingSchema>;
 export type InsertAutomationRule = z.infer<typeof insertAutomationRuleSchema>;
 export type InsertTrainingMatrixRecord = z.infer<typeof insertTrainingMatrixRecordSchema>;
+export type InsertCompetencyStatusHistory = z.infer<typeof insertCompetencyStatusHistorySchema>;
+export type InsertCompetencyEvidenceRecord = z.infer<typeof insertCompetencyEvidenceRecordSchema>;

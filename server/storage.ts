@@ -35,6 +35,10 @@ import {
   learningPathSteps,
   learningPathEnrollments,
   learningPathStepProgress,
+  // Competency library and training matrix tables
+  competencyLibrary,
+  roleCompetencyMappings,
+  trainingMatrixRecords,
   type User,
   type UpsertUser,
   type CompanyObjective,
@@ -69,6 +73,10 @@ import {
   type LearningPathStep,
   type LearningPathEnrollment,
   type LearningPathStepProgress,
+  // Competency library and training matrix types
+  type CompetencyLibraryItem,
+  type RoleCompetencyMapping,
+  type TrainingMatrixRecord,
   type InsertCompanyObjective,
   type InsertTeamObjective,
   type InsertTeamKeyResult,
@@ -99,6 +107,9 @@ import {
   type InsertLearningPathStep,
   type InsertLearningPathEnrollment,
   type InsertLearningPathStepProgress,
+  type InsertCompetencyLibraryItem,
+  type InsertRoleCompetencyMapping,
+  type InsertTrainingMatrixRecord,
   insertTeamSchema,
   updateUserProfileSchema,
 } from "@shared/schema";
@@ -3124,85 +3135,346 @@ export class DatabaseStorage implements IStorage {
 
   // Competency Library Management (Vertical Slice 4)
   async getCompetencyLibrary(): Promise<CompetencyLibraryItem[]> {
-    throw new Error("Competency library not yet implemented - will be added in Vertical Slice 4");
+    const results = await db.select()
+      .from(competencyLibrary)
+      .orderBy(competencyLibrary.competencyId);
+    
+    return results;
   }
 
   async getCompetencyLibraryItem(itemId: string): Promise<CompetencyLibraryItem | undefined> {
-    throw new Error("Competency library not yet implemented - will be added in Vertical Slice 4");
+    const results = await db.select()
+      .from(competencyLibrary)
+      .where(eq(competencyLibrary.id, itemId));
+    
+    return results[0];
   }
 
   async createCompetencyLibraryItem(item: InsertCompetencyLibraryItem): Promise<CompetencyLibraryItem> {
-    throw new Error("Competency library not yet implemented - will be added in Vertical Slice 4");
+    const [newItem] = await db.insert(competencyLibrary)
+      .values(item)
+      .returning();
+    
+    return newItem;
   }
 
   async updateCompetencyLibraryItem(itemId: string, updates: Partial<InsertCompetencyLibraryItem>): Promise<CompetencyLibraryItem> {
-    throw new Error("Competency library not yet implemented - will be added in Vertical Slice 4");
+    const [updatedItem] = await db.update(competencyLibrary)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(competencyLibrary.id, itemId))
+      .returning();
+    
+    return updatedItem;
   }
 
   async deleteCompetencyLibraryItem(itemId: string): Promise<void> {
-    throw new Error("Competency library not yet implemented - will be added in Vertical Slice 4");
+    await db.delete(competencyLibrary)
+      .where(eq(competencyLibrary.id, itemId));
   }
 
   async linkLearningPathToCompetency(competencyLibraryId: string, learningPathId: string): Promise<void> {
-    throw new Error("Competency library not yet implemented - will be added in Vertical Slice 4");
+    // Get current linked paths
+    const competencyItem = await this.getCompetencyLibraryItem(competencyLibraryId);
+    if (!competencyItem) throw new Error("Competency library item not found");
+    
+    const currentPaths = competencyItem.linkedLearningPaths || [];
+    if (!currentPaths.includes(learningPathId)) {
+      const updatedPaths = [...currentPaths, learningPathId];
+      await this.updateCompetencyLibraryItem(competencyLibraryId, {
+        linkedLearningPaths: updatedPaths
+      });
+    }
   }
 
   async unlinkLearningPathFromCompetency(competencyLibraryId: string, learningPathId: string): Promise<void> {
-    throw new Error("Competency library not yet implemented - will be added in Vertical Slice 4");
+    // Get current linked paths
+    const competencyItem = await this.getCompetencyLibraryItem(competencyLibraryId);
+    if (!competencyItem) throw new Error("Competency library item not found");
+    
+    const currentPaths = competencyItem.linkedLearningPaths || [];
+    const updatedPaths = currentPaths.filter(pathId => pathId !== learningPathId);
+    
+    await this.updateCompetencyLibraryItem(competencyLibraryId, {
+      linkedLearningPaths: updatedPaths
+    });
   }
 
   // Role Competency Mappings (Vertical Slice 3)
   async getRoleCompetencyMappings(role?: string, teamId?: string): Promise<RoleCompetencyMapping[]> {
-    throw new Error("Role competency mappings not yet implemented - will be added in Vertical Slice 3");
+    let query = db.select().from(roleCompetencyMappings);
+    
+    const conditions = [];
+    if (role) {
+      conditions.push(eq(roleCompetencyMappings.role, role));
+    }
+    if (teamId) {
+      conditions.push(eq(roleCompetencyMappings.teamId, teamId));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+    
+    return await query.orderBy(roleCompetencyMappings.priority);
   }
 
   async getRoleCompetencyMapping(mappingId: string): Promise<RoleCompetencyMapping | undefined> {
-    throw new Error("Role competency mappings not yet implemented - will be added in Vertical Slice 3");
+    const results = await db.select()
+      .from(roleCompetencyMappings)
+      .where(eq(roleCompetencyMappings.id, mappingId));
+    
+    return results[0];
   }
 
   async createRoleCompetencyMapping(mapping: InsertRoleCompetencyMapping): Promise<RoleCompetencyMapping> {
-    throw new Error("Role competency mappings not yet implemented - will be added in Vertical Slice 3");
+    const [newMapping] = await db.insert(roleCompetencyMappings)
+      .values(mapping)
+      .returning();
+    
+    return newMapping;
   }
 
   async updateRoleCompetencyMapping(mappingId: string, updates: Partial<InsertRoleCompetencyMapping>): Promise<RoleCompetencyMapping> {
-    throw new Error("Role competency mappings not yet implemented - will be added in Vertical Slice 3");
+    const [updatedMapping] = await db.update(roleCompetencyMappings)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(roleCompetencyMappings.id, mappingId))
+      .returning();
+    
+    return updatedMapping;
   }
 
   async deleteRoleCompetencyMapping(mappingId: string): Promise<void> {
-    throw new Error("Role competency mappings not yet implemented - will be added in Vertical Slice 3");
+    await db.delete(roleCompetencyMappings)
+      .where(eq(roleCompetencyMappings.id, mappingId));
   }
 
   async getRequiredCompetenciesForUser(userId: string): Promise<CompetencyLibraryItem[]> {
-    throw new Error("Role competency mappings not yet implemented - will be added in Vertical Slice 3");
+    // Get user details
+    const user = await this.getUser(userId);
+    if (!user) return [];
+    
+    // Get competencies required for this user's role and team
+    const mappings = await db.select()
+      .from(roleCompetencyMappings)
+      .innerJoin(competencyLibrary, eq(roleCompetencyMappings.competencyLibraryId, competencyLibrary.id))
+      .where(and(
+        eq(roleCompetencyMappings.role, user.role),
+        user.teamId ? eq(roleCompetencyMappings.teamId, user.teamId) : isNull(roleCompetencyMappings.teamId)
+      ))
+      .orderBy(roleCompetencyMappings.priority);
+    
+    return mappings.map(mapping => mapping.competency_library);
   }
 
   // Training Matrix and Compliance (Vertical Slice 3)
   async getTrainingMatrixRecords(userId?: string, competencyLibraryId?: string): Promise<TrainingMatrixRecord[]> {
-    throw new Error("Training matrix not yet implemented - will be added in Vertical Slice 3");
+    let query = db.select().from(trainingMatrixRecords);
+    
+    const conditions = [];
+    if (userId) {
+      conditions.push(eq(trainingMatrixRecords.userId, userId));
+    }
+    if (competencyLibraryId) {
+      conditions.push(eq(trainingMatrixRecords.competencyLibraryId, competencyLibraryId));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+    
+    return await query.orderBy(trainingMatrixRecords.updatedAt);
   }
 
   async getTrainingMatrixRecord(recordId: string): Promise<TrainingMatrixRecord | undefined> {
-    throw new Error("Training matrix not yet implemented - will be added in Vertical Slice 3");
+    const results = await db.select()
+      .from(trainingMatrixRecords)
+      .where(eq(trainingMatrixRecords.id, recordId));
+    
+    return results[0];
   }
 
   async createTrainingMatrixRecord(record: InsertTrainingMatrixRecord): Promise<TrainingMatrixRecord> {
-    throw new Error("Training matrix not yet implemented - will be added in Vertical Slice 3");
+    const [newRecord] = await db.insert(trainingMatrixRecords)
+      .values(record)
+      .returning();
+    
+    return newRecord;
   }
 
   async updateTrainingMatrixRecord(recordId: string, updates: Partial<InsertTrainingMatrixRecord>): Promise<TrainingMatrixRecord> {
-    throw new Error("Training matrix not yet implemented - will be added in Vertical Slice 3");
+    const [updatedRecord] = await db.update(trainingMatrixRecords)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(trainingMatrixRecords.id, recordId))
+      .returning();
+    
+    return updatedRecord;
   }
 
   async getComplianceReport(filters?: { role?: string; teamId?: string; competencyId?: string; status?: string; }): Promise<any> {
-    throw new Error("Training matrix not yet implemented - will be added in Vertical Slice 3");
+    // Build query with joins to get comprehensive compliance data
+    let baseQuery = db.select({
+      userId: users.id,
+      userEmail: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      role: users.role,
+      teamId: users.teamId,
+      competencyLibraryId: competencyLibrary.id,
+      currentStatus: trainingMatrixRecords.currentStatus,
+      lastAssessmentDate: trainingMatrixRecords.lastAssessmentDate,
+      expiryDate: trainingMatrixRecords.expiryDate,
+      evidenceRecords: trainingMatrixRecords.evidenceRecords
+    })
+    .from(users)
+    .innerJoin(roleCompetencyMappings, eq(users.role, roleCompetencyMappings.role))
+    .innerJoin(competencyLibrary, eq(roleCompetencyMappings.competencyLibraryId, competencyLibrary.id))
+    .leftJoin(trainingMatrixRecords, and(
+      eq(trainingMatrixRecords.userId, users.id),
+      eq(trainingMatrixRecords.competencyLibraryId, competencyLibrary.id)
+    ));
+    
+    // Apply filters
+    const conditions = [];
+    if (filters?.role) {
+      conditions.push(eq(users.role, filters.role));
+    }
+    if (filters?.teamId) {
+      conditions.push(eq(users.teamId, filters.teamId));
+    }
+    if (filters?.competencyId) {
+      conditions.push(eq(competencyLibrary.id, filters.competencyId));
+    }
+    if (filters?.status) {
+      conditions.push(eq(trainingMatrixRecords.currentStatus, filters.status));
+    }
+    
+    if (conditions.length > 0) {
+      baseQuery = baseQuery.where(and(...conditions));
+    }
+    
+    const results = await baseQuery;
+    
+    // Group by user for easier reporting
+    const report = results.reduce((acc, record) => {
+      const userKey = record.userId;
+      if (!acc[userKey]) {
+        acc[userKey] = {
+          user: {
+            id: record.userId,
+            email: record.userEmail,
+            firstName: record.firstName,
+            lastName: record.lastName,
+            role: record.role,
+            teamId: record.teamId
+          },
+          competencies: []
+        };
+      }
+      
+      acc[userKey].competencies.push({
+        competencyLibraryId: record.competencyLibraryId,
+        status: record.currentStatus || 'not_started',
+        lastAssessmentDate: record.lastAssessmentDate,
+        expiryDate: record.expiryDate,
+        evidenceRecords: record.evidenceRecords
+      });
+      
+      return acc;
+    }, {} as any);
+    
+    return Object.values(report);
   }
 
   async getCompetencyGapAnalysis(userId?: string): Promise<any> {
-    throw new Error("Training matrix not yet implemented - will be added in Vertical Slice 3");
+    if (userId) {
+      // Individual user gap analysis
+      const user = await this.getUser(userId);
+      if (!user) throw new Error("User not found");
+      
+      const requiredCompetencies = await this.getRequiredCompetenciesForUser(userId);
+      const userRecords = await this.getTrainingMatrixRecords(userId);
+      
+      const gaps = requiredCompetencies.map(competency => {
+        const record = userRecords.find(r => r.competencyLibraryId === competency.id);
+        const status = record?.currentStatus || 'not_started';
+        const isGap = !record || !['competent'].includes(status);
+        
+        return {
+          competency,
+          status,
+          isGap,
+          record,
+          recommendedPaths: competency.linkedLearningPaths || []
+        };
+      });
+      
+      return {
+        user,
+        totalRequired: requiredCompetencies.length,
+        completed: gaps.filter(g => !g.isGap).length,
+        gaps: gaps.filter(g => g.isGap).length,
+        gapDetails: gaps.filter(g => g.isGap)
+      };
+    } else {
+      // Organization-wide gap analysis
+      const allUsers = await this.getUsers();
+      const overallGaps = [];
+      
+      for (const user of allUsers) {
+        if (user.id) {
+          const userGaps = await this.getCompetencyGapAnalysis(user.id);
+          if (userGaps.gaps > 0) {
+            overallGaps.push(userGaps);
+          }
+        }
+      }
+      
+      return {
+        totalUsers: allUsers.length,
+        usersWithGaps: overallGaps.length,
+        totalGaps: overallGaps.reduce((sum, user) => sum + user.gaps, 0),
+        userDetails: overallGaps
+      };
+    }
   }
 
   async updateCompetencyStatus(userId: string, competencyLibraryId: string, status: string, evidenceData?: any): Promise<TrainingMatrixRecord> {
-    throw new Error("Training matrix not yet implemented - will be added in Vertical Slice 3");
+    // Check if record exists
+    const existingRecord = await db.select()
+      .from(trainingMatrixRecords)
+      .where(and(
+        eq(trainingMatrixRecords.userId, userId),
+        eq(trainingMatrixRecords.competencyLibraryId, competencyLibraryId)
+      ));
+    
+    if (existingRecord.length > 0) {
+      // Update existing record
+      const [updatedRecord] = await db.update(trainingMatrixRecords)
+        .set({
+          currentStatus: status,
+          evidenceRecords: evidenceData,
+          lastAssessmentDate: status === 'competent' ? new Date() : null,
+          updatedAt: new Date()
+        })
+        .where(eq(trainingMatrixRecords.id, existingRecord[0].id))
+        .returning();
+      
+      return updatedRecord;
+    } else {
+      // Create new record
+      const [newRecord] = await db.insert(trainingMatrixRecords)
+        .values({
+          userId,
+          competencyLibraryId,
+          currentStatus: status,
+          evidenceRecords: evidenceData,
+          lastAssessmentDate: status === 'competent' ? new Date() : null,
+          updatedBy: userId // For now, assume user is updating their own status
+        })
+        .returning();
+      
+      return newRecord;
+    }
   }
 
   // Automation Rules Engine (Vertical Slice 5)
