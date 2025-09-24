@@ -138,7 +138,8 @@ const badgeSchema = z.object({
   description: z.string().min(10, "Description is required"),
   criteria: z.string().min(10, "Achievement criteria required"),
   courseIds: z.array(z.string()).optional().default([]),
-  icon: z.string().optional(),
+  iconKey: z.string().optional(),
+  iconUrl: z.string().optional(),
   color: z.string().default("#3B82F6"),
 });
 
@@ -1181,7 +1182,8 @@ export default function Learning() {
       description: "",
       criteria: "",
       courseIds: [],
-      icon: "",
+      iconKey: "",
+      iconUrl: "",
       color: "#3B82F6",
     },
   });
@@ -5811,6 +5813,129 @@ export default function Learning() {
                                 </FormItem>
                               )}
                             />
+                            <FormField
+                              control={createBadgeForm.control}
+                              name="color"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Badge Color</FormLabel>
+                                  <FormControl>
+                                    <div className="flex items-center space-x-3">
+                                      <input
+                                        type="color"
+                                        {...field}
+                                        className="w-12 h-8 rounded border cursor-pointer"
+                                        data-testid="input-badge-color"
+                                      />
+                                      <span className="text-sm text-muted-foreground">
+                                        Choose a color for your badge
+                                      </span>
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createBadgeForm.control}
+                              name="iconKey"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Badge Icon (Optional)</FormLabel>
+                                  <FormDescription>
+                                    Upload a custom icon for your badge. Supports JPG, PNG, WebP files.
+                                  </FormDescription>
+                                  <FormControl>
+                                    <div className="space-y-3">
+                                      <div className="flex items-center space-x-3">
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            
+                                            try {
+                                              // Get upload URL from backend
+                                              const uploadResponse = await fetch('/api/objects/badges/upload', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                  filename: file.name,
+                                                  badgeId: 'temp-' + Date.now() // Temporary ID for upload
+                                                })
+                                              });
+                                              
+                                              if (!uploadResponse.ok) throw new Error('Upload URL failed');
+                                              
+                                              const { uploadURL, iconKey } = await uploadResponse.json();
+                                              
+                                              // Upload file to storage
+                                              const fileUpload = await fetch(uploadURL, {
+                                                method: 'PUT',
+                                                body: file,
+                                                headers: {
+                                                  'Content-Type': file.type,
+                                                },
+                                              });
+                                              
+                                              if (!fileUpload.ok) throw new Error('File upload failed');
+                                              
+                                              // Update form with the icon key
+                                              field.onChange(iconKey);
+                                              
+                                              toast({
+                                                title: "Icon Uploaded",
+                                                description: "Badge icon uploaded successfully.",
+                                              });
+                                            } catch (error) {
+                                              console.error('Icon upload failed:', error);
+                                              toast({
+                                                title: "Upload Failed",
+                                                description: "Failed to upload badge icon. Please try again.",
+                                                variant: "destructive",
+                                              });
+                                            }
+                                          }}
+                                          className="text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/80"
+                                          data-testid="input-badge-icon"
+                                        />
+                                        {field.value && createBadgeForm.watch('iconUrl') && (
+                                          <div className="flex items-center space-x-2 text-sm text-green-600">
+                                            <Upload className="w-4 h-4" />
+                                            <span>Icon uploaded</span>
+                                            <img 
+                                              src={createBadgeForm.watch('iconUrl')} 
+                                              alt="Badge preview" 
+                                              className="w-6 h-6 rounded object-cover border"
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                      {field.value && (
+                                        <div className="p-2 bg-muted rounded flex items-center justify-between">
+                                          <span className="text-sm text-muted-foreground">{field.value}</span>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              field.onChange("");
+                                              createBadgeForm.setValue('iconUrl', '');
+                                            }}
+                                            className="text-destructive hover:text-destructive"
+                                            data-testid="button-remove-badge-icon"
+                                          >
+                                            <X className="w-4 h-4" />
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                             <div className="flex justify-end space-x-2">
                               <Button type="button" variant="outline" onClick={() => setIsCreateBadgeOpen(false)}>
                                 Cancel
@@ -5848,10 +5973,18 @@ export default function Learning() {
                           <CardHeader className="pb-2">
                             <div className="flex items-center space-x-3">
                               <div 
-                                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+                                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold overflow-hidden"
                                 style={{ backgroundColor: badge.color || '#3b82f6' }}
                               >
-                                <Trophy className="w-5 h-5" />
+                                {badge.iconUrl ? (
+                                  <img 
+                                    src={badge.iconUrl} 
+                                    alt={badge.name} 
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <Trophy className="w-5 h-5" />
+                                )}
                               </div>
                               <div className="flex-1">
                                 <CardTitle className="text-lg">{badge.name}</CardTitle>
@@ -5868,20 +6001,8 @@ export default function Learning() {
                                 <p className="text-xs text-muted-foreground">{badge.criteria}</p>
                               </div>
                             )}
-                            <div className="flex justify-between items-center text-xs text-muted-foreground">
-                              <span>Created: {new Date(badge.created_at).toLocaleDateString()}</span>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => {
-                                  // TODO: Add edit badge functionality
-                                  console.log('Edit badge:', badge.id);
-                                }}
-                                data-testid={`button-edit-badge-${badge.id}`}
-                              >
-                                <Edit className="w-3 h-3 mr-1" />
-                                Edit
-                              </Button>
+                            <div className="text-xs text-muted-foreground">
+                              <span>Created: {new Date(badge.createdAt || badge.created_at).toLocaleDateString()}</span>
                             </div>
                           </CardContent>
                         </Card>

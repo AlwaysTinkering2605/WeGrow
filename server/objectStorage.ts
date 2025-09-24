@@ -177,8 +177,8 @@ export class ObjectStorageService {
       throw new Error('Only PDF, JPG, JPEG, or PNG files are allowed for certificates');
     }
     
-    if (fileType === 'badge_icon' && !['jpg', 'jpeg', 'png', 'svg', 'webp'].includes(extension || '')) {
-      throw new Error('Only JPG, JPEG, PNG, SVG, or WebP files are allowed for badge icons');
+    if (fileType === 'badge_icon' && !['jpg', 'jpeg', 'png', 'webp'].includes(extension || '')) {
+      throw new Error('Only JPG, JPEG, PNG, or WebP files are allowed for badge icons');
     }
   }
 
