@@ -1,6 +1,8 @@
 import { sql, relations } from "drizzle-orm";
 import {
   index,
+  uniqueIndex,
+  foreignKey,
   jsonb,
   pgTable,
   timestamp,
@@ -485,11 +487,19 @@ export const learningPaths = pgTable("learning_paths", {
   estimatedDuration: integer("estimated_duration"), // Minutes
   isActive: boolean("is_active").default(true),
   isPublished: boolean("is_published").default(false),
+  publishedAt: timestamp("published_at"), // When path was published
   completionCriteria: jsonb("completion_criteria"), // Requirements for path completion
   createdBy: varchar("created_by").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+  deletedAt: timestamp("deleted_at"), // Soft delete support
+}, (table) => ({
+  // Indices for performance
+  titleIdx: index("learning_paths_title_idx").on(table.title),
+  categoryIdx: index("learning_paths_category_idx").on(table.category),
+  isPublishedIdx: index("learning_paths_published_idx").on(table.isPublished),
+  createdByIdx: index("learning_paths_created_by_idx").on(table.createdBy),
+}));
 
 // Learning Path Steps - individual activities within a path
 export const learningPathSteps = pgTable("learning_path_steps", {
@@ -510,7 +520,20 @@ export const learningPathSteps = pgTable("learning_path_steps", {
   estimatedDuration: integer("estimated_duration"), // Minutes
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+  deletedAt: timestamp("deleted_at"), // Soft delete support
+}, (table) => ({
+  // Critical: Unique constraint with soft delete awareness - prevent duplicate orders in active steps only  
+  uniquePathStepOrder: uniqueIndex("learning_path_steps_path_order_unique").on(table.pathId, table.stepOrder).where(sql`${table.deletedAt} IS NULL`),
+  // Foreign key for data integrity
+  pathFk: foreignKey({
+    columns: [table.pathId],
+    foreignColumns: [learningPaths.id],
+    name: "learning_path_steps_path_fk"
+  }),
+  // Performance indices - keeping only necessary ones
+  stepTypeIdx: index("learning_path_steps_step_type_idx").on(table.stepType),
+  resourceIdIdx: index("learning_path_steps_resource_id_idx").on(table.resourceId),
+}));
 
 // Learning Path Enrollments - user progress through paths
 export const learningPathEnrollments = pgTable("learning_path_enrollments", {
