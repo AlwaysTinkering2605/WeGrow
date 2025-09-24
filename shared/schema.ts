@@ -1472,3 +1472,353 @@ export type InsertAutomationRule = z.infer<typeof insertAutomationRuleSchema>;
 export type InsertTrainingMatrixRecord = z.infer<typeof insertTrainingMatrixRecordSchema>;
 export type InsertCompetencyStatusHistory = z.infer<typeof insertCompetencyStatusHistorySchema>;
 export type InsertCompetencyEvidenceRecord = z.infer<typeof insertCompetencyEvidenceRecordSchema>;
+
+// Enhanced Competency Management DTOs and Types
+export const auditTrailFilterSchema = z.object({
+  search: z.string().optional(),
+  action: z.string().optional(),
+  user: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  limit: z.number().min(1).max(1000).default(100),
+  offset: z.number().min(0).default(0)
+});
+
+export const complianceReportConfigSchema = z.object({
+  type: z.enum(['full_audit', 'compliance_summary', 'gap_analysis']).default('full_audit'),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  format: z.enum(['json', 'csv', 'pdf']).default('json'),
+  includeAuditTrail: z.boolean().default(true),
+  includeRiskAssessment: z.boolean().default(true),
+  includeRecommendations: z.boolean().default(true),
+  roleFilter: z.array(z.string()).optional(),
+  teamFilter: z.array(z.string()).optional()
+});
+
+export const competencyProfileFilterSchema = z.object({
+  includeEvidence: z.boolean().default(true),
+  includeGoals: z.boolean().default(true),
+  includeDeadlines: z.boolean().default(true)
+});
+
+export const userCompetencyProfileSchema = z.object({
+  userId: z.string(),
+  user: z.object({
+    id: z.string(),
+    firstName: z.string().nullable(),
+    lastName: z.string().nullable(),
+    email: z.string().nullable(),
+    role: z.string(),
+    teamId: z.string().nullable()
+  }),
+  competencies: z.array(z.object({
+    id: z.string(),
+    competencyId: z.string(),
+    currentLevel: z.number(),
+    targetLevel: z.number(),
+    status: z.string(),
+    lastAssessed: z.string().nullable(),
+    nextReview: z.string().nullable(),
+    priority: z.string(),
+    evidenceCount: z.number(),
+    competency: z.object({
+      id: z.string(),
+      title: z.string(),
+      description: z.string().nullable(),
+      category: z.string(),
+      skillType: z.string(),
+      assessmentCriteria: z.string().nullable()
+    })
+  })),
+  totalCompetencies: z.number(),
+  achievedCompetencies: z.number(),
+  inProgressCompetencies: z.number(),
+  overallCompletionRate: z.number(),
+  nextDevelopmentGoals: z.array(z.any()),
+  recentEvidence: z.array(z.any()),
+  upcomingDeadlines: z.array(z.object({
+    id: z.string(),
+    competencyId: z.string(),
+    deadline: z.string(),
+    daysRemaining: z.number(),
+    isOverdue: z.boolean(),
+    priority: z.string(),
+    competency: z.object({
+      title: z.string(),
+      category: z.string()
+    })
+  }))
+});
+
+export const teamCompetencyOverviewSchema = z.object({
+  teamId: z.string(),
+  teamName: z.string(),
+  totalCompetencies: z.number(),
+  achievedCompetencies: z.number(),
+  inProgressCompetencies: z.number(),
+  overdueCompetencies: z.number(),
+  completionRate: z.number(),
+  members: z.array(z.object({
+    userId: z.string(),
+    name: z.string(),
+    role: z.string(),
+    completionRate: z.number()
+  }))
+});
+
+export const auditTrailRecordSchema = z.object({
+  id: z.string(),
+  timestamp: z.string(),
+  userId: z.string(),
+  action: z.string(),
+  entity: z.string(),
+  entityId: z.string(),
+  oldValue: z.any(),
+  newValue: z.any(),
+  user: z.object({
+    firstName: z.string().nullable(),
+    lastName: z.string().nullable(),
+    email: z.string().nullable(),
+    role: z.string()
+  })
+});
+
+export const complianceMetricsSchema = z.object({
+  overallComplianceRate: z.number(),
+  complianceByRole: z.array(z.object({
+    role: z.string(),
+    complianceRate: z.number(),
+    totalUsers: z.number(),
+    compliantUsers: z.number()
+  })),
+  complianceByCategory: z.array(z.object({
+    category: z.string(),
+    complianceRate: z.number(),
+    totalCompetencies: z.number(),
+    compliantCompetencies: z.number()
+  })),
+  monthlyTrends: z.array(z.object({
+    month: z.string(),
+    complianceRate: z.number(),
+    newlyAchieved: z.number(),
+    expired: z.number()
+  })),
+  auditReadiness: z.object({
+    score: z.number(),
+    lastAudit: z.string(),
+    nextAudit: z.string(),
+    criticalIssues: z.number(),
+    recommendations: z.number()
+  })
+});
+
+// Additional schemas for complete type safety
+export const complianceMetricsFilterSchema = z.object({
+  roleFilter: z.array(z.string()).optional(),
+  teamFilter: z.array(z.string()).optional(),
+  categoryFilter: z.array(z.string()).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional()
+});
+
+export const complianceReportSchema = z.object({
+  id: z.string(),
+  reportType: z.string(),
+  generatedAt: z.string(),
+  generatedBy: z.string(),
+  reportPeriod: z.object({
+    startDate: z.string(),
+    endDate: z.string()
+  }),
+  summary: z.object({
+    totalUsers: z.number(),
+    totalCompetencies: z.number(),
+    achievedCompetencies: z.number(),
+    inProgressCompetencies: z.number(),
+    overdueCompetencies: z.number(),
+    complianceRate: z.number()
+  }),
+  metrics: complianceMetricsSchema,
+  auditTrail: z.array(auditTrailRecordSchema),
+  riskAssessment: z.array(z.object({
+    id: z.string(),
+    category: z.string(),
+    severity: z.string(),
+    description: z.string(),
+    affectedUsers: z.number(),
+    affectedCompetencies: z.array(z.string()),
+    mitigationActions: z.array(z.string()),
+    dueDate: z.string()
+  })),
+  recommendations: z.array(z.object({
+    id: z.string(),
+    priority: z.string(),
+    category: z.string(),
+    title: z.string(),
+    description: z.string(),
+    expectedOutcome: z.string(),
+    estimatedEffort: z.string(),
+    deadline: z.string()
+  }))
+});
+
+// Export types for the new DTOs
+export type AuditTrailFilter = z.infer<typeof auditTrailFilterSchema>;
+export type ComplianceReportConfig = z.infer<typeof complianceReportConfigSchema>;
+export type CompetencyProfileFilter = z.infer<typeof competencyProfileFilterSchema>;
+export type UserCompetencyProfile = z.infer<typeof userCompetencyProfileSchema>;
+export type TeamCompetencyOverview = z.infer<typeof teamCompetencyOverviewSchema>;
+export type AuditTrailRecord = z.infer<typeof auditTrailRecordSchema>;
+export type ComplianceMetrics = z.infer<typeof complianceMetricsSchema>;
+export type ComplianceMetricsFilter = z.infer<typeof complianceMetricsFilterSchema>;
+export type ComplianceReport = z.infer<typeof complianceReportSchema>;
+
+// Additional types for legacy methods to achieve complete type safety
+export const userCompetencySchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  competencyId: z.string(),
+  currentLevel: z.number(),
+  targetLevel: z.number(),
+  competency: z.object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().nullable()
+  })
+});
+
+export const courseDetailsWithProgressSchema = z.object({
+  course: z.object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().nullable(),
+    type: z.string(),
+    isPublished: z.boolean(),
+    createdAt: z.string()
+  }),
+  currentVersion: z.object({
+    id: z.string(),
+    version: z.string(),
+    isActive: z.boolean()
+  }).nullable(),
+  modules: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    sortOrder: z.number()
+  })),
+  userProgress: z.object({
+    enrollmentId: z.string().nullable(),
+    completionPercentage: z.number(),
+    status: z.string()
+  }).nullable()
+});
+
+export const recognitionFeedItemSchema = z.object({
+  id: z.string(),
+  fromUserId: z.string(),
+  toUserId: z.string(),
+  value: z.string(),
+  message: z.string(),
+  createdAt: z.string(),
+  fromUser: z.object({
+    firstName: z.string().nullable(),
+    lastName: z.string().nullable(),
+    teamName: z.string().nullable()
+  }),
+  toUser: z.object({
+    firstName: z.string().nullable(),
+    lastName: z.string().nullable(),
+    teamName: z.string().nullable()
+  })
+});
+
+export const teamHierarchyNodeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  parentTeamId: z.string().nullable(),
+  teamLeadId: z.string(),
+  department: z.string().nullable(),
+  isActive: z.boolean(),
+  children: z.array(z.lazy(() => teamHierarchyNodeSchema)).optional()
+});
+
+export const trainingMatrixViewSchema = z.object({
+  userId: z.string(),
+  userName: z.string(),
+  role: z.string(),
+  team: z.string().nullable(),
+  competencyId: z.string(),
+  competencyTitle: z.string(),
+  category: z.string(),
+  currentLevel: z.number(),
+  targetLevel: z.number(),
+  status: z.string(),
+  lastAssessed: z.string().nullable(),
+  nextReview: z.string().nullable(),
+  priority: z.string()
+});
+
+export const userProfileUpdateSchema = z.object({
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  email: z.string().optional(),
+  mobilePhone: z.string().optional(),
+  jobTitle: z.string().optional(),
+  managerId: z.string().optional(),
+  teamId: z.string().optional()
+});
+
+export const trainingMatrixFilterSchema = z.object({
+  role: z.string().optional(),
+  teamId: z.string().optional(),
+  competencyId: z.string().optional(),
+  status: z.string().optional()
+});
+
+// Enhanced audit trail with proper pagination
+export const enhancedAuditTrailFilterSchema = auditTrailFilterSchema.extend({
+  page: z.number().min(1).default(1),
+  pageSize: z.number().min(1).max(1000).default(50),
+  sortBy: z.enum(['timestamp', 'user', 'action']).default('timestamp'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc')
+});
+
+// Quiz answer types for complete type safety
+export const quizAnswerSchema = z.record(z.string(), z.union([
+  z.string(),
+  z.array(z.string())
+]));
+
+// Export the new types
+export type UserCompetencyView = z.infer<typeof userCompetencySchema>;
+export type CourseDetailsWithProgress = z.infer<typeof courseDetailsWithProgressSchema>;
+export type RecognitionFeedItem = z.infer<typeof recognitionFeedItemSchema>;
+export type TeamHierarchyNode = z.infer<typeof teamHierarchyNodeSchema>;
+export type TrainingMatrixView = z.infer<typeof trainingMatrixViewSchema>;
+export type UserProfileUpdate = z.infer<typeof userProfileUpdateSchema>;
+export type TrainingMatrixFilter = z.infer<typeof trainingMatrixFilterSchema>;
+export type EnhancedAuditTrailFilter = z.infer<typeof enhancedAuditTrailFilterSchema>;
+export type QuizAnswers = z.infer<typeof quizAnswerSchema>;
+
+// Additional types for remaining any types
+export const competencyEvidenceDataSchema = z.object({
+  title: z.string(),
+  description: z.string().optional(),
+  evidenceType: z.string(),
+  fileUrl: z.string().optional(),
+  notes: z.string().optional()
+});
+
+export const automationTriggerDataSchema = z.object({
+  event: z.string(),
+  userId: z.string().optional(),
+  competencyId: z.string().optional(),
+  context: z.record(z.string(), z.any()).optional()
+});
+
+// Re-export types for storage interface to avoid z import
+export type InsertTeam = z.infer<typeof insertTeamSchema>;
+export type CompetencyEvidenceData = z.infer<typeof competencyEvidenceDataSchema>;
+export type AutomationTriggerData = z.infer<typeof automationTriggerDataSchema>;
