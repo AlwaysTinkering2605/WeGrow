@@ -2561,6 +2561,239 @@ export class DatabaseStorage implements IStorage {
       return { enrollment, trainingRecord };
     });
   }
+
+  // ========================================
+  // LEARNING PATHS AND TRAINING MATRIX STUB IMPLEMENTATIONS
+  // These methods are implemented incrementally in vertical slices
+  // ========================================
+
+  // Learning Paths Management (Vertical Slice 1)
+  async getLearningPaths(): Promise<LearningPath[]> {
+    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+  }
+
+  async getLearningPath(pathId: string): Promise<LearningPath | undefined> {
+    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+  }
+
+  async getLearningPathWithSteps(pathId: string): Promise<LearningPath & { steps: LearningPathStep[] }> {
+    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+  }
+
+  async createLearningPath(path: InsertLearningPath): Promise<LearningPath> {
+    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+  }
+
+  async updateLearningPath(pathId: string, updates: Partial<InsertLearningPath>): Promise<LearningPath> {
+    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+  }
+
+  async deleteLearningPath(pathId: string): Promise<void> {
+    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+  }
+
+  async publishLearningPath(pathId: string): Promise<LearningPath> {
+    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+  }
+
+  async unpublishLearningPath(pathId: string): Promise<LearningPath> {
+    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+  }
+
+  // Learning Path Steps Management (Vertical Slice 1)
+  async getLearningPathSteps(pathId: string): Promise<LearningPathStep[]> {
+    throw new Error("Learning path steps management not yet implemented - will be added in Vertical Slice 1");
+  }
+
+  async getLearningPathStep(stepId: string): Promise<LearningPathStep | undefined> {
+    throw new Error("Learning path steps management not yet implemented - will be added in Vertical Slice 1");
+  }
+
+  async createLearningPathStep(step: InsertLearningPathStep): Promise<LearningPathStep> {
+    throw new Error("Learning path steps management not yet implemented - will be added in Vertical Slice 1");
+  }
+
+  async updateLearningPathStep(stepId: string, updates: Partial<InsertLearningPathStep>): Promise<LearningPathStep> {
+    throw new Error("Learning path steps management not yet implemented - will be added in Vertical Slice 1");
+  }
+
+  async deleteLearningPathStep(stepId: string): Promise<void> {
+    throw new Error("Learning path steps management not yet implemented - will be added in Vertical Slice 1");
+  }
+
+  async reorderLearningPathSteps(pathId: string, stepIds: string[]): Promise<void> {
+    throw new Error("Learning path steps management not yet implemented - will be added in Vertical Slice 1");
+  }
+
+  // Learning Path Enrollments and Progress (Vertical Slice 2)
+  async getLearningPathEnrollments(userId?: string, pathId?: string): Promise<LearningPathEnrollment[]> {
+    throw new Error("Learning path enrollments not yet implemented - will be added in Vertical Slice 2");
+  }
+
+  async getLearningPathEnrollment(enrollmentId: string): Promise<LearningPathEnrollment | undefined> {
+    throw new Error("Learning path enrollments not yet implemented - will be added in Vertical Slice 2");
+  }
+
+  async enrollUserInLearningPath(enrollment: InsertLearningPathEnrollment): Promise<LearningPathEnrollment> {
+    throw new Error("Learning path enrollments not yet implemented - will be added in Vertical Slice 2");
+  }
+
+  async updateLearningPathEnrollment(enrollmentId: string, updates: Partial<InsertLearningPathEnrollment>): Promise<LearningPathEnrollment> {
+    throw new Error("Learning path enrollments not yet implemented - will be added in Vertical Slice 2");
+  }
+
+  async completeLearningPathEnrollment(enrollmentId: string): Promise<LearningPathEnrollment> {
+    throw new Error("Learning path enrollments not yet implemented - will be added in Vertical Slice 2");
+  }
+
+  async suspendLearningPathEnrollment(enrollmentId: string, reason?: string): Promise<LearningPathEnrollment> {
+    throw new Error("Learning path enrollments not yet implemented - will be added in Vertical Slice 2");
+  }
+
+  async resumeLearningPathEnrollment(enrollmentId: string): Promise<LearningPathEnrollment> {
+    throw new Error("Learning path enrollments not yet implemented - will be added in Vertical Slice 2");
+  }
+
+  // Learning Path Step Progress (Vertical Slice 2)
+  async getLearningPathStepProgress(enrollmentId: string): Promise<LearningPathStepProgress[]> {
+    throw new Error("Learning path step progress not yet implemented - will be added in Vertical Slice 2");
+  }
+
+  async getStepProgress(enrollmentId: string, stepId: string): Promise<LearningPathStepProgress | undefined> {
+    throw new Error("Learning path step progress not yet implemented - will be added in Vertical Slice 2");
+  }
+
+  async updateStepProgress(progress: InsertLearningPathStepProgress): Promise<LearningPathStepProgress> {
+    throw new Error("Learning path step progress not yet implemented - will be added in Vertical Slice 2");
+  }
+
+  async completeStep(enrollmentId: string, stepId: string, score?: number, timeSpent?: number): Promise<LearningPathStepProgress> {
+    throw new Error("Learning path step progress not yet implemented - will be added in Vertical Slice 2");
+  }
+
+  async skipStep(enrollmentId: string, stepId: string, reason: string): Promise<LearningPathStepProgress> {
+    throw new Error("Learning path step progress not yet implemented - will be added in Vertical Slice 2");
+  }
+
+  // Competency Library Management (Vertical Slice 4)
+  async getCompetencyLibrary(): Promise<CompetencyLibraryItem[]> {
+    throw new Error("Competency library not yet implemented - will be added in Vertical Slice 4");
+  }
+
+  async getCompetencyLibraryItem(itemId: string): Promise<CompetencyLibraryItem | undefined> {
+    throw new Error("Competency library not yet implemented - will be added in Vertical Slice 4");
+  }
+
+  async createCompetencyLibraryItem(item: InsertCompetencyLibraryItem): Promise<CompetencyLibraryItem> {
+    throw new Error("Competency library not yet implemented - will be added in Vertical Slice 4");
+  }
+
+  async updateCompetencyLibraryItem(itemId: string, updates: Partial<InsertCompetencyLibraryItem>): Promise<CompetencyLibraryItem> {
+    throw new Error("Competency library not yet implemented - will be added in Vertical Slice 4");
+  }
+
+  async deleteCompetencyLibraryItem(itemId: string): Promise<void> {
+    throw new Error("Competency library not yet implemented - will be added in Vertical Slice 4");
+  }
+
+  async linkLearningPathToCompetency(competencyLibraryId: string, learningPathId: string): Promise<void> {
+    throw new Error("Competency library not yet implemented - will be added in Vertical Slice 4");
+  }
+
+  async unlinkLearningPathFromCompetency(competencyLibraryId: string, learningPathId: string): Promise<void> {
+    throw new Error("Competency library not yet implemented - will be added in Vertical Slice 4");
+  }
+
+  // Role Competency Mappings (Vertical Slice 3)
+  async getRoleCompetencyMappings(role?: string, teamId?: string): Promise<RoleCompetencyMapping[]> {
+    throw new Error("Role competency mappings not yet implemented - will be added in Vertical Slice 3");
+  }
+
+  async getRoleCompetencyMapping(mappingId: string): Promise<RoleCompetencyMapping | undefined> {
+    throw new Error("Role competency mappings not yet implemented - will be added in Vertical Slice 3");
+  }
+
+  async createRoleCompetencyMapping(mapping: InsertRoleCompetencyMapping): Promise<RoleCompetencyMapping> {
+    throw new Error("Role competency mappings not yet implemented - will be added in Vertical Slice 3");
+  }
+
+  async updateRoleCompetencyMapping(mappingId: string, updates: Partial<InsertRoleCompetencyMapping>): Promise<RoleCompetencyMapping> {
+    throw new Error("Role competency mappings not yet implemented - will be added in Vertical Slice 3");
+  }
+
+  async deleteRoleCompetencyMapping(mappingId: string): Promise<void> {
+    throw new Error("Role competency mappings not yet implemented - will be added in Vertical Slice 3");
+  }
+
+  async getRequiredCompetenciesForUser(userId: string): Promise<CompetencyLibraryItem[]> {
+    throw new Error("Role competency mappings not yet implemented - will be added in Vertical Slice 3");
+  }
+
+  // Training Matrix and Compliance (Vertical Slice 3)
+  async getTrainingMatrixRecords(userId?: string, competencyLibraryId?: string): Promise<TrainingMatrixRecord[]> {
+    throw new Error("Training matrix not yet implemented - will be added in Vertical Slice 3");
+  }
+
+  async getTrainingMatrixRecord(recordId: string): Promise<TrainingMatrixRecord | undefined> {
+    throw new Error("Training matrix not yet implemented - will be added in Vertical Slice 3");
+  }
+
+  async createTrainingMatrixRecord(record: InsertTrainingMatrixRecord): Promise<TrainingMatrixRecord> {
+    throw new Error("Training matrix not yet implemented - will be added in Vertical Slice 3");
+  }
+
+  async updateTrainingMatrixRecord(recordId: string, updates: Partial<InsertTrainingMatrixRecord>): Promise<TrainingMatrixRecord> {
+    throw new Error("Training matrix not yet implemented - will be added in Vertical Slice 3");
+  }
+
+  async getComplianceReport(filters?: { role?: string; teamId?: string; competencyId?: string; status?: string; }): Promise<any> {
+    throw new Error("Training matrix not yet implemented - will be added in Vertical Slice 3");
+  }
+
+  async getCompetencyGapAnalysis(userId?: string): Promise<any> {
+    throw new Error("Training matrix not yet implemented - will be added in Vertical Slice 3");
+  }
+
+  async updateCompetencyStatus(userId: string, competencyLibraryId: string, status: string, evidenceData?: any): Promise<TrainingMatrixRecord> {
+    throw new Error("Training matrix not yet implemented - will be added in Vertical Slice 3");
+  }
+
+  // Automation Rules Engine (Vertical Slice 5)
+  async getAutomationRules(isActive?: boolean): Promise<AutomationRule[]> {
+    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+  }
+
+  async getAutomationRule(ruleId: string): Promise<AutomationRule | undefined> {
+    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+  }
+
+  async createAutomationRule(rule: InsertAutomationRule): Promise<AutomationRule> {
+    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+  }
+
+  async updateAutomationRule(ruleId: string, updates: Partial<InsertAutomationRule>): Promise<AutomationRule> {
+    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+  }
+
+  async deleteAutomationRule(ruleId: string): Promise<void> {
+    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+  }
+
+  async activateAutomationRule(ruleId: string): Promise<AutomationRule> {
+    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+  }
+
+  async deactivateAutomationRule(ruleId: string): Promise<AutomationRule> {
+    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+  }
+
+  async executeAutomationRule(ruleId: string, triggerData?: any): Promise<{ executed: boolean; enrollments: number; errors?: string[] }> {
+    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+  }
+
+  async executeAutomationRulesForUser(userId: string, triggerEvent: string): Promise<{ totalRules: number; executed: number; enrollments: number }> {
+    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+  }
 }
 
 export const storage = new DatabaseStorage();
