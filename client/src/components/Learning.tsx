@@ -1014,6 +1014,8 @@ export default function Learning() {
   const [isEditQuizOpen, setIsEditQuizOpen] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState<any>(null);
   const [isCreateBadgeOpen, setIsCreateBadgeOpen] = useState(false);
+  const [isEditBadgeOpen, setIsEditBadgeOpen] = useState(false);
+  const [editingBadge, setEditingBadge] = useState<any>(null);
   const [isManageQuestionsOpen, setIsManageQuestionsOpen] = useState(false);
   const [selectedCourseForEdit, setSelectedCourseForEdit] = useState<any>(null);
   const [selectedCourseForContent, setSelectedCourseForContent] = useState<string>("");
@@ -1187,6 +1189,34 @@ export default function Learning() {
       color: "#3B82F6",
     },
   });
+
+  const editBadgeForm = useForm({
+    resolver: zodResolver(badgeSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      criteria: "",
+      courseIds: [],
+      iconKey: "",
+      iconUrl: "",
+      color: "#3B82F6",
+    },
+  });
+
+  // Effect to populate edit badge form when editingBadge changes
+  useEffect(() => {
+    if (editingBadge) {
+      editBadgeForm.reset({
+        name: editingBadge.name || "",
+        description: editingBadge.description || "",
+        criteria: editingBadge.criteria || "",
+        courseIds: editingBadge.courseIds || [],
+        iconKey: editingBadge.iconKey || "",
+        iconUrl: editingBadge.iconUrl || "",
+        color: editingBadge.color || "#3B82F6",
+      });
+    }
+  }, [editingBadge, editBadgeForm]);
 
   const createQuestionForm = useForm({
     resolver: zodResolver(quizQuestionSchema),
@@ -1802,6 +1832,29 @@ export default function Learning() {
       toast({
         title: "Creation Failed",
         description: error.message || "Failed to create badge. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const editBadgeMutation = useMutation({
+    mutationFn: async ({ id, ...badgeData }: { id: string } & z.infer<typeof badgeSchema>) => {
+      const response = await apiRequest("PUT", `/api/lms/admin/badges/${id}`, badgeData);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Badge Updated",
+        description: "Badge has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/badges"] });
+      setIsEditBadgeOpen(false);
+      setEditingBadge(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update badge. Please try again.",
         variant: "destructive",
       });
     },
@@ -5868,7 +5921,7 @@ export default function Learning() {
                                               
                                               if (!uploadResponse.ok) throw new Error('Upload URL failed');
                                               
-                                              const { uploadURL, iconKey } = await uploadResponse.json();
+                                              const { uploadURL, iconKey, objectPath } = await uploadResponse.json();
                                               
                                               // Upload file to storage
                                               const fileUpload = await fetch(uploadURL, {
@@ -5881,8 +5934,10 @@ export default function Learning() {
                                               
                                               if (!fileUpload.ok) throw new Error('File upload failed');
                                               
-                                              // Update form with the icon key
+                                              // Update form with both iconKey and iconUrl
                                               field.onChange(iconKey);
+                                              const iconUrl = `/objects${objectPath}`;
+                                              createBadgeForm.setValue('iconUrl', iconUrl);
                                               
                                               toast({
                                                 title: "Icon Uploaded",
@@ -5958,6 +6013,221 @@ export default function Learning() {
                         </Form>
                       </DialogContent>
                     </Dialog>
+                    
+                    {/* Edit Badge Dialog */}
+                    <Dialog open={isEditBadgeOpen} onOpenChange={setIsEditBadgeOpen}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Edit Badge</DialogTitle>
+                          <DialogDescription>Update badge details and criteria</DialogDescription>
+                        </DialogHeader>
+                        <Form {...editBadgeForm}>
+                          <form onSubmit={editBadgeForm.handleSubmit((data) => {
+                            if (editingBadge) {
+                              editBadgeMutation.mutate({ id: editingBadge.id, ...data });
+                            }
+                          })} className="space-y-4">
+                            <FormField
+                              control={editBadgeForm.control}
+                              name="name"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Badge Name</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="e.g., Quality Expert" {...field} data-testid="input-edit-badge-name" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={editBadgeForm.control}
+                              name="description"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Description</FormLabel>
+                                  <FormControl>
+                                    <Textarea 
+                                      placeholder="Describe what this badge represents..."
+                                      {...field}
+                                      data-testid="textarea-edit-badge-description"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={editBadgeForm.control}
+                              name="criteria"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Achievement Criteria</FormLabel>
+                                  <FormControl>
+                                    <Textarea 
+                                      placeholder="Specify what learners need to do to earn this badge..."
+                                      {...field}
+                                      data-testid="textarea-edit-badge-criteria"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={editBadgeForm.control}
+                              name="color"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Badge Color</FormLabel>
+                                  <FormControl>
+                                    <div className="flex items-center space-x-3">
+                                      <input
+                                        type="color"
+                                        {...field}
+                                        className="w-12 h-8 rounded border cursor-pointer"
+                                        data-testid="input-edit-badge-color"
+                                      />
+                                      <span className="text-sm text-muted-foreground">
+                                        Choose a color for your badge
+                                      </span>
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={editBadgeForm.control}
+                              name="iconKey"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Badge Icon (Optional)</FormLabel>
+                                  <FormDescription>
+                                    Upload a custom icon for your badge. Supports JPG, PNG, WebP files.
+                                  </FormDescription>
+                                  <FormControl>
+                                    <div className="space-y-3">
+                                      <div className="flex items-center space-x-3">
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            
+                                            try {
+                                              // Get upload URL from backend
+                                              const uploadResponse = await fetch('/api/objects/badges/upload', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                  filename: file.name,
+                                                  badgeId: editingBadge?.id || 'temp-' + Date.now()
+                                                })
+                                              });
+                                              
+                                              if (!uploadResponse.ok) throw new Error('Upload URL failed');
+                                              
+                                              const { uploadURL, iconKey, objectPath } = await uploadResponse.json();
+                                              
+                                              // Upload file to storage
+                                              const fileUpload = await fetch(uploadURL, {
+                                                method: 'PUT',
+                                                body: file,
+                                                headers: {
+                                                  'Content-Type': file.type,
+                                                },
+                                              });
+                                              
+                                              if (!fileUpload.ok) throw new Error('File upload failed');
+                                              
+                                              // Update form with both iconKey and iconUrl
+                                              field.onChange(iconKey);
+                                              const iconUrl = `/objects${objectPath}`;
+                                              editBadgeForm.setValue('iconUrl', iconUrl);
+                                              
+                                              toast({
+                                                title: "Icon Uploaded",
+                                                description: "Badge icon uploaded successfully.",
+                                              });
+                                            } catch (error) {
+                                              console.error('Icon upload failed:', error);
+                                              toast({
+                                                title: "Upload Failed",
+                                                description: "Failed to upload badge icon. Please try again.",
+                                                variant: "destructive",
+                                              });
+                                            }
+                                          }}
+                                          className="text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/80"
+                                          data-testid="input-edit-badge-icon"
+                                        />
+                                        {field.value && editBadgeForm.watch('iconUrl') && (
+                                          <div className="flex items-center space-x-2 text-sm text-green-600">
+                                            <Upload className="w-4 h-4" />
+                                            <span>Icon uploaded</span>
+                                            <img 
+                                              src={editBadgeForm.watch('iconUrl')} 
+                                              alt="Badge preview" 
+                                              className="w-6 h-6 rounded object-cover border"
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                      {field.value && (
+                                        <div className="p-2 bg-muted rounded flex items-center justify-between">
+                                          <span className="text-sm text-muted-foreground">{field.value}</span>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              field.onChange("");
+                                              editBadgeForm.setValue('iconUrl', '');
+                                            }}
+                                            className="text-destructive hover:text-destructive"
+                                            data-testid="button-remove-edit-badge-icon"
+                                          >
+                                            <X className="w-4 h-4" />
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="flex justify-end space-x-2">
+                              <Button 
+                                type="button" 
+                                variant="outline" 
+                                onClick={() => {
+                                  setIsEditBadgeOpen(false);
+                                  setEditingBadge(null);
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                              <Button type="submit" disabled={editBadgeMutation.isPending} data-testid="button-submit-edit-badge">
+                                {editBadgeMutation.isPending ? (
+                                  <>
+                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                    Updating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Pen className="w-4 h-4 mr-2" />
+                                    Update Badge
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </form>
+                        </Form>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -5989,6 +6259,17 @@ export default function Learning() {
                               <div className="flex-1">
                                 <CardTitle className="text-lg">{badge.name}</CardTitle>
                               </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingBadge(badge);
+                                  setIsEditBadgeOpen(true);
+                                }}
+                                data-testid={`button-edit-badge-${badge.id}`}
+                              >
+                                <Pen className="w-4 h-4" />
+                              </Button>
                             </div>
                           </CardHeader>
                           <CardContent className="space-y-3">

@@ -2099,6 +2099,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/lms/admin/badges/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { courseIds, ...badgeData } = req.body;
+      const validatedBadgeData = insertBadgeSchema.partial().parse(badgeData);
+      
+      // Validate courseIds
+      const validatedCourseIds = z.array(z.string()).optional().parse(courseIds);
+      
+      // Update badge with optional course requirements
+      const badge = await storage.updateBadge(id, validatedBadgeData, validatedCourseIds);
+      res.json(badge);
+    } catch (error: any) {
+      return handleValidationError(error, res, "update badge");
+    }
+  });
+
   app.delete('/api/lms/admin/courses/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
     try {
       const { id } = req.params;

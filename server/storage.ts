@@ -242,6 +242,7 @@ export interface IStorage {
   getCertificate(certificateId: string): Promise<Certificate | undefined>;
   
   createBadge(badge: InsertBadge, courseIds?: string[]): Promise<Badge>;
+  updateBadge(badgeId: string, badge: Partial<InsertBadge>, courseIds?: string[]): Promise<Badge>;
   getBadges(): Promise<Badge[]>;
   getBadgeCourseRequirements(badgeId: string): Promise<string[]>;
   checkBadgeEligibility(userId: string, badgeId: string): Promise<boolean>;
@@ -1740,6 +1741,26 @@ export class DatabaseStorage implements IStorage {
     }
     
     return created;
+  }
+
+  async updateBadge(badgeId: string, badge: Partial<InsertBadge>, courseIds?: string[]): Promise<Badge> {
+    const [updated] = await db.update(badges).set(badge).where(eq(badges.id, badgeId)).returning();
+    
+    if (courseIds !== undefined) {
+      // Remove existing course requirements
+      await db.delete(badgeCourseRequirements).where(eq(badgeCourseRequirements.badgeId, badgeId));
+      
+      // Add new course requirements
+      if (courseIds.length > 0) {
+        const requirements = courseIds.map(courseId => ({
+          badgeId: badgeId,
+          courseId: courseId
+        }));
+        await db.insert(badgeCourseRequirements).values(requirements);
+      }
+    }
+    
+    return updated;
   }
 
   async getBadges(): Promise<Badge[]> {
