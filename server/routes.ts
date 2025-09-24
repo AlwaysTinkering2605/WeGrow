@@ -36,6 +36,12 @@ import {
   insertLearningPathStepSchema,
   insertLearningPathEnrollmentSchema,
   insertLearningPathStepProgressSchema,
+  // Enhanced Competency Library schemas
+  insertCompetencyLibrarySchema,
+  insertRoleCompetencyMappingSchema,
+  insertTrainingMatrixRecordSchema,
+  insertCompetencyStatusHistorySchema,
+  insertCompetencyEvidenceRecordSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -936,6 +942,409 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(500).json({ message: "Failed to create competency assessment" });
+    }
+  });
+
+  // Enhanced Competency Library - Hierarchical Competency Management
+  app.get('/api/competency-library', isAuthenticated, async (req, res) => {
+    try {
+      const competencies = await storage.getCompetencyLibrary();
+      res.json(competencies);
+    } catch (error) {
+      console.error("Error fetching competency library:", error);
+      res.status(500).json({ message: "Failed to fetch competency library" });
+    }
+  });
+
+  app.get('/api/competency-library/hierarchical', isAuthenticated, async (req, res) => {
+    try {
+      const parentId = req.query.parentId as string | undefined;
+      const competencies = await storage.getHierarchicalCompetencies(parentId);
+      res.json(competencies);
+    } catch (error) {
+      console.error("Error fetching hierarchical competencies:", error);
+      res.status(500).json({ message: "Failed to fetch hierarchical competencies" });
+    }
+  });
+
+  app.get('/api/competency-library/:id', isAuthenticated, async (req, res) => {
+    try {
+      const competency = await storage.getCompetencyLibraryItem(req.params.id);
+      if (!competency) {
+        return res.status(404).json({ message: "Competency not found" });
+      }
+      res.json(competency);
+    } catch (error) {
+      console.error("Error fetching competency:", error);
+      res.status(500).json({ message: "Failed to fetch competency" });
+    }
+  });
+
+  app.get('/api/competency-library/:id/children', isAuthenticated, async (req, res) => {
+    try {
+      const children = await storage.getCompetencyChildren(req.params.id);
+      res.json(children);
+    } catch (error) {
+      console.error("Error fetching competency children:", error);
+      res.status(500).json({ message: "Failed to fetch competency children" });
+    }
+  });
+
+  app.post('/api/competency-library', isAuthenticated, requireLeadership(), async (req: any, res) => {
+    try {
+      const competencyData = insertCompetencyLibrarySchema.parse(req.body);
+      const competency = await storage.createCompetencyLibraryItem(competencyData);
+      res.json(competency);
+    } catch (error: any) {
+      console.error("Error creating competency:", error);
+      
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid data provided", 
+          errors: error.errors 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to create competency" });
+    }
+  });
+
+  app.put('/api/competency-library/:id', isAuthenticated, requireLeadership(), async (req, res) => {
+    try {
+      const updates = insertCompetencyLibrarySchema.partial().parse(req.body);
+      const competency = await storage.updateCompetencyLibraryItem(req.params.id, updates);
+      res.json(competency);
+    } catch (error: any) {
+      console.error("Error updating competency:", error);
+      
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid data provided", 
+          errors: error.errors 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to update competency" });
+    }
+  });
+
+  app.delete('/api/competency-library/:id', isAuthenticated, requireLeadership(), async (req, res) => {
+    try {
+      await storage.deleteCompetencyLibraryItem(req.params.id);
+      res.json({ message: "Competency deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting competency:", error);
+      res.status(500).json({ message: "Failed to delete competency" });
+    }
+  });
+
+  // Role Competency Mapping - Team Filtering and Priority Management
+  app.get('/api/role-competency-mappings', isAuthenticated, async (req, res) => {
+    try {
+      const role = req.query.role as string | undefined;
+      const teamId = req.query.teamId as string | undefined;
+      const mappings = await storage.getRoleCompetencyMappings(role, teamId);
+      res.json(mappings);
+    } catch (error) {
+      console.error("Error fetching role competency mappings:", error);
+      res.status(500).json({ message: "Failed to fetch role competency mappings" });
+    }
+  });
+
+  app.get('/api/role-competency-mappings/:id', isAuthenticated, async (req, res) => {
+    try {
+      const mapping = await storage.getRoleCompetencyMapping(req.params.id);
+      if (!mapping) {
+        return res.status(404).json({ message: "Role competency mapping not found" });
+      }
+      res.json(mapping);
+    } catch (error) {
+      console.error("Error fetching role competency mapping:", error);
+      res.status(500).json({ message: "Failed to fetch role competency mapping" });
+    }
+  });
+
+  app.post('/api/role-competency-mappings', isAuthenticated, requireLeadership(), async (req: any, res) => {
+    try {
+      const mappingData = insertRoleCompetencyMappingSchema.parse(req.body);
+      const mapping = await storage.createRoleCompetencyMapping(mappingData);
+      res.json(mapping);
+    } catch (error: any) {
+      console.error("Error creating role competency mapping:", error);
+      
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid data provided", 
+          errors: error.errors 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to create role competency mapping" });
+    }
+  });
+
+  app.put('/api/role-competency-mappings/:id', isAuthenticated, requireLeadership(), async (req, res) => {
+    try {
+      const updates = insertRoleCompetencyMappingSchema.partial().parse(req.body);
+      const mapping = await storage.updateRoleCompetencyMapping(req.params.id, updates);
+      res.json(mapping);
+    } catch (error: any) {
+      console.error("Error updating role competency mapping:", error);
+      
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid data provided", 
+          errors: error.errors 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to update role competency mapping" });
+    }
+  });
+
+  app.delete('/api/role-competency-mappings/:id', isAuthenticated, requireLeadership(), async (req, res) => {
+    try {
+      await storage.deleteRoleCompetencyMapping(req.params.id);
+      res.json({ message: "Role competency mapping deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting role competency mapping:", error);
+      res.status(500).json({ message: "Failed to delete role competency mapping" });
+    }
+  });
+
+  app.get('/api/users/:userId/required-competencies', isAuthenticated, async (req, res) => {
+    try {
+      const competencies = await storage.getRequiredCompetenciesForUser(req.params.userId);
+      res.json(competencies);
+    } catch (error) {
+      console.error("Error fetching required competencies for user:", error);
+      res.status(500).json({ message: "Failed to fetch required competencies for user" });
+    }
+  });
+
+  // Competency Audit Trail - ISO 9001:2015 Compliance
+  app.get('/api/competency-status-history/:userId', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const competencyLibraryId = req.query.competencyLibraryId as string | undefined;
+      const history = await storage.getCompetencyStatusHistory(userId, competencyLibraryId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching competency status history:", error);
+      res.status(500).json({ message: "Failed to fetch competency status history" });
+    }
+  });
+
+  app.post('/api/competency-status-history', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const historyData = insertCompetencyStatusHistorySchema.parse({ ...req.body, userId: currentUserId });
+      const history = await storage.createCompetencyStatusHistory(historyData);
+      res.json(history);
+    } catch (error: any) {
+      console.error("Error creating competency status history:", error);
+      
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid data provided", 
+          errors: error.errors 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to create competency status history" });
+    }
+  });
+
+  app.get('/api/competency-evidence/:userId', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const competencyLibraryId = req.query.competencyLibraryId as string | undefined;
+      const evidence = await storage.getCompetencyEvidenceRecords(userId, competencyLibraryId);
+      res.json(evidence);
+    } catch (error) {
+      console.error("Error fetching competency evidence records:", error);
+      res.status(500).json({ message: "Failed to fetch competency evidence records" });
+    }
+  });
+
+  app.get('/api/competency-evidence/record/:id', isAuthenticated, async (req, res) => {
+    try {
+      const record = await storage.getCompetencyEvidenceRecord(req.params.id);
+      if (!record) {
+        return res.status(404).json({ message: "Evidence record not found" });
+      }
+      res.json(record);
+    } catch (error) {
+      console.error("Error fetching evidence record:", error);
+      res.status(500).json({ message: "Failed to fetch evidence record" });
+    }
+  });
+
+  app.post('/api/competency-evidence', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const evidenceData = insertCompetencyEvidenceRecordSchema.parse({ ...req.body, userId: currentUserId });
+      const evidence = await storage.createCompetencyEvidenceRecord(evidenceData);
+      res.json(evidence);
+    } catch (error: any) {
+      console.error("Error creating competency evidence:", error);
+      
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid data provided", 
+          errors: error.errors 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to create competency evidence" });
+    }
+  });
+
+  app.put('/api/competency-evidence/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      
+      // Check ownership or supervisor/leadership permission
+      const existingEvidence = await storage.getCompetencyEvidenceRecord(req.params.id);
+      if (!existingEvidence) {
+        return res.status(404).json({ message: "Evidence record not found" });
+      }
+      
+      if (existingEvidence.userId !== currentUserId && !['supervisor', 'leadership'].includes(currentUser?.role || '')) {
+        return res.status(403).json({ message: "Can only update your own evidence records" });
+      }
+      
+      const updates = insertCompetencyEvidenceRecordSchema.partial().parse(req.body);
+      const evidence = await storage.updateCompetencyEvidenceRecord(req.params.id, updates);
+      res.json(evidence);
+    } catch (error: any) {
+      console.error("Error updating competency evidence:", error);
+      
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid data provided", 
+          errors: error.errors 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to update competency evidence" });
+    }
+  });
+
+  app.post('/api/competency-evidence/:id/verify', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const verifierId = req.user.claims.sub;
+      const { notes } = req.body;
+      const evidence = await storage.verifyCompetencyEvidence(req.params.id, verifierId, notes);
+      res.json(evidence);
+    } catch (error) {
+      console.error("Error verifying competency evidence:", error);
+      res.status(500).json({ message: "Failed to verify competency evidence" });
+    }
+  });
+
+  // Training Matrix and Compliance Reporting
+  app.get('/api/training-matrix', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.query.userId as string | undefined;
+      const competencyLibraryId = req.query.competencyLibraryId as string | undefined;
+      const records = await storage.getTrainingMatrixRecords(userId, competencyLibraryId);
+      res.json(records);
+    } catch (error) {
+      console.error("Error fetching training matrix records:", error);
+      res.status(500).json({ message: "Failed to fetch training matrix records" });
+    }
+  });
+
+  app.get('/api/training-matrix/:id', isAuthenticated, async (req, res) => {
+    try {
+      const record = await storage.getTrainingMatrixRecord(req.params.id);
+      if (!record) {
+        return res.status(404).json({ message: "Training matrix record not found" });
+      }
+      res.json(record);
+    } catch (error) {
+      console.error("Error fetching training matrix record:", error);
+      res.status(500).json({ message: "Failed to fetch training matrix record" });
+    }
+  });
+
+  app.post('/api/training-matrix', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const recordData = insertTrainingMatrixRecordSchema.parse({ ...req.body, updatedBy: currentUserId });
+      const record = await storage.createTrainingMatrixRecord(recordData);
+      res.json(record);
+    } catch (error: any) {
+      console.error("Error creating training matrix record:", error);
+      
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid data provided", 
+          errors: error.errors 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to create training matrix record" });
+    }
+  });
+
+  app.put('/api/training-matrix/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const updates = insertTrainingMatrixRecordSchema.partial().parse(req.body);
+      const record = await storage.updateTrainingMatrixRecord(req.params.id, updates);
+      res.json(record);
+    } catch (error: any) {
+      console.error("Error updating training matrix record:", error);
+      
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid data provided", 
+          errors: error.errors 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to update training matrix record" });
+    }
+  });
+
+  app.put('/api/competency-status/:userId/:competencyLibraryId', isAuthenticated, async (req, res) => {
+    try {
+      const { userId, competencyLibraryId } = req.params;
+      const { status, evidenceData } = req.body;
+      const record = await storage.updateCompetencyStatus(userId, competencyLibraryId, status, evidenceData);
+      res.json(record);
+    } catch (error) {
+      console.error("Error updating competency status:", error);
+      res.status(500).json({ message: "Failed to update competency status" });
+    }
+  });
+
+  app.get('/api/compliance-report', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const filters = {
+        role: req.query.role as string | undefined,
+        teamId: req.query.teamId as string | undefined,
+        competencyId: req.query.competencyId as string | undefined,
+        status: req.query.status as string | undefined
+      };
+      const report = await storage.getComplianceReport(filters);
+      res.json(report);
+    } catch (error) {
+      console.error("Error generating compliance report:", error);
+      res.status(500).json({ message: "Failed to generate compliance report" });
+    }
+  });
+
+  app.get('/api/competency-gap-analysis', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const userId = req.query.userId as string | undefined;
+      const analysis = await storage.getCompetencyGapAnalysis(userId);
+      res.json(analysis);
+    } catch (error) {
+      console.error("Error performing competency gap analysis:", error);
+      res.status(500).json({ message: "Failed to perform competency gap analysis" });
     }
   });
 

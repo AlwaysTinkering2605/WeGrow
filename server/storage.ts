@@ -39,6 +39,9 @@ import {
   competencyLibrary,
   roleCompetencyMappings,
   trainingMatrixRecords,
+  competencyStatusHistory,
+  competencyEvidenceRecords,
+  automationRules,
   type User,
   type UpsertUser,
   type CompanyObjective,
@@ -77,6 +80,9 @@ import {
   type CompetencyLibraryItem,
   type RoleCompetencyMapping,
   type TrainingMatrixRecord,
+  type CompetencyStatusHistory,
+  type CompetencyEvidenceRecord,
+  type AutomationRule,
   type InsertCompanyObjective,
   type InsertTeamObjective,
   type InsertTeamKeyResult,
@@ -110,6 +116,9 @@ import {
   type InsertCompetencyLibraryItem,
   type InsertRoleCompetencyMapping,
   type InsertTrainingMatrixRecord,
+  type InsertCompetencyStatusHistory,
+  type InsertCompetencyEvidenceRecord,
+  type InsertAutomationRule,
   insertTeamSchema,
   updateUserProfileSchema,
 } from "@shared/schema";
@@ -395,6 +404,17 @@ export interface IStorage {
   deactivateAutomationRule(ruleId: string): Promise<AutomationRule>;
   executeAutomationRule(ruleId: string, triggerData?: any): Promise<{ executed: boolean; enrollments: number; errors?: string[] }>;
   executeAutomationRulesForUser(userId: string, triggerEvent: string): Promise<{ totalRules: number; executed: number; enrollments: number }>;
+
+  // Competency Audit Trail - ISO 9001:2015 Compliance
+  getCompetencyStatusHistory(userId: string, competencyLibraryId?: string): Promise<CompetencyStatusHistory[]>;
+  createCompetencyStatusHistory(history: InsertCompetencyStatusHistory): Promise<CompetencyStatusHistory>;
+  getCompetencyEvidenceRecords(userId: string, competencyLibraryId?: string): Promise<CompetencyEvidenceRecord[]>;
+  getCompetencyEvidenceRecord(recordId: string): Promise<CompetencyEvidenceRecord | undefined>;
+  createCompetencyEvidenceRecord(evidence: InsertCompetencyEvidenceRecord): Promise<CompetencyEvidenceRecord>;
+  updateCompetencyEvidenceRecord(recordId: string, updates: Partial<InsertCompetencyEvidenceRecord>): Promise<CompetencyEvidenceRecord>;
+  verifyCompetencyEvidence(recordId: string, verifierId: string, notes?: string): Promise<CompetencyEvidenceRecord>;
+  getHierarchicalCompetencies(parentId?: string): Promise<CompetencyLibraryItem[]>;
+  getCompetencyChildren(parentId: string): Promise<CompetencyLibraryItem[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3417,7 +3437,7 @@ export class DatabaseStorage implements IStorage {
       };
     } else {
       // Organization-wide gap analysis
-      const allUsers = await this.getUsers();
+      const allUsers = await this.getAllUsers();
       const overallGaps = [];
       
       for (const user of allUsers) {
@@ -3512,6 +3532,90 @@ export class DatabaseStorage implements IStorage {
 
   async executeAutomationRulesForUser(userId: string, triggerEvent: string): Promise<{ totalRules: number; executed: number; enrollments: number }> {
     throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+  }
+
+  // Competency Audit Trail - ISO 9001:2015 Compliance Implementation
+  async getCompetencyStatusHistory(userId: string, competencyLibraryId?: string): Promise<CompetencyStatusHistory[]> {
+    const query = db.select().from(competencyStatusHistory)
+      .where(eq(competencyStatusHistory.userId, userId));
+    
+    if (competencyLibraryId) {
+      return await query.where(eq(competencyStatusHistory.competencyLibraryId, competencyLibraryId))
+        .orderBy(desc(competencyStatusHistory.changedAt));
+    }
+    
+    return await query.orderBy(desc(competencyStatusHistory.changedAt));
+  }
+
+  async createCompetencyStatusHistory(history: InsertCompetencyStatusHistory): Promise<CompetencyStatusHistory> {
+    const [record] = await db.insert(competencyStatusHistory)
+      .values(history)
+      .returning();
+    return record;
+  }
+
+  async getCompetencyEvidenceRecords(userId: string, competencyLibraryId?: string): Promise<CompetencyEvidenceRecord[]> {
+    const query = db.select().from(competencyEvidenceRecords)
+      .where(eq(competencyEvidenceRecords.userId, userId));
+    
+    if (competencyLibraryId) {
+      return await query.where(eq(competencyEvidenceRecords.competencyLibraryId, competencyLibraryId))
+        .orderBy(desc(competencyEvidenceRecords.uploadedAt));
+    }
+    
+    return await query.orderBy(desc(competencyEvidenceRecords.uploadedAt));
+  }
+
+  async getCompetencyEvidenceRecord(recordId: string): Promise<CompetencyEvidenceRecord | undefined> {
+    const [record] = await db.select().from(competencyEvidenceRecords)
+      .where(eq(competencyEvidenceRecords.id, recordId));
+    return record;
+  }
+
+  async createCompetencyEvidenceRecord(evidence: InsertCompetencyEvidenceRecord): Promise<CompetencyEvidenceRecord> {
+    const [record] = await db.insert(competencyEvidenceRecords)
+      .values(evidence)
+      .returning();
+    return record;
+  }
+
+  async updateCompetencyEvidenceRecord(recordId: string, updates: Partial<InsertCompetencyEvidenceRecord>): Promise<CompetencyEvidenceRecord> {
+    const [record] = await db.update(competencyEvidenceRecords)
+      .set(updates)
+      .where(eq(competencyEvidenceRecords.id, recordId))
+      .returning();
+    return record;
+  }
+
+  async verifyCompetencyEvidence(recordId: string, verifierId: string, notes?: string): Promise<CompetencyEvidenceRecord> {
+    const [record] = await db.update(competencyEvidenceRecords)
+      .set({
+        isVerified: true,
+        verifiedBy: verifierId,
+        verificationNotes: notes,
+        verifiedAt: new Date()
+      })
+      .where(eq(competencyEvidenceRecords.id, recordId))
+      .returning();
+    return record;
+  }
+
+  async getHierarchicalCompetencies(parentId?: string): Promise<CompetencyLibraryItem[]> {
+    if (parentId) {
+      return await db.select().from(competencyLibrary)
+        .where(eq(competencyLibrary.parentCompetencyLibraryId, parentId))
+        .orderBy(asc(competencyLibrary.sortOrder));
+    } else {
+      return await db.select().from(competencyLibrary)
+        .where(isNull(competencyLibrary.parentCompetencyLibraryId))
+        .orderBy(asc(competencyLibrary.sortOrder));
+    }
+  }
+
+  async getCompetencyChildren(parentId: string): Promise<CompetencyLibraryItem[]> {
+    return await db.select().from(competencyLibrary)
+      .where(eq(competencyLibrary.parentCompetencyLibraryId, parentId))
+      .orderBy(asc(competencyLibrary.sortOrder));
   }
 }
 
