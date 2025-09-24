@@ -47,6 +47,11 @@ export const completionMethodEnum = pgEnum("completion_method", ["manual", "quiz
 export const questionTypeEnum = pgEnum("question_type", ["multiple_choice", "true_false", "multi_select"]);
 export const trainingStatusEnum = pgEnum("training_status", ["in_progress", "completed", "on_hold"]);
 
+// Phase 2: Gamification enums
+export const badgeTypeEnum = pgEnum("badge_type", ["completion", "streak", "performance", "participation", "milestone"]);
+export const achievementTypeEnum = pgEnum("achievement_type", ["course_completion", "learning_path_completion", "quiz_mastery", "streak", "engagement", "leadership"]);
+export const pointTransactionTypeEnum = pgEnum("point_transaction_type", ["earned", "bonus", "deducted", "reset"]);
+
 // Teams table - formal team structure
 export const teams = pgTable("teams", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -429,37 +434,6 @@ export const certificates = pgTable("certificates", {
   uniqueCertificateNumber: uniqueIndex("ux_cert_number").on(table.certificateNumber),
 }));
 
-// Badges
-export const badges = pgTable("badges", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: varchar("name").notNull(),
-  description: text("description"),
-  iconKey: varchar("icon_key"), // Object storage key for the badge icon
-  iconUrl: varchar("icon_url"), // Public URL for the badge icon
-  criteria: text("criteria"), // How to earn this badge
-  color: varchar("color").default('#3b82f6'), // Badge color for display
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// User badges
-export const userBadges = pgTable("user_badges", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull(),
-  badgeId: varchar("badge_id").notNull(),
-  awardedAt: timestamp("awarded_at").defaultNow(),
-  awardedBy: varchar("awarded_by"), // System or user ID
-  reason: text("reason"),
-  courseVersionId: varchar("course_version_id"), // If earned from course completion
-});
-
-// Badge course requirements - defines which courses are needed to earn a badge
-export const badgeCourseRequirements = pgTable("badge_course_requirements", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  badgeId: varchar("badge_id").notNull(),
-  courseId: varchar("course_id").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
 
 // Training requirements - maps roles to required courses
 export const trainingRequirements = pgTable("training_requirements", {
@@ -1105,6 +1079,195 @@ export const competencyEvidenceRecordsRelations = relations(competencyEvidenceRe
   }),
 }));
 
+// Phase 2: Gamification Tables
+
+// Badges available in the system
+export const badges = pgTable("badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description").notNull(),
+  imageUrl: varchar("image_url"),
+  badgeType: badgeTypeEnum("badge_type").notNull(),
+  criteria: jsonb("criteria"), // JSON describing earning criteria
+  pointsRequired: integer("points_required"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("badges_type_idx").on(table.badgeType),
+  index("badges_active_idx").on(table.isActive),
+]);
+
+// Badges earned by users
+export const userBadges = pgTable("user_badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  badgeId: varchar("badge_id").notNull(),
+  awardedAt: timestamp("awarded_at").defaultNow(),
+  awardedBy: varchar("awarded_by"), // System or user who awarded
+  description: text("description"), // Why this was awarded
+  metadata: jsonb("metadata"), // Additional data about earning
+}, (table) => [
+  foreignKey({
+    columns: [table.userId],
+    foreignColumns: [users.id],
+    name: "user_badges_user_fk"
+  }),
+  foreignKey({
+    columns: [table.badgeId],
+    foreignColumns: [badges.id],
+    name: "user_badges_badge_fk"
+  }),
+  unique("user_badge_unique").on(table.userId, table.badgeId),
+  index("user_badges_user_idx").on(table.userId),
+  index("user_badges_awarded_idx").on(table.awardedAt),
+]);
+
+// User points tracking
+export const userPoints = pgTable("user_points", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  totalPoints: integer("total_points").default(0).notNull(),
+  currentLevel: integer("current_level").default(1).notNull(),
+  pointsToNextLevel: integer("points_to_next_level").default(100).notNull(),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.userId],
+    foreignColumns: [users.id],
+    name: "user_points_user_fk"
+  }),
+  index("user_points_total_idx").on(table.totalPoints),
+  index("user_points_level_idx").on(table.currentLevel),
+  index("user_points_leaderboard_idx").on(sql`total_points DESC`),
+]);
+
+// Point transaction history
+export const pointTransactions = pgTable("point_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  points: integer("points").notNull(),
+  transactionType: pointTransactionTypeEnum("transaction_type").notNull(),
+  reason: varchar("reason").notNull(),
+  description: text("description"),
+  relatedEntityType: varchar("related_entity_type"), // "course", "quiz", "path", etc.
+  relatedEntityId: varchar("related_entity_id"),
+  awardedBy: varchar("awarded_by"), // System or user
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.userId],
+    foreignColumns: [users.id],
+    name: "point_transactions_user_fk"
+  }),
+  index("point_transactions_user_idx").on(table.userId),
+  index("point_transactions_type_idx").on(table.transactionType),
+  index("point_transactions_date_idx").on(table.createdAt),
+]);
+
+// System achievements available
+export const achievements = pgTable("achievements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description").notNull(),
+  imageUrl: varchar("image_url"),
+  achievementType: achievementTypeEnum("achievement_type").notNull(),
+  criteria: jsonb("criteria"), // JSON describing earning criteria
+  pointsAwarded: integer("points_awarded").default(0),
+  badgeId: varchar("badge_id"), // Optional badge awarded with achievement
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.badgeId],
+    foreignColumns: [badges.id],
+    name: "achievements_badge_fk"
+  }),
+  index("achievements_type_idx").on(table.achievementType),
+  index("achievements_active_idx").on(table.isActive),
+]);
+
+// Achievements earned by users
+export const userAchievements = pgTable("user_achievements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  achievementId: varchar("achievement_id").notNull(),
+  progress: integer("progress").default(0), // For achievements with progress tracking
+  maxProgress: integer("max_progress").default(1), // Total needed for completion
+  isCompleted: boolean("is_completed").default(false),
+  completedAt: timestamp("completed_at"),
+  metadata: jsonb("metadata"), // Achievement-specific data
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.userId],
+    foreignColumns: [users.id],
+    name: "user_achievements_user_fk"
+  }),
+  foreignKey({
+    columns: [table.achievementId],
+    foreignColumns: [achievements.id],
+    name: "user_achievements_achievement_fk"
+  }),
+  unique("user_achievement_unique").on(table.userId, table.achievementId),
+  index("user_achievements_user_idx").on(table.userId),
+  index("user_achievements_completed_idx").on(table.isCompleted),
+]);
+
+// Gamification Relations
+export const badgesRelations = relations(badges, ({ many }) => ({
+  userBadges: many(userBadges),
+  achievements: many(achievements),
+}));
+
+export const userBadgesRelations = relations(userBadges, ({ one }) => ({
+  user: one(users, {
+    fields: [userBadges.userId],
+    references: [users.id],
+  }),
+  badge: one(badges, {
+    fields: [userBadges.badgeId],
+    references: [badges.id],
+  }),
+}));
+
+export const userPointsRelations = relations(userPoints, ({ one, many }) => ({
+  user: one(users, {
+    fields: [userPoints.userId],
+    references: [users.id],
+  }),
+  transactions: many(pointTransactions),
+}));
+
+export const pointTransactionsRelations = relations(pointTransactions, ({ one }) => ({
+  user: one(users, {
+    fields: [pointTransactions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const achievementsRelations = relations(achievements, ({ one, many }) => ({
+  badge: one(badges, {
+    fields: [achievements.badgeId],
+    references: [badges.id],
+  }),
+  userAchievements: many(userAchievements),
+}));
+
+export const userAchievementsRelations = relations(userAchievements, ({ one }) => ({
+  user: one(users, {
+    fields: [userAchievements.userId],
+    references: [users.id],
+  }),
+  achievement: one(achievements, {
+    fields: [userAchievements.achievementId],
+    references: [achievements.id],
+  }),
+}));
+
 // Insert schemas
 export const insertTeamSchema = createInsertSchema(teams).omit({
   id: true,
@@ -1310,20 +1473,6 @@ export const insertCertificateSchema = createInsertSchema(certificates).omit({
   issuedAt: true,
 });
 
-export const insertBadgeSchema = createInsertSchema(badges).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertBadgeCourseRequirementSchema = createInsertSchema(badgeCourseRequirements).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertUserBadgeSchema = createInsertSchema(userBadges).omit({
-  id: true,
-  awardedAt: true,
-});
 
 export const insertTrainingRequirementSchema = createInsertSchema(trainingRequirements).omit({
   id: true,
@@ -1403,6 +1552,40 @@ export const insertCompetencyEvidenceRecordSchema = createInsertSchema(competenc
   uploadedAt: true,
 });
 
+// Phase 2: Gamification Insert Schemas
+export const insertBadgeSchema = createInsertSchema(badges).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertUserBadgeSchema = createInsertSchema(userBadges).omit({
+  id: true,
+  awardedAt: true,
+});
+
+export const insertUserPointsSchema = createInsertSchema(userPoints).omit({
+  id: true,
+  lastUpdated: true,
+});
+
+export const insertPointTransactionSchema = createInsertSchema(pointTransactions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAchievementSchema = createInsertSchema(achievements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertUserAchievementSchema = createInsertSchema(userAchievements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -1460,7 +1643,6 @@ export type InsertQuizAttempt = z.infer<typeof insertQuizAttemptSchema>;
 export type InsertTrainingRecord = z.infer<typeof insertTrainingRecordSchema>;
 export type InsertCertificate = z.infer<typeof insertCertificateSchema>;
 export type InsertBadge = z.infer<typeof insertBadgeSchema>;
-export type InsertBadgeCourseRequirement = z.infer<typeof insertBadgeCourseRequirementSchema>;
 export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
 export type InsertTrainingRequirement = z.infer<typeof insertTrainingRequirementSchema>;
 export type InsertPdpCourseLink = z.infer<typeof insertPdpCourseLinkSchema>;

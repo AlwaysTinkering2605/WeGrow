@@ -27,8 +27,12 @@ import {
   certificates,
   badges,
   userBadges,
-  badgeCourseRequirements,
   trainingRequirements,
+  // Phase 2: Gamification tables
+  userPoints,
+  pointTransactions,
+  achievements,
+  userAchievements,
   pdpCourseLinks,
   // Learning path tables
   learningPaths,
@@ -70,6 +74,16 @@ import {
   type Badge,
   type UserBadge,
   type TrainingRequirement,
+  // Phase 2: Gamification types
+  type UserPoints,
+  type PointTransaction,
+  type Achievement,
+  type UserAchievement,
+  // Gamification insert types
+  type InsertUserPoints,
+  type InsertPointTransaction,
+  type InsertAchievement,
+  type InsertUserAchievement,
   type PdpCourseLink,
   // Learning path types
   type LearningPath,
@@ -450,6 +464,34 @@ export interface IStorage {
   getAuditTrail(filters?: EnhancedAuditTrailFilter): Promise<AuditTrailRecord[]>;
   exportAuditTrail(format: 'csv' | 'json', filters?: EnhancedAuditTrailFilter): Promise<string>;
   generateComplianceReport(config: ComplianceReportConfig): Promise<ComplianceReport>;
+
+  // Phase 2: Gamification Methods
+  
+  // Points System
+  getUserPoints(userId: string): Promise<UserPoints | undefined>;
+  awardPoints(userId: string, points: number, reason: string, entityType?: string, entityId?: string): Promise<UserPoints>;
+  getPointTransactions(userId: string, limit?: number): Promise<PointTransaction[]>;
+  getLeaderboard(limit?: number): Promise<Array<{user: User; points: UserPoints}>>;
+  
+  // Badge System
+  getAllBadges(): Promise<Badge[]>;
+  getBadge(badgeId: string): Promise<Badge | undefined>;
+  createBadge(badge: InsertBadge): Promise<Badge>;
+  getUserBadges(userId: string): Promise<Array<{userBadge: UserBadge; badge: Badge}>>;
+  awardBadge(userId: string, badgeId: string, reason?: string, awardedBy?: string): Promise<UserBadge>;
+  checkBadgeEligibility(userId: string, badgeId: string): Promise<boolean>;
+  
+  // Achievement System
+  getAllAchievements(): Promise<Achievement[]>;
+  getAchievement(achievementId: string): Promise<Achievement | undefined>;
+  createAchievement(achievement: InsertAchievement): Promise<Achievement>;
+  getUserAchievements(userId: string): Promise<Array<{userAchievement: UserAchievement; achievement: Achievement}>>;
+  progressAchievement(userId: string, achievementId: string, progress: number): Promise<UserAchievement>;
+  checkAchievementCompletion(userId: string, achievementId: string): Promise<UserAchievement | undefined>;
+  
+  // Gamification Analytics
+  getGamificationStats(userId: string): Promise<{totalPoints: number; badgeCount: number; achievementCount: number; level: number}>;
+  getSystemGamificationStats(): Promise<{totalUsers: number; totalPoints: number; totalBadges: number; totalAchievements: number}>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4667,6 +4709,246 @@ export class DatabaseStorage implements IStorage {
     };
     
     return report;
+  }
+
+  // Phase 2: Gamification Methods
+
+  // Points System
+  async getUserPoints(userId: string): Promise<UserPoints | undefined> {
+    const [userPointsRecord] = await db.select().from(userPoints).where(eq(userPoints.userId, userId));
+    return userPointsRecord;
+  }
+
+  async awardPoints(userId: string, points: number, reason: string, entityType?: string, entityId?: string): Promise<UserPoints> {
+    return await db.transaction(async (tx) => {
+      // Create point transaction
+      await tx.insert(pointTransactions).values({
+        userId,
+        points,
+        transactionType: 'earned',
+        reason,
+        relatedEntityType: entityType,
+        relatedEntityId: entityId,
+        awardedBy: 'system'
+      });
+
+      // Upsert user points atomically
+      const [result] = await tx
+        .insert(userPoints)
+        .values({
+          userId,
+          totalPoints: points,
+          currentLevel: Math.floor(points / 100) + 1,
+          pointsToNextLevel: Math.max(0, 100 - points)
+        })
+        .onConflictDoUpdate({
+          target: userPoints.userId,
+          set: {
+            totalPoints: sql`${userPoints.totalPoints} + ${points}`,
+            lastUpdated: new Date()
+          }
+        })
+        .returning();
+
+      // Recalculate level after update
+      const newLevel = Math.floor(result.totalPoints / 100) + 1;
+      const pointsToNext = Math.max(0, (newLevel * 100) - result.totalPoints);
+
+      // Update level and points to next level if needed
+      if (result.currentLevel !== newLevel || result.pointsToNextLevel !== pointsToNext) {
+        const [finalResult] = await tx
+          .update(userPoints)
+          .set({
+            currentLevel: newLevel,
+            pointsToNextLevel: pointsToNext
+          })
+          .where(eq(userPoints.userId, userId))
+          .returning();
+        
+        return finalResult;
+      }
+
+      return result;
+    });
+  }
+
+  async getPointTransactions(userId: string, limit = 50): Promise<PointTransaction[]> {
+    return await db.select().from(pointTransactions)
+      .where(eq(pointTransactions.userId, userId))
+      .orderBy(desc(pointTransactions.createdAt))
+      .limit(limit);
+  }
+
+  async getLeaderboard(limit = 10): Promise<Array<{user: User; points: UserPoints}>> {
+    const leaderboard = await db
+      .select()
+      .from(userPoints)
+      .innerJoin(users, eq(userPoints.userId, users.id))
+      .orderBy(desc(userPoints.totalPoints))
+      .limit(limit);
+
+    return leaderboard.map(row => ({
+      user: row.users,
+      points: row.user_points
+    }));
+  }
+
+  // Badge System
+  async getAllBadges(): Promise<Badge[]> {
+    return await db.select().from(badges).where(eq(badges.isActive, true));
+  }
+
+  async getBadge(badgeId: string): Promise<Badge | undefined> {
+    const [badge] = await db.select().from(badges).where(eq(badges.id, badgeId));
+    return badge;
+  }
+
+  async createBadge(badge: InsertBadge): Promise<Badge> {
+    const [newBadge] = await db.insert(badges).values(badge).returning();
+    return newBadge;
+  }
+
+  async getUserBadges(userId: string): Promise<Array<{userBadge: UserBadge; badge: Badge}>> {
+    const userBadgeList = await db
+      .select()
+      .from(userBadges)
+      .innerJoin(badges, eq(userBadges.badgeId, badges.id))
+      .where(eq(userBadges.userId, userId))
+      .orderBy(desc(userBadges.awardedAt));
+
+    return userBadgeList.map(row => ({
+      userBadge: row.user_badges,
+      badge: row.badges
+    }));
+  }
+
+  async awardBadge(userId: string, badgeId: string, reason?: string, awardedBy?: string): Promise<UserBadge> {
+    const [userBadge] = await db
+      .insert(userBadges)
+      .values({
+        userId,
+        badgeId,
+        description: reason,
+        awardedBy: awardedBy || 'system'
+      })
+      .onConflictDoNothing({
+        target: [userBadges.userId, userBadges.badgeId]
+      })
+      .returning();
+
+    // If no badge was inserted (already exists), return the existing one
+    if (!userBadge) {
+      const [existingBadge] = await db
+        .select()
+        .from(userBadges)
+        .where(and(eq(userBadges.userId, userId), eq(userBadges.badgeId, badgeId)));
+      
+      return existingBadge;
+    }
+
+    return userBadge;
+  }
+
+  async checkBadgeEligibility(userId: string, badgeId: string): Promise<boolean> {
+    // Stub implementation - always return false for now
+    return false;
+  }
+
+  // Achievement System
+  async getAllAchievements(): Promise<Achievement[]> {
+    return await db.select().from(achievements).where(eq(achievements.isActive, true));
+  }
+
+  async getAchievement(achievementId: string): Promise<Achievement | undefined> {
+    const [achievement] = await db.select().from(achievements).where(eq(achievements.id, achievementId));
+    return achievement;
+  }
+
+  async createAchievement(achievement: InsertAchievement): Promise<Achievement> {
+    const [newAchievement] = await db.insert(achievements).values(achievement).returning();
+    return newAchievement;
+  }
+
+  async getUserAchievements(userId: string): Promise<Array<{userAchievement: UserAchievement; achievement: Achievement}>> {
+    const userAchievementList = await db
+      .select()
+      .from(userAchievements)
+      .innerJoin(achievements, eq(userAchievements.achievementId, achievements.id))
+      .where(eq(userAchievements.userId, userId))
+      .orderBy(desc(userAchievements.updatedAt));
+
+    return userAchievementList.map(row => ({
+      userAchievement: row.user_achievements,
+      achievement: row.achievements
+    }));
+  }
+
+  async progressAchievement(userId: string, achievementId: string, progress: number): Promise<UserAchievement> {
+    return await db.transaction(async (tx) => {
+      // Upsert achievement progress with proper conflict handling
+      const [result] = await tx
+        .insert(userAchievements)
+        .values({
+          userId,
+          achievementId,
+          progress,
+          maxProgress: 1,
+          isCompleted: progress >= 1,
+          completedAt: progress >= 1 ? new Date() : null
+        })
+        .onConflictDoUpdate({
+          target: [userAchievements.userId, userAchievements.achievementId],
+          set: {
+            progress: sql`GREATEST(${userAchievements.progress}, ${progress})`,
+            isCompleted: sql`${userAchievements.progress} >= ${userAchievements.maxProgress} OR ${progress} >= ${userAchievements.maxProgress}`,
+            completedAt: sql`CASE WHEN (${userAchievements.progress} >= ${userAchievements.maxProgress} OR ${progress} >= ${userAchievements.maxProgress}) AND ${userAchievements.completedAt} IS NULL THEN NOW() ELSE ${userAchievements.completedAt} END`,
+            updatedAt: new Date()
+          }
+        })
+        .returning();
+
+      return result;
+    });
+  }
+
+  async checkAchievementCompletion(userId: string, achievementId: string): Promise<UserAchievement | undefined> {
+    const [userAchievement] = await db.select().from(userAchievements)
+      .where(and(
+        eq(userAchievements.userId, userId),
+        eq(userAchievements.achievementId, achievementId),
+        eq(userAchievements.isCompleted, true)
+      ));
+
+    return userAchievement;
+  }
+
+  // Gamification Analytics
+  async getGamificationStats(userId: string): Promise<{totalPoints: number; badgeCount: number; achievementCount: number; level: number}> {
+    const [points] = await db.select().from(userPoints).where(eq(userPoints.userId, userId));
+    const badgeCount = await db.select({ count: sql<number>`count(*)` }).from(userBadges).where(eq(userBadges.userId, userId));
+    const achievementCount = await db.select({ count: sql<number>`count(*)` }).from(userAchievements)
+      .where(and(eq(userAchievements.userId, userId), eq(userAchievements.isCompleted, true)));
+
+    return {
+      totalPoints: points?.totalPoints || 0,
+      badgeCount: badgeCount[0]?.count || 0,
+      achievementCount: achievementCount[0]?.count || 0,
+      level: points?.currentLevel || 1
+    };
+  }
+
+  async getSystemGamificationStats(): Promise<{totalUsers: number; totalPoints: number; totalBadges: number; totalAchievements: number}> {
+    const userCount = await db.select({ count: sql<number>`count(*)` }).from(users);
+    const pointsSum = await db.select({ sum: sql<number>`sum(total_points)` }).from(userPoints);
+    const badgeCount = await db.select({ count: sql<number>`count(*)` }).from(badges).where(eq(badges.isActive, true));
+    const achievementCount = await db.select({ count: sql<number>`count(*)` }).from(achievements).where(eq(achievements.isActive, true));
+
+    return {
+      totalUsers: userCount[0]?.count || 0,
+      totalPoints: pointsSum[0]?.sum || 0,
+      totalBadges: badgeCount[0]?.count || 0,
+      totalAchievements: achievementCount[0]?.count || 0
+    };
   }
 }
 

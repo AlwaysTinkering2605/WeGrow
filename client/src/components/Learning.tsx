@@ -2234,7 +2234,7 @@ export default function Learning() {
     : 0;
   
   // Fetch training matrix data from API
-  const { data: trainingMatrix, isLoading: trainingMatrixLoading } = useQuery<any[]>({
+  const { data: trainingMatrix, isLoading: trainingMatrixDataLoading } = useQuery<any[]>({
     queryKey: ["/api/lms/training-matrix", { role: user?.role, teamId: user?.teamId }],
     retry: false,
     enabled: !!user,
