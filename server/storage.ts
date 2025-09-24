@@ -298,6 +298,77 @@ export interface IStorage {
     completionDate: Date, 
     assignedBy: string
   ): Promise<{ enrollment: Enrollment; trainingRecord: TrainingRecord }>;
+
+  // Learning Paths Management
+  getLearningPaths(): Promise<LearningPath[]>;
+  getLearningPath(pathId: string): Promise<LearningPath | undefined>;
+  getLearningPathWithSteps(pathId: string): Promise<LearningPath & { steps: LearningPathStep[] }>;
+  createLearningPath(path: InsertLearningPath): Promise<LearningPath>;
+  updateLearningPath(pathId: string, updates: Partial<InsertLearningPath>): Promise<LearningPath>;
+  deleteLearningPath(pathId: string): Promise<void>;
+  publishLearningPath(pathId: string): Promise<LearningPath>;
+  unpublishLearningPath(pathId: string): Promise<LearningPath>;
+
+  // Learning Path Steps Management
+  getLearningPathSteps(pathId: string): Promise<LearningPathStep[]>;
+  getLearningPathStep(stepId: string): Promise<LearningPathStep | undefined>;
+  createLearningPathStep(step: InsertLearningPathStep): Promise<LearningPathStep>;
+  updateLearningPathStep(stepId: string, updates: Partial<InsertLearningPathStep>): Promise<LearningPathStep>;
+  deleteLearningPathStep(stepId: string): Promise<void>;
+  reorderLearningPathSteps(pathId: string, stepIds: string[]): Promise<void>;
+
+  // Learning Path Enrollments and Progress
+  getLearningPathEnrollments(userId?: string, pathId?: string): Promise<LearningPathEnrollment[]>;
+  getLearningPathEnrollment(enrollmentId: string): Promise<LearningPathEnrollment | undefined>;
+  enrollUserInLearningPath(enrollment: InsertLearningPathEnrollment): Promise<LearningPathEnrollment>;
+  updateLearningPathEnrollment(enrollmentId: string, updates: Partial<InsertLearningPathEnrollment>): Promise<LearningPathEnrollment>;
+  completeLearningPathEnrollment(enrollmentId: string): Promise<LearningPathEnrollment>;
+  suspendLearningPathEnrollment(enrollmentId: string, reason?: string): Promise<LearningPathEnrollment>;
+  resumeLearningPathEnrollment(enrollmentId: string): Promise<LearningPathEnrollment>;
+
+  // Learning Path Step Progress
+  getLearningPathStepProgress(enrollmentId: string): Promise<LearningPathStepProgress[]>;
+  getStepProgress(enrollmentId: string, stepId: string): Promise<LearningPathStepProgress | undefined>;
+  updateStepProgress(progress: InsertLearningPathStepProgress): Promise<LearningPathStepProgress>;
+  completeStep(enrollmentId: string, stepId: string, score?: number, timeSpent?: number): Promise<LearningPathStepProgress>;
+  skipStep(enrollmentId: string, stepId: string, reason: string): Promise<LearningPathStepProgress>;
+  
+  // Competency Library Management
+  getCompetencyLibrary(): Promise<CompetencyLibraryItem[]>;
+  getCompetencyLibraryItem(itemId: string): Promise<CompetencyLibraryItem | undefined>;
+  createCompetencyLibraryItem(item: InsertCompetencyLibraryItem): Promise<CompetencyLibraryItem>;
+  updateCompetencyLibraryItem(itemId: string, updates: Partial<InsertCompetencyLibraryItem>): Promise<CompetencyLibraryItem>;
+  deleteCompetencyLibraryItem(itemId: string): Promise<void>;
+  linkLearningPathToCompetency(competencyLibraryId: string, learningPathId: string): Promise<void>;
+  unlinkLearningPathFromCompetency(competencyLibraryId: string, learningPathId: string): Promise<void>;
+
+  // Role Competency Mappings
+  getRoleCompetencyMappings(role?: string, teamId?: string): Promise<RoleCompetencyMapping[]>;
+  getRoleCompetencyMapping(mappingId: string): Promise<RoleCompetencyMapping | undefined>;
+  createRoleCompetencyMapping(mapping: InsertRoleCompetencyMapping): Promise<RoleCompetencyMapping>;
+  updateRoleCompetencyMapping(mappingId: string, updates: Partial<InsertRoleCompetencyMapping>): Promise<RoleCompetencyMapping>;
+  deleteRoleCompetencyMapping(mappingId: string): Promise<void>;
+  getRequiredCompetenciesForUser(userId: string): Promise<CompetencyLibraryItem[]>;
+
+  // Training Matrix and Compliance
+  getTrainingMatrixRecords(userId?: string, competencyLibraryId?: string): Promise<TrainingMatrixRecord[]>;
+  getTrainingMatrixRecord(recordId: string): Promise<TrainingMatrixRecord | undefined>;
+  createTrainingMatrixRecord(record: InsertTrainingMatrixRecord): Promise<TrainingMatrixRecord>;
+  updateTrainingMatrixRecord(recordId: string, updates: Partial<InsertTrainingMatrixRecord>): Promise<TrainingMatrixRecord>;
+  getComplianceReport(filters?: { role?: string; teamId?: string; competencyId?: string; status?: string; }): Promise<any>;
+  getCompetencyGapAnalysis(userId?: string): Promise<any>;
+  updateCompetencyStatus(userId: string, competencyLibraryId: string, status: string, evidenceData?: any): Promise<TrainingMatrixRecord>;
+
+  // Automation Rules Engine
+  getAutomationRules(isActive?: boolean): Promise<AutomationRule[]>;
+  getAutomationRule(ruleId: string): Promise<AutomationRule | undefined>;
+  createAutomationRule(rule: InsertAutomationRule): Promise<AutomationRule>;
+  updateAutomationRule(ruleId: string, updates: Partial<InsertAutomationRule>): Promise<AutomationRule>;
+  deleteAutomationRule(ruleId: string): Promise<void>;
+  activateAutomationRule(ruleId: string): Promise<AutomationRule>;
+  deactivateAutomationRule(ruleId: string): Promise<AutomationRule>;
+  executeAutomationRule(ruleId: string, triggerData?: any): Promise<{ executed: boolean; enrollments: number; errors?: string[] }>;
+  executeAutomationRulesForUser(userId: string, triggerEvent: string): Promise<{ totalRules: number; executed: number; enrollments: number }>;
 }
 
 export class DatabaseStorage implements IStorage {

@@ -475,6 +475,151 @@ export const pdpCourseLinks = pgTable("pdp_course_links", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Learning Paths - structured learning sequences
+export const learningPaths = pgTable("learning_paths", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  pathType: varchar("path_type").notNull(), // "linear", "non_linear", "adaptive"
+  category: varchar("category"), // e.g., "onboarding", "compliance", "professional_development"
+  estimatedDuration: integer("estimated_duration"), // Minutes
+  isActive: boolean("is_active").default(true),
+  isPublished: boolean("is_published").default(false),
+  completionCriteria: jsonb("completion_criteria"), // Requirements for path completion
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Learning Path Steps - individual activities within a path
+export const learningPathSteps = pgTable("learning_path_steps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pathId: varchar("path_id").notNull(),
+  stepOrder: integer("step_order").notNull(), // For sequenced paths
+  title: varchar("title").notNull(),
+  description: text("description"),
+  stepType: varchar("step_type").notNull(), // "course", "quiz", "video", "document", "external", "assessment"
+  resourceId: varchar("resource_id"), // ID of course, quiz, etc.
+  resourceType: varchar("resource_type"), // "course", "quiz", "external_url", "document"
+  resourceUrl: text("resource_url"), // For external resources
+  resourceData: jsonb("resource_data"), // Additional resource metadata
+  prerequisites: text("prerequisites").array(), // Array of step IDs that must be completed first
+  isOptional: boolean("is_optional").default(false),
+  isRequired: boolean("is_required").default(true),
+  passingScore: integer("passing_score"), // Minimum score required
+  estimatedDuration: integer("estimated_duration"), // Minutes
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Learning Path Enrollments - user progress through paths
+export const learningPathEnrollments = pgTable("learning_path_enrollments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pathId: varchar("path_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  enrollmentStatus: varchar("enrollment_status").default("active"), // "active", "completed", "failed", "suspended"
+  progress: integer("progress").default(0), // Percentage complete
+  currentStepId: varchar("current_step_id"), // Current active step
+  startDate: timestamp("start_date").defaultNow(),
+  dueDate: timestamp("due_date"), // Dynamic deadline
+  completionDate: timestamp("completion_date"),
+  totalScore: integer("total_score"), // Aggregate score across all assessments
+  metadata: jsonb("metadata"), // Additional tracking data
+  assignedBy: varchar("assigned_by"), // User or system that assigned this path
+  enrollmentSource: varchar("enrollment_source").default("manual"), // "manual", "automation_rule", "self_enrolled"
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Learning Path Step Progress - detailed step completion tracking
+export const learningPathStepProgress = pgTable("learning_path_step_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  enrollmentId: varchar("enrollment_id").notNull(),
+  stepId: varchar("step_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  status: varchar("status").default("not_started"), // "not_started", "in_progress", "completed", "failed", "skipped"
+  score: integer("score"), // Score achieved on this step
+  attempts: integer("attempts").default(0),
+  timeSpent: integer("time_spent").default(0), // Minutes
+  startDate: timestamp("start_date"),
+  completionDate: timestamp("completion_date"),
+  metadata: jsonb("metadata"), // Step-specific tracking data
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Enhanced Competency Library - extends existing competencies for training matrix
+export const competencyLibrary = pgTable("competency_library", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  competencyId: varchar("competency_id").notNull(), // Links to existing competencies table
+  requiredForRoles: text("required_for_roles").array(), // Array of role names
+  requiredForTeams: text("required_for_teams").array(), // Array of team IDs
+  proficiencyLevels: jsonb("proficiency_levels"), // Define skill levels (basic, intermediate, advanced)
+  assessmentCriteria: text("assessment_criteria"), // How competency is measured
+  renewalPeriodDays: integer("renewal_period_days"), // Days until renewal required
+  isComplianceRequired: boolean("is_compliance_required").default(false),
+  evidenceRequirements: jsonb("evidence_requirements"), // Types of evidence needed
+  linkedLearningPaths: text("linked_learning_paths").array(), // Paths that build this competency
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Role Competency Mappings - define which competencies are required for which roles
+export const roleCompetencyMappings = pgTable("role_competency_mappings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  role: userRoleEnum("role").notNull(),
+  competencyLibraryId: varchar("competency_library_id").notNull(),
+  teamId: varchar("team_id"), // Team-specific requirements
+  requiredProficiencyLevel: varchar("required_proficiency_level").default("basic"), // "basic", "intermediate", "advanced"
+  isMandatory: boolean("is_mandatory").default(true),
+  priority: varchar("priority").default("medium"), // "low", "medium", "high", "critical"
+  gracePeriodDays: integer("grace_period_days"), // Days after hiring/role change to achieve competency
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Automation Rules - rules engine for path assignment
+export const automationRules = pgTable("automation_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  triggerEvent: varchar("trigger_event").notNull(), // "user_created", "user_updated", "role_changed", "team_changed", "scheduled"
+  conditions: jsonb("conditions").notNull(), // Array of condition objects
+  actions: jsonb("actions").notNull(), // Array of action objects (assign path, etc.)
+  priority: integer("priority").default(100), // Lower numbers = higher priority
+  scheduleConfig: jsonb("schedule_config"), // For time-based triggers
+  lastRun: timestamp("last_run"),
+  totalExecutions: integer("total_executions").default(0),
+  successfulExecutions: integer("successful_executions").default(0),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Training Matrix Records - aggregated competency status for compliance
+export const trainingMatrixRecords = pgTable("training_matrix_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  competencyLibraryId: varchar("competency_library_id").notNull(),
+  currentStatus: varchar("current_status").notNull(), // "not_started", "in_progress", "competent", "expired", "non_compliant"
+  proficiencyLevel: varchar("proficiency_level"), // "basic", "intermediate", "advanced"
+  lastAssessmentDate: timestamp("last_assessment_date"),
+  lastAssessmentScore: integer("last_assessment_score"),
+  expiryDate: timestamp("expiry_date"), // When competency expires
+  evidenceRecords: jsonb("evidence_records"), // Array of evidence objects
+  trainingHistory: jsonb("training_history"), // Array of completed training records
+  complianceNotes: text("compliance_notes"), // Auditor notes
+  riskLevel: varchar("risk_level").default("low"), // "low", "medium", "high" - compliance risk
+  nextActionRequired: varchar("next_action_required"), // What needs to be done next
+  nextActionDueDate: timestamp("next_action_due_date"),
+  updatedBy: varchar("updated_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const teamsRelations = relations(teams, ({ one, many }) => ({
   parentTeam: one(teams, {
@@ -638,6 +783,119 @@ export const recognitionsRelations = relations(recognitions, ({ one }) => ({
     fields: [recognitions.toUserId],
     references: [users.id],
     relationName: "receivedRecognitions",
+  }),
+}));
+
+// Learning Paths Relations
+export const learningPathsRelations = relations(learningPaths, ({ one, many }) => ({
+  creator: one(users, {
+    fields: [learningPaths.createdBy],
+    references: [users.id],
+  }),
+  steps: many(learningPathSteps),
+  enrollments: many(learningPathEnrollments),
+}));
+
+export const learningPathStepsRelations = relations(learningPathSteps, ({ one, many }) => ({
+  path: one(learningPaths, {
+    fields: [learningPathSteps.pathId],
+    references: [learningPaths.id],
+  }),
+  course: one(courses, {
+    fields: [learningPathSteps.resourceId],
+    references: [courses.id],
+  }),
+  quiz: one(quizzes, {
+    fields: [learningPathSteps.resourceId],
+    references: [quizzes.id],
+  }),
+  stepProgress: many(learningPathStepProgress),
+}));
+
+export const learningPathEnrollmentsRelations = relations(learningPathEnrollments, ({ one, many }) => ({
+  path: one(learningPaths, {
+    fields: [learningPathEnrollments.pathId],
+    references: [learningPaths.id],
+  }),
+  user: one(users, {
+    fields: [learningPathEnrollments.userId],
+    references: [users.id],
+  }),
+  assignedByUser: one(users, {
+    fields: [learningPathEnrollments.assignedBy],
+    references: [users.id],
+    relationName: "assignedEnrollments",
+  }),
+  currentStep: one(learningPathSteps, {
+    fields: [learningPathEnrollments.currentStepId],
+    references: [learningPathSteps.id],
+  }),
+  stepProgress: many(learningPathStepProgress),
+}));
+
+export const learningPathStepProgressRelations = relations(learningPathStepProgress, ({ one }) => ({
+  enrollment: one(learningPathEnrollments, {
+    fields: [learningPathStepProgress.enrollmentId],
+    references: [learningPathEnrollments.id],
+  }),
+  step: one(learningPathSteps, {
+    fields: [learningPathStepProgress.stepId],
+    references: [learningPathSteps.id],
+  }),
+  user: one(users, {
+    fields: [learningPathStepProgress.userId],
+    references: [users.id],
+  }),
+}));
+
+export const competencyLibraryRelations = relations(competencyLibrary, ({ one, many }) => ({
+  competency: one(competencies, {
+    fields: [competencyLibrary.competencyId],
+    references: [competencies.id],
+  }),
+  creator: one(users, {
+    fields: [competencyLibrary.createdBy],
+    references: [users.id],
+  }),
+  roleMappings: many(roleCompetencyMappings),
+  trainingMatrixRecords: many(trainingMatrixRecords),
+}));
+
+export const roleCompetencyMappingsRelations = relations(roleCompetencyMappings, ({ one }) => ({
+  competencyLibraryItem: one(competencyLibrary, {
+    fields: [roleCompetencyMappings.competencyLibraryId],
+    references: [competencyLibrary.id],
+  }),
+  team: one(teams, {
+    fields: [roleCompetencyMappings.teamId],
+    references: [teams.id],
+  }),
+  creator: one(users, {
+    fields: [roleCompetencyMappings.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const automationRulesRelations = relations(automationRules, ({ one }) => ({
+  creator: one(users, {
+    fields: [automationRules.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const trainingMatrixRecordsRelations = relations(trainingMatrixRecords, ({ one }) => ({
+  user: one(users, {
+    fields: [trainingMatrixRecords.userId],
+    references: [users.id],
+  }),
+  competencyLibraryItem: one(competencyLibrary, {
+    fields: [trainingMatrixRecords.competencyLibraryId],
+    references: [competencyLibrary.id],
+  }),
+  updatedByUser: one(users, {
+    fields: [trainingMatrixRecords.updatedBy],
+    references: [users.id],
+    relationName: "updatedMatrixRecords",
   }),
 }));
 
@@ -872,6 +1130,58 @@ export const insertPdpCourseLinkSchema = createInsertSchema(pdpCourseLinks).omit
   createdAt: true,
 });
 
+// Learning Paths Insert Schemas
+export const insertLearningPathSchema = createInsertSchema(learningPaths).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLearningPathStepSchema = createInsertSchema(learningPathSteps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLearningPathEnrollmentSchema = createInsertSchema(learningPathEnrollments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLearningPathStepProgressSchema = createInsertSchema(learningPathStepProgress).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCompetencyLibrarySchema = createInsertSchema(competencyLibrary).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRoleCompetencyMappingSchema = createInsertSchema(roleCompetencyMappings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAutomationRuleSchema = createInsertSchema(automationRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastRun: true,
+  totalExecutions: true,
+  successfulExecutions: true,
+});
+
+export const insertTrainingMatrixRecordSchema = createInsertSchema(trainingMatrixRecords).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -933,3 +1243,22 @@ export type InsertBadgeCourseRequirement = z.infer<typeof insertBadgeCourseRequi
 export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
 export type InsertTrainingRequirement = z.infer<typeof insertTrainingRequirementSchema>;
 export type InsertPdpCourseLink = z.infer<typeof insertPdpCourseLinkSchema>;
+
+// Learning Paths and Training Matrix Types
+export type LearningPath = typeof learningPaths.$inferSelect;
+export type LearningPathStep = typeof learningPathSteps.$inferSelect;
+export type LearningPathEnrollment = typeof learningPathEnrollments.$inferSelect;
+export type LearningPathStepProgress = typeof learningPathStepProgress.$inferSelect;
+export type CompetencyLibraryItem = typeof competencyLibrary.$inferSelect;
+export type RoleCompetencyMapping = typeof roleCompetencyMappings.$inferSelect;
+export type AutomationRule = typeof automationRules.$inferSelect;
+export type TrainingMatrixRecord = typeof trainingMatrixRecords.$inferSelect;
+
+export type InsertLearningPath = z.infer<typeof insertLearningPathSchema>;
+export type InsertLearningPathStep = z.infer<typeof insertLearningPathStepSchema>;
+export type InsertLearningPathEnrollment = z.infer<typeof insertLearningPathEnrollmentSchema>;
+export type InsertLearningPathStepProgress = z.infer<typeof insertLearningPathStepProgressSchema>;
+export type InsertCompetencyLibraryItem = z.infer<typeof insertCompetencyLibrarySchema>;
+export type InsertRoleCompetencyMapping = z.infer<typeof insertRoleCompetencyMappingSchema>;
+export type InsertAutomationRule = z.infer<typeof insertAutomationRuleSchema>;
+export type InsertTrainingMatrixRecord = z.infer<typeof insertTrainingMatrixRecordSchema>;
