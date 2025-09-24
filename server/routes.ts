@@ -34,6 +34,8 @@ import {
   // Learning Paths schemas
   insertLearningPathSchema,
   insertLearningPathStepSchema,
+  insertLearningPathEnrollmentSchema,
+  insertLearningPathStepProgressSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -2546,6 +2548,329 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to reorder learning path steps" });
+    }
+  });
+
+  // ========================================
+  // Learning Path Enrollments API
+  // ========================================
+
+  // Get user's learning path enrollments
+  app.get('/api/users/:userId/learning-path-enrollments', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const requestingUserId = req.user.claims.sub;
+      
+      // Users can only see their own enrollments, unless they're supervisor/leadership
+      const currentUser = await storage.getUser(requestingUserId);
+      if (userId !== requestingUserId && (!currentUser || !['supervisor', 'leadership'].includes(currentUser.role))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const enrollments = await storage.getLearningPathEnrollments(userId);
+      res.json(enrollments);
+    } catch (error: any) {
+      console.error("Error fetching user learning path enrollments:", error);
+      res.status(500).json({ message: "Failed to fetch learning path enrollments" });
+    }
+  });
+
+  // Get enrollments for a specific learning path (admin only)
+  app.get('/api/learning-paths/:pathId/enrollments', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { pathId } = req.params;
+      const enrollments = await storage.getLearningPathEnrollments(undefined, pathId);
+      res.json(enrollments);
+    } catch (error: any) {
+      console.error("Error fetching learning path enrollments:", error);
+      res.status(500).json({ message: "Failed to fetch learning path enrollments" });
+    }
+  });
+
+  // Enroll user in learning path
+  app.post('/api/learning-paths/:pathId/enroll', isAuthenticated, async (req: any, res) => {
+    try {
+      const { pathId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Check if learning path exists and is published
+      const learningPath = await storage.getLearningPath(pathId);
+      if (!learningPath) {
+        return res.status(404).json({ message: "Learning path not found" });
+      }
+      
+      if (!learningPath.isPublished) {
+        return res.status(400).json({ message: "Cannot enroll in unpublished learning path" });
+      }
+      
+      const enrollment = await storage.enrollUserInLearningPath({
+        userId,
+        pathId,
+        enrollmentSource: "self_enrolled"
+      });
+      
+      res.status(201).json(enrollment);
+    } catch (error: any) {
+      console.error("Error enrolling user in learning path:", error);
+      if (error.message.includes("already enrolled")) {
+        return res.status(409).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to enroll in learning path" });
+    }
+  });
+
+  // Get specific enrollment details
+  app.get('/api/learning-path-enrollments/:enrollmentId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId } = req.params;
+      const enrollment = await storage.getLearningPathEnrollment(enrollmentId);
+      
+      if (!enrollment) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+      
+      const requestingUserId = req.user.claims.sub;
+      // Users can only see their own enrollments, unless they're supervisor/leadership
+      const currentUser = await storage.getUser(requestingUserId);
+      if (enrollment.userId !== requestingUserId && (!currentUser || !['supervisor', 'leadership'].includes(currentUser.role))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      res.json(enrollment);
+    } catch (error: any) {
+      console.error("Error fetching learning path enrollment:", error);
+      res.status(500).json({ message: "Failed to fetch learning path enrollment" });
+    }
+  });
+
+  // Update enrollment (admin only)
+  app.put('/api/learning-path-enrollments/:enrollmentId', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { enrollmentId } = req.params;
+      const updates = insertLearningPathEnrollmentSchema.partial().parse(req.body);
+      
+      const updatedEnrollment = await storage.updateLearningPathEnrollment(enrollmentId, updates);
+      res.json(updatedEnrollment);
+    } catch (error: any) {
+      console.error("Error updating learning path enrollment:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to update learning path enrollment" });
+    }
+  });
+
+  // Complete enrollment
+  app.post('/api/learning-path-enrollments/:enrollmentId/complete', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId } = req.params;
+      const enrollment = await storage.getLearningPathEnrollment(enrollmentId);
+      
+      if (!enrollment) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+      
+      const requestingUserId = req.user.claims.sub;
+      // Users can only complete their own enrollments, unless they're supervisor/leadership
+      const currentUser = await storage.getUser(requestingUserId);
+      if (enrollment.userId !== requestingUserId && (!currentUser || !['supervisor', 'leadership'].includes(currentUser.role))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const completedEnrollment = await storage.completeLearningPathEnrollment(enrollmentId);
+      res.json(completedEnrollment);
+    } catch (error: any) {
+      console.error("Error completing learning path enrollment:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to complete learning path enrollment" });
+    }
+  });
+
+  // Suspend enrollment (admin only)
+  app.post('/api/learning-path-enrollments/:enrollmentId/suspend', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { enrollmentId } = req.params;
+      const { reason } = req.body;
+      
+      const suspendedEnrollment = await storage.suspendLearningPathEnrollment(enrollmentId, reason);
+      res.json(suspendedEnrollment);
+    } catch (error: any) {
+      console.error("Error suspending learning path enrollment:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to suspend learning path enrollment" });
+    }
+  });
+
+  // Resume enrollment (admin only)
+  app.post('/api/learning-path-enrollments/:enrollmentId/resume', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { enrollmentId } = req.params;
+      
+      const resumedEnrollment = await storage.resumeLearningPathEnrollment(enrollmentId);
+      res.json(resumedEnrollment);
+    } catch (error: any) {
+      console.error("Error resuming learning path enrollment:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to resume learning path enrollment" });
+    }
+  });
+
+  // ========================================
+  // Learning Path Step Progress API
+  // ========================================
+
+  // Get step progress for an enrollment
+  app.get('/api/learning-path-enrollments/:enrollmentId/progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId } = req.params;
+      const enrollment = await storage.getLearningPathEnrollment(enrollmentId);
+      
+      if (!enrollment) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+      
+      const requestingUserId = req.user.claims.sub;
+      // Users can only see their own progress, unless they're supervisor/leadership
+      const currentUser = await storage.getUser(requestingUserId);
+      if (enrollment.userId !== requestingUserId && (!currentUser || !['supervisor', 'leadership'].includes(currentUser.role))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const stepProgress = await storage.getLearningPathStepProgress(enrollmentId);
+      res.json(stepProgress);
+    } catch (error: any) {
+      console.error("Error fetching learning path step progress:", error);
+      res.status(500).json({ message: "Failed to fetch learning path step progress" });
+    }
+  });
+
+  // Get specific step progress
+  app.get('/api/learning-path-enrollments/:enrollmentId/steps/:stepId/progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId, stepId } = req.params;
+      const enrollment = await storage.getLearningPathEnrollment(enrollmentId);
+      
+      if (!enrollment) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+      
+      const requestingUserId = req.user.claims.sub;
+      // Users can only see their own progress, unless they're supervisor/leadership
+      const currentUser = await storage.getUser(requestingUserId);
+      if (enrollment.userId !== requestingUserId && (!currentUser || !['supervisor', 'leadership'].includes(currentUser.role))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const stepProgress = await storage.getStepProgress(enrollmentId, stepId);
+      if (!stepProgress) {
+        return res.status(404).json({ message: "Step progress not found" });
+      }
+      
+      res.json(stepProgress);
+    } catch (error: any) {
+      console.error("Error fetching step progress:", error);
+      res.status(500).json({ message: "Failed to fetch step progress" });
+    }
+  });
+
+  // Update step progress
+  app.put('/api/learning-path-enrollments/:enrollmentId/steps/:stepId/progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId, stepId } = req.params;
+      const enrollment = await storage.getLearningPathEnrollment(enrollmentId);
+      
+      if (!enrollment) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+      
+      const requestingUserId = req.user.claims.sub;
+      // Users can only update their own progress, unless they're supervisor/leadership
+      const currentUser = await storage.getUser(requestingUserId);
+      if (enrollment.userId !== requestingUserId && (!currentUser || !['supervisor', 'leadership'].includes(currentUser.role))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const validatedProgress = insertLearningPathStepProgressSchema.partial().omit({ enrollmentId: true, stepId: true }).parse(req.body);
+      const progressData = {
+        enrollmentId,
+        stepId,
+        userId: enrollment.userId,
+        ...validatedProgress
+      };
+      
+      const updatedProgress = await storage.updateStepProgress(progressData);
+      res.json(updatedProgress);
+    } catch (error: any) {
+      console.error("Error updating step progress:", error);
+      res.status(500).json({ message: "Failed to update step progress" });
+    }
+  });
+
+  // Complete a step
+  app.post('/api/learning-path-enrollments/:enrollmentId/steps/:stepId/complete', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId, stepId } = req.params;
+      const { score, timeSpent } = req.body;
+      const enrollment = await storage.getLearningPathEnrollment(enrollmentId);
+      
+      if (!enrollment) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+      
+      const requestingUserId = req.user.claims.sub;
+      // Users can only complete their own steps, unless they're supervisor/leadership
+      const currentUser = await storage.getUser(requestingUserId);
+      if (enrollment.userId !== requestingUserId && (!currentUser || !['supervisor', 'leadership'].includes(currentUser.role))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const completedProgress = await storage.completeStep(enrollmentId, stepId, score, timeSpent);
+      res.json(completedProgress);
+    } catch (error: any) {
+      console.error("Error completing step:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to complete step" });
+    }
+  });
+
+  // Skip a step
+  app.post('/api/learning-path-enrollments/:enrollmentId/steps/:stepId/skip', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId, stepId } = req.params;
+      const { reason } = req.body;
+      const enrollment = await storage.getLearningPathEnrollment(enrollmentId);
+      
+      if (!enrollment) {
+        return res.status(404).json({ message: "Enrollment not found" });
+      }
+      
+      const requestingUserId = req.user.claims.sub;
+      // Users can only skip their own steps, unless they're supervisor/leadership
+      const currentUser = await storage.getUser(requestingUserId);
+      if (enrollment.userId !== requestingUserId && (!currentUser || !['supervisor', 'leadership'].includes(currentUser.role))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      if (!reason) {
+        return res.status(400).json({ message: "Reason is required for skipping a step" });
+      }
+      
+      const skippedProgress = await storage.skipStep(enrollmentId, stepId, reason);
+      res.json(skippedProgress);
+    } catch (error: any) {
+      console.error("Error skipping step:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to skip step" });
     }
   });
 

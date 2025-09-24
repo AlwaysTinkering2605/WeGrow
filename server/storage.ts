@@ -30,6 +30,11 @@ import {
   badgeCourseRequirements,
   trainingRequirements,
   pdpCourseLinks,
+  // Learning path tables
+  learningPaths,
+  learningPathSteps,
+  learningPathEnrollments,
+  learningPathStepProgress,
   type User,
   type UpsertUser,
   type CompanyObjective,
@@ -59,6 +64,11 @@ import {
   type UserBadge,
   type TrainingRequirement,
   type PdpCourseLink,
+  // Learning path types
+  type LearningPath,
+  type LearningPathStep,
+  type LearningPathEnrollment,
+  type LearningPathStepProgress,
   type InsertCompanyObjective,
   type InsertTeamObjective,
   type InsertTeamKeyResult,
@@ -84,11 +94,16 @@ import {
   type InsertUserBadge,
   type InsertTrainingRequirement,
   type InsertPdpCourseLink,
+  // Learning path insert types
+  type InsertLearningPath,
+  type InsertLearningPathStep,
+  type InsertLearningPathEnrollment,
+  type InsertLearningPathStepProgress,
   insertTeamSchema,
   updateUserProfileSchema,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, inArray, isNull, max } from "drizzle-orm";
+import { eq, and, desc, asc, ne, sql, inArray, isNull, max } from "drizzle-orm";
 
 export interface IStorage {
   // User operations - required for Replit Auth
@@ -2842,54 +2857,269 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  // Learning Path Enrollments and Progress (Vertical Slice 2)
+  // Learning Path Enrollments and Progress
   async getLearningPathEnrollments(userId?: string, pathId?: string): Promise<LearningPathEnrollment[]> {
-    throw new Error("Learning path enrollments not yet implemented - will be added in Vertical Slice 2");
+    let query = db.select().from(learningPathEnrollments);
+    const conditions = [];
+    
+    if (userId) {
+      conditions.push(eq(learningPathEnrollments.userId, userId));
+    }
+    if (pathId) {
+      conditions.push(eq(learningPathEnrollments.pathId, pathId));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+    
+    return await query.orderBy(desc(learningPathEnrollments.startDate));
   }
 
   async getLearningPathEnrollment(enrollmentId: string): Promise<LearningPathEnrollment | undefined> {
-    throw new Error("Learning path enrollments not yet implemented - will be added in Vertical Slice 2");
+    const results = await db.select()
+      .from(learningPathEnrollments)
+      .where(eq(learningPathEnrollments.id, enrollmentId));
+    
+    return results[0];
   }
 
   async enrollUserInLearningPath(enrollment: InsertLearningPathEnrollment): Promise<LearningPathEnrollment> {
-    throw new Error("Learning path enrollments not yet implemented - will be added in Vertical Slice 2");
+    return await db.transaction(async (tx) => {
+      // Check if user is already enrolled in this path
+      const existingEnrollment = await tx.select()
+        .from(learningPathEnrollments)
+        .where(and(
+          eq(learningPathEnrollments.userId, enrollment.userId),
+          eq(learningPathEnrollments.pathId, enrollment.pathId),
+          ne(learningPathEnrollments.enrollmentStatus, "completed")
+        ));
+      
+      if (existingEnrollment.length > 0) {
+        throw new Error("User is already enrolled in this learning path");
+      }
+      
+      const [newEnrollment] = await tx.insert(learningPathEnrollments)
+        .values(enrollment)
+        .returning();
+      
+      // Initialize step progress for all steps in the path
+      const steps = await tx.select()
+        .from(learningPathSteps)
+        .where(and(
+          eq(learningPathSteps.pathId, enrollment.pathId),
+          isNull(learningPathSteps.deletedAt)
+        ))
+        .orderBy(learningPathSteps.stepOrder);
+      
+      if (steps.length > 0) {
+        const stepProgressRecords = steps.map(step => ({
+          enrollmentId: newEnrollment.id,
+          stepId: step.id,
+          userId: enrollment.userId,
+          status: "not_started" as const,
+          attempts: 0,
+          timeSpent: 0,
+          startDate: null,
+          completionDate: null
+        }));
+        
+        await tx.insert(learningPathStepProgress).values(stepProgressRecords);
+      }
+      
+      return newEnrollment;
+    });
   }
 
   async updateLearningPathEnrollment(enrollmentId: string, updates: Partial<InsertLearningPathEnrollment>): Promise<LearningPathEnrollment> {
-    throw new Error("Learning path enrollments not yet implemented - will be added in Vertical Slice 2");
+    const [updatedEnrollment] = await db.update(learningPathEnrollments)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(learningPathEnrollments.id, enrollmentId))
+      .returning();
+    
+    if (!updatedEnrollment) {
+      throw new Error("Learning path enrollment not found");
+    }
+    
+    return updatedEnrollment;
   }
 
   async completeLearningPathEnrollment(enrollmentId: string): Promise<LearningPathEnrollment> {
-    throw new Error("Learning path enrollments not yet implemented - will be added in Vertical Slice 2");
+    const [completedEnrollment] = await db.update(learningPathEnrollments)
+      .set({
+        enrollmentStatus: "completed",
+        progress: 100,
+        completionDate: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(learningPathEnrollments.id, enrollmentId))
+      .returning();
+    
+    if (!completedEnrollment) {
+      throw new Error("Learning path enrollment not found");
+    }
+    
+    return completedEnrollment;
   }
 
   async suspendLearningPathEnrollment(enrollmentId: string, reason?: string): Promise<LearningPathEnrollment> {
-    throw new Error("Learning path enrollments not yet implemented - will be added in Vertical Slice 2");
+    const [suspendedEnrollment] = await db.update(learningPathEnrollments)
+      .set({
+        enrollmentStatus: "suspended",
+        metadata: reason ? { suspensionReason: reason } : null,
+        updatedAt: new Date()
+      })
+      .where(eq(learningPathEnrollments.id, enrollmentId))
+      .returning();
+    
+    if (!suspendedEnrollment) {
+      throw new Error("Learning path enrollment not found");
+    }
+    
+    return suspendedEnrollment;
   }
 
   async resumeLearningPathEnrollment(enrollmentId: string): Promise<LearningPathEnrollment> {
-    throw new Error("Learning path enrollments not yet implemented - will be added in Vertical Slice 2");
+    const [resumedEnrollment] = await db.update(learningPathEnrollments)
+      .set({
+        enrollmentStatus: "active",
+        metadata: null,
+        updatedAt: new Date()
+      })
+      .where(eq(learningPathEnrollments.id, enrollmentId))
+      .returning();
+    
+    if (!resumedEnrollment) {
+      throw new Error("Learning path enrollment not found");
+    }
+    
+    return resumedEnrollment;
   }
 
-  // Learning Path Step Progress (Vertical Slice 2)
+  // Learning Path Step Progress
   async getLearningPathStepProgress(enrollmentId: string): Promise<LearningPathStepProgress[]> {
-    throw new Error("Learning path step progress not yet implemented - will be added in Vertical Slice 2");
+    return await db.select()
+      .from(learningPathStepProgress)
+      .where(eq(learningPathStepProgress.enrollmentId, enrollmentId))
+      .orderBy(asc(learningPathStepProgress.createdAt));
   }
 
   async getStepProgress(enrollmentId: string, stepId: string): Promise<LearningPathStepProgress | undefined> {
-    throw new Error("Learning path step progress not yet implemented - will be added in Vertical Slice 2");
+    const results = await db.select()
+      .from(learningPathStepProgress)
+      .where(and(
+        eq(learningPathStepProgress.enrollmentId, enrollmentId),
+        eq(learningPathStepProgress.stepId, stepId)
+      ));
+    
+    return results[0];
   }
 
   async updateStepProgress(progress: InsertLearningPathStepProgress): Promise<LearningPathStepProgress> {
-    throw new Error("Learning path step progress not yet implemented - will be added in Vertical Slice 2");
+    const existingProgress = await this.getStepProgress(progress.enrollmentId, progress.stepId);
+    
+    if (!existingProgress) {
+      // Create new step progress record
+      const [newProgress] = await db.insert(learningPathStepProgress)
+        .values(progress)
+        .returning();
+      
+      // Update enrollment progress based on step completion
+      await this.updateLearningPathEnrollmentProgress(progress.enrollmentId);
+      
+      return newProgress;
+    } else {
+      // Update existing step progress
+      const [updatedProgress] = await db.update(learningPathStepProgress)
+        .set({ ...progress, updatedAt: new Date() })
+        .where(and(
+          eq(learningPathStepProgress.enrollmentId, progress.enrollmentId),
+          eq(learningPathStepProgress.stepId, progress.stepId)
+        ))
+        .returning();
+      
+      // Update enrollment progress based on step completion
+      await this.updateLearningPathEnrollmentProgress(progress.enrollmentId);
+      
+      return updatedProgress;
+    }
   }
 
   async completeStep(enrollmentId: string, stepId: string, score?: number, timeSpent?: number): Promise<LearningPathStepProgress> {
-    throw new Error("Learning path step progress not yet implemented - will be added in Vertical Slice 2");
+    const [completedProgress] = await db.update(learningPathStepProgress)
+      .set({
+        status: "completed",
+        score: score,
+        timeSpent: timeSpent,
+        completionDate: new Date(),
+        updatedAt: new Date()
+      })
+      .where(and(
+        eq(learningPathStepProgress.enrollmentId, enrollmentId),
+        eq(learningPathStepProgress.stepId, stepId)
+      ))
+      .returning();
+    
+    if (!completedProgress) {
+      throw new Error("Step progress not found");
+    }
+    
+    // Update enrollment progress
+    await this.updateLearningPathEnrollmentProgress(enrollmentId);
+    
+    return completedProgress;
   }
 
   async skipStep(enrollmentId: string, stepId: string, reason: string): Promise<LearningPathStepProgress> {
-    throw new Error("Learning path step progress not yet implemented - will be added in Vertical Slice 2");
+    const [skippedProgress] = await db.update(learningPathStepProgress)
+      .set({
+        status: "skipped",
+        metadata: { skipReason: reason },
+        updatedAt: new Date()
+      })
+      .where(and(
+        eq(learningPathStepProgress.enrollmentId, enrollmentId),
+        eq(learningPathStepProgress.stepId, stepId)
+      ))
+      .returning();
+    
+    if (!skippedProgress) {
+      throw new Error("Step progress not found");
+    }
+    
+    // Update enrollment progress
+    await this.updateLearningPathEnrollmentProgress(enrollmentId);
+    
+    return skippedProgress;
+  }
+
+  // Helper method to update learning path enrollment progress based on step completion
+  private async updateLearningPathEnrollmentProgress(enrollmentId: string): Promise<void> {
+    // Get all step progress for this enrollment
+    const stepProgresses = await this.getLearningPathStepProgress(enrollmentId);
+    
+    if (stepProgresses.length === 0) return;
+    
+    // Calculate overall progress
+    const completedSteps = stepProgresses.filter(step => step.status === "completed" || step.status === "skipped").length;
+    const totalSteps = stepProgresses.length;
+    const progressPercentage = Math.round((completedSteps / totalSteps) * 100);
+    
+    // Determine if all steps are completed
+    const allStepsCompleted = completedSteps === totalSteps;
+    
+    // Update enrollment
+    const updates: Partial<InsertLearningPathEnrollment> = {
+      progress: progressPercentage
+    };
+    
+    if (allStepsCompleted) {
+      updates.enrollmentStatus = "completed";
+    }
+    
+    await db.update(learningPathEnrollments)
+      .set(updates)
+      .where(eq(learningPathEnrollments.id, enrollmentId));
   }
 
   // Competency Library Management (Vertical Slice 4)
