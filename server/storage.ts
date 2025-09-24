@@ -1861,22 +1861,170 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // Real-time Training Matrix Sync - updates training matrix for incremental lesson completion progress
+  // Real-time Training Matrix Sync - updates training matrix for learning progress events
   private async syncTrainingMatrixOnLessonCompletion(
     enrollmentId: string, 
     lessonId: string, 
     lesson: any
   ): Promise<void> {
     try {
-      // For now, lesson completion sync is disabled since we need proper competency mapping
-      // In a production system, this would require explicit mappings between courses/lessons and competencies
-      // The current implementation focuses on learning path completion which has explicit competency links
-      console.log(`Lesson completion sync placeholder: enrollmentId=${enrollmentId}, lessonId=${lessonId}`);
-      
-      // TODO: Implement proper lesson-to-competency mapping when competency library is fully configured
+      // Get the enrollment to find the learning path
+      const enrollment = await this.getEnrollment(enrollmentId);
+      if (!enrollment) {
+        console.log(`No enrollment found for ${enrollmentId}`);
+        return;
+      }
+
+      // Sync training matrix for lesson completion in learning path context
+      const syncResult = await this.syncTrainingMatrixOnLearningProgress(
+        enrollment.userId,
+        undefined, // We don't have direct learning path mapping from lesson
+        'lesson',
+        { completed: true }
+      );
+
+      if (syncResult.syncedCompetencies > 0) {
+        console.log(`[SYNC] Lesson completion synced ${syncResult.syncedCompetencies} competencies for user ${enrollment.userId}`);
+      }
     } catch (error) {
       console.error("Error syncing training matrix on lesson completion:", error);
       // Don't throw error to avoid breaking lesson completion flow
+    }
+  }
+
+  // Real-time Training Matrix sync when learning progress occurs
+  async syncTrainingMatrixOnLearningProgress(
+    userId: string, 
+    learningPathId?: string, 
+    stepType?: 'lesson' | 'quiz' | 'path_completion',
+    progressData?: { score?: number; completed?: boolean }
+  ): Promise<{ syncedCompetencies: number; statusUpdates: string[]; errors?: string[] }> {
+    const errors: string[] = [];
+    const statusUpdates: string[] = [];
+    let syncedCompetencies = 0;
+
+    try {
+      // Find all competencies linked to this learning path
+      const competencies = await db
+        .select()
+        .from(competencyLibrary)
+        .where(
+          learningPathId 
+            ? sql`${competencyLibrary.linkedLearningPaths} @> ${JSON.stringify([learningPathId])}`
+            : sql`array_length(${competencyLibrary.linkedLearningPaths}, 1) > 0`
+        );
+
+      if (competencies.length === 0) {
+        return { syncedCompetencies: 0, statusUpdates: [] };
+      }
+
+      for (const competency of competencies) {
+        if (learningPathId && !competency.linkedLearningPaths?.includes(learningPathId)) {
+          continue;
+        }
+
+        try {
+          // Get current training matrix record
+          const [currentRecord] = await db
+            .select()
+            .from(trainingMatrixRecords)
+            .where(
+              and(
+                eq(trainingMatrixRecords.userId, userId),
+                eq(trainingMatrixRecords.competencyLibraryId, competency.id)
+              )
+            );
+
+          // Determine new status based on progress
+          let newStatus = currentRecord?.currentStatus || "not_started";
+          let shouldUpdate = false;
+
+          if (stepType === 'lesson' || stepType === 'quiz') {
+            // Check if user has any progress in learning paths linked to this competency
+            if (competency.linkedLearningPaths && competency.linkedLearningPaths.length > 0) {
+              const pathEnrollments = await db
+                .select()
+                .from(learningPathEnrollments)
+                .where(
+                  and(
+                    eq(learningPathEnrollments.userId, userId),
+                    sql`${learningPathEnrollments.learningPathId} = ANY(${competency.linkedLearningPaths})`
+                  )
+                );
+
+              if (pathEnrollments.length > 0 && newStatus === "not_started") {
+                newStatus = "in_progress";
+                shouldUpdate = true;
+              }
+            }
+          } else if (stepType === 'path_completion') {
+            // Path completion moves to competent
+            if (newStatus !== "competent") {
+              newStatus = "competent";
+              shouldUpdate = true;
+            }
+          }
+
+          if (shouldUpdate) {
+            // Update or create training matrix record
+            if (currentRecord) {
+              await db
+                .update(trainingMatrixRecords)
+                .set({
+                  currentStatus: newStatus,
+                  lastAssessmentDate: new Date(),
+                  lastAssessmentScore: progressData?.score || currentRecord.lastAssessmentScore,
+                  updatedAt: new Date(),
+                  updatedBy: userId
+                })
+                .where(eq(trainingMatrixRecords.id, currentRecord.id));
+            } else {
+              await db.insert(trainingMatrixRecords).values({
+                userId,
+                competencyLibraryId: competency.id,
+                currentStatus: newStatus,
+                lastAssessmentDate: new Date(),
+                lastAssessmentScore: progressData?.score,
+                updatedBy: userId
+              });
+            }
+
+            // Create audit trail entry
+            await this.createCompetencyStatusHistory({
+              userId,
+              competencyLibraryId: competency.id,
+              previousStatus: currentRecord?.currentStatus || "not_started",
+              newStatus,
+              changeReason: `Learning progress sync - ${stepType}`,
+              evidenceType: "learning_path_progress",
+              evidenceData: {
+                learningPathId,
+                stepType,
+                progressData,
+                triggeredBy: "real_time_sync"
+              },
+              changedBy: userId
+            });
+
+            statusUpdates.push(`${competency.title}: ${currentRecord?.currentStatus || "not_started"} → ${newStatus}`);
+            syncedCompetencies++;
+
+            // Log audit trail for ISO compliance
+            console.log(`[AUDIT] Training Matrix sync - User ${userId}, Competency ${competency.id} (${competency.title}): ${currentRecord?.currentStatus || "not_started"} → ${newStatus} via ${stepType}`);
+          }
+        } catch (error: any) {
+          errors.push(`Failed to sync competency ${competency.id}: ${error.message}`);
+        }
+      }
+
+      return { 
+        syncedCompetencies, 
+        statusUpdates, 
+        errors: errors.length > 0 ? errors : undefined 
+      };
+    } catch (error: any) {
+      errors.push(`Training Matrix sync failed: ${error.message}`);
+      return { syncedCompetencies: 0, statusUpdates: [], errors };
     }
   }
 
@@ -3128,96 +3276,27 @@ export class DatabaseStorage implements IStorage {
           .onConflictDoNothing({ target: certificates.learningPathEnrollmentId });
       }
       
-      // Sync Training Matrix records when learning path is completed
-      await this.syncTrainingMatrixOnLearningPathCompletion(tx, completedEnrollment, learningPath);
+      // Real-time Training Matrix sync for learning path completion
+      try {
+        const syncResult = await this.syncTrainingMatrixOnLearningProgress(
+          completedEnrollment.userId,
+          completedEnrollment.learningPathId,
+          'path_completion',
+          { completed: true }
+        );
+        
+        if (syncResult.syncedCompetencies > 0) {
+          console.log(`[SYNC] Learning path completion synced ${syncResult.syncedCompetencies} competencies for user ${completedEnrollment.userId}`);
+        }
+      } catch (error) {
+        console.error("Error syncing training matrix on learning path completion:", error);
+        // Don't throw to avoid breaking enrollment completion
+      }
       
       return completedEnrollment;
     });
   }
 
-  // Real-time Training Matrix Sync - updates training matrix when learning paths are completed
-  private async syncTrainingMatrixOnLearningPathCompletion(
-    tx: any, 
-    completedEnrollment: LearningPathEnrollment, 
-    learningPath: any
-  ): Promise<void> {
-    // Find competency library items linked to this learning path
-    const linkedCompetencies = await tx.select()
-      .from(competencyLibrary)
-      .where(sql`${competencyLibrary.linkedLearningPaths} IS NOT NULL AND ${completedEnrollment.pathId} = ANY(${competencyLibrary.linkedLearningPaths})`);
-
-    for (const competency of linkedCompetencies) {
-      // Check if training matrix record exists for this user-competency combination
-      const existingRecords = await tx.select()
-        .from(trainingMatrixRecords)
-        .where(and(
-          eq(trainingMatrixRecords.userId, completedEnrollment.userId),
-          eq(trainingMatrixRecords.competencyLibraryId, competency.id)
-        ));
-
-      const completionEvidence = {
-        type: "learning_path_completion",
-        learningPathId: learningPath.id,
-        learningPathTitle: learningPath.title,
-        enrollmentId: completedEnrollment.id,
-        completionDate: completedEnrollment.completionDate,
-        pathType: learningPath.pathType,
-        category: learningPath.category,
-        estimatedDuration: learningPath.estimatedDuration
-      };
-
-      const trainingHistoryEntry = {
-        type: "learning_path",
-        learningPathId: learningPath.id,
-        title: learningPath.title,
-        completionDate: completedEnrollment.completionDate,
-        pathType: learningPath.pathType,
-        category: learningPath.category
-      };
-
-      if (existingRecords.length === 0) {
-        // Create new training matrix record
-        await tx.insert(trainingMatrixRecords).values({
-          userId: completedEnrollment.userId,
-          competencyLibraryId: competency.id,
-          currentStatus: "competent", // Learning path completion indicates competency
-          proficiencyLevel: "basic", // Default to basic, can be enhanced later
-          lastAssessmentDate: completedEnrollment.completionDate,
-          lastAssessmentScore: 100, // Learning path completion = 100%
-          evidenceRecords: [completionEvidence],
-          trainingHistory: [trainingHistoryEntry],
-          riskLevel: "low",
-          nextActionRequired: "monitor_renewal",
-          nextActionDueDate: competency.renewalPeriodDays 
-            ? new Date(Date.now() + (competency.renewalPeriodDays * 24 * 60 * 60 * 1000))
-            : null,
-          updatedBy: "system_auto_sync"
-        });
-      } else {
-        // Update existing training matrix record
-        const existingRecord = existingRecords[0];
-        const updatedEvidenceRecords = [...(existingRecord.evidenceRecords || []), completionEvidence];
-        const updatedTrainingHistory = [...(existingRecord.trainingHistory || []), trainingHistoryEntry];
-
-        await tx.update(trainingMatrixRecords)
-          .set({
-            currentStatus: "competent", // Update status to competent
-            lastAssessmentDate: completedEnrollment.completionDate,
-            lastAssessmentScore: 100,
-            evidenceRecords: updatedEvidenceRecords,
-            trainingHistory: updatedTrainingHistory,
-            riskLevel: "low",
-            nextActionRequired: "monitor_renewal",
-            nextActionDueDate: competency.renewalPeriodDays 
-              ? new Date(Date.now() + (competency.renewalPeriodDays * 24 * 60 * 60 * 1000))
-              : null,
-            updatedBy: "system_auto_sync",
-            updatedAt: new Date()
-          })
-          .where(eq(trainingMatrixRecords.id, existingRecord.id));
-      }
-    }
-  }
 
   async suspendLearningPathEnrollment(enrollmentId: string, reason?: string): Promise<LearningPathEnrollment> {
     const [suspendedEnrollment] = await db.update(learningPathEnrollments)
@@ -3323,6 +3402,26 @@ export class DatabaseStorage implements IStorage {
     
     // Update enrollment progress
     await this.updateLearningPathEnrollmentProgress(enrollmentId);
+
+    // Real-time Training Matrix sync for step completion
+    try {
+      const enrollment = await this.getLearningPathEnrollment(enrollmentId);
+      if (enrollment) {
+        const syncResult = await this.syncTrainingMatrixOnLearningProgress(
+          enrollment.userId,
+          enrollment.learningPathId,
+          'lesson', // Step completion treated as lesson progress
+          { score, completed: true }
+        );
+        
+        if (syncResult.syncedCompetencies > 0) {
+          console.log(`[SYNC] Step completion synced ${syncResult.syncedCompetencies} competencies for user ${enrollment.userId}`);
+        }
+      }
+    } catch (error) {
+      console.error("Error syncing training matrix on step completion:", error);
+      // Don't throw to avoid breaking step completion
+    }
     
     return completedProgress;
   }
