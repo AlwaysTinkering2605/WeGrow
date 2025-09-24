@@ -49,6 +49,8 @@ function Router() {
       <Route path="/team" component={Home} />
       <Route path="/company-objectives" component={Home} />
       <Route path="/team-objectives" component={Home} />
+      <Route path="/competency-management" component={Home} />
+      <Route path="/training-matrix" component={Home} />
       <Route path="/reports" component={Home} />
       <Route path="/settings" component={Home} />
       <Route component={NotFound} />

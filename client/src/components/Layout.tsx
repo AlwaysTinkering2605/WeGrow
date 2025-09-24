@@ -15,6 +15,7 @@ import {
   Settings,
   UsersRound,
   GraduationCap,
+  Layers,
 } from "lucide-react";
 import Dashboard from "./Dashboard";
 import Goals from "./Goals";
@@ -30,8 +31,10 @@ import CompanyObjectives from "./CompanyObjectives";
 import TeamObjectives from "./TeamObjectives";
 import Reports from "./Reports";
 import CompanySettings from "./CompanySettings";
+import CompetencyManagement from "./CompetencyManagement";
+import TrainingMatrixDashboard from "./TrainingMatrixDashboard";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "team" | "company-objectives" | "team-objectives" | "reports" | "settings";
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "team" | "company-objectives" | "team-objectives" | "reports" | "settings" | "competency-management" | "training-matrix";
 
 export default function Layout() {
   const [location] = useLocation();
@@ -52,6 +55,8 @@ export default function Layout() {
     if (location === "/team-objectives") return "team-objectives";
     if (location === "/reports") return "reports";
     if (location === "/settings") return "settings";
+    if (location === "/competency-management") return "competency-management";
+    if (location === "/training-matrix") return "training-matrix";
     return "dashboard";
   };
 
@@ -73,12 +78,15 @@ export default function Layout() {
   const supervisorTabs = [
     { id: "team", label: "Team Management", icon: UsersRound, component: TeamManagement },
     { id: "team-objectives", label: "Team Objectives", icon: Target, component: TeamObjectives },
+    { id: "training-matrix", label: "Training Matrix", icon: BarChart3, component: TrainingMatrixDashboard },
   ];
 
   const leadershipTabs = [
     { id: "team", label: "Team Management", icon: UsersRound, component: TeamManagement },
     { id: "company-objectives", label: "Company Objectives", icon: Target, component: CompanyObjectives },
     { id: "team-objectives", label: "Team Objectives", icon: Target, component: TeamObjectives },
+    { id: "competency-management", label: "Competency Management", icon: Layers, component: CompetencyManagement },
+    { id: "training-matrix", label: "Training Matrix", icon: BarChart3, component: TrainingMatrixDashboard },
     { id: "reports", label: "Reports", icon: BarChart3, component: Reports },
     { id: "settings", label: "Company Settings", icon: Settings, component: CompanySettings },
   ];
