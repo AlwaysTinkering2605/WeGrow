@@ -1277,6 +1277,19 @@ export default function Learning() {
     retry: false,
   });
 
+  // Phase 1 Enhancement: Learning Path Enrollments with Due Dates
+  const { data: learningPathEnrollments, isLoading: learningPathEnrollmentsLoading, refetch: refetchLearningPathEnrollments } = useQuery<any[]>({
+    queryKey: ["/api/users", user?.id, "learning-path-enrollments"],
+    enabled: !!user?.id,
+    retry: false,
+  });
+
+  // Phase 1 Enhancement: Training Matrix Records (Real-time Sync)
+  const { data: trainingMatrixRecords, isLoading: trainingMatrixLoading, refetch: refetchTrainingMatrix } = useQuery<any[]>({
+    queryKey: ["/api/training-matrix"],
+    retry: false,
+  });
+
   // Fetch available courses for the catalog
   const { data: availableCourses, isLoading: coursesLoading, error: coursesError, refetch: refetchCourses } = useQuery<any[]>({
     queryKey: ["/api/lms/courses"],
@@ -1332,6 +1345,54 @@ export default function Learning() {
 
 
   // Lesson progress mutation
+  // Phase 1 Enhancement: Closed-Loop Integration
+  const triggerClosedLoopMutation = useMutation({
+    mutationFn: async (userId?: string) => {
+      const endpoint = userId 
+        ? `/api/automation/trigger/user/${userId}`
+        : '/api/automation/trigger/organization';
+      return apiRequest(endpoint, { method: 'POST' });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Closed-Loop Integration Complete",
+        description: `Processed ${data.gapsIdentified || data.totalGapsIdentified || 0} competency gaps, assigned ${data.pathsAssigned || data.totalPathsAssigned || 0} learning paths`,
+      });
+      refetchLearningPathEnrollments();
+      refetchTrainingMatrix();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to trigger closed-loop integration",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Phase 1 Enhancement: Manual Competency Gap Analysis
+  const competencyGapAnalysisMutation = useMutation({
+    mutationFn: async (filters: { userId?: string; teamId?: string; role?: string }) => {
+      return apiRequest('/api/lms/competency-gap-analysis', {
+        method: 'POST',
+        body: JSON.stringify(filters),
+      });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Gap Analysis Complete",
+        description: `Found ${data.gapCount || data.results?.reduce((sum: number, r: any) => sum + (r.gapCount || 0), 0) || 0} competency gaps`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to perform gap analysis",
+        variant: "destructive",
+      });
+    }
+  });
+
   const updateProgressMutation = useMutation({
     mutationFn: async ({ enrollmentId, lessonId, progressPercentage, lastPosition, timeSpent, status }: {
       enrollmentId: string;
@@ -1372,7 +1433,14 @@ export default function Learning() {
         queryClient.invalidateQueries({ queryKey: ["/api/lms/enrollments", variables.enrollmentId] });
       }
       
-      console.log(`Progress updated: ${variables.progressPercentage}% for lesson ${variables.lessonId}. Cache invalidated.`);
+      // Phase 1 Enhancement: Real-time sync - invalidate training matrix and learning path enrollments
+      queryClient.invalidateQueries({ queryKey: ["/api/training-matrix"] });
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/users", user.id, "learning-path-enrollments"] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/certificates/me"] });
+      
+      console.log(`Progress updated: ${variables.progressPercentage}% for lesson ${variables.lessonId}. Cache invalidated with Phase 1 real-time sync.`);
     },
     onError: (error: any) => {
       console.error('Failed to update progress:', error);
@@ -6870,6 +6938,112 @@ export default function Learning() {
         )}
 
         {!isAdminMode && activeTab === "dashboard" && (<div className="space-y-6">
+          {/* Phase 1 Enhancement: Closed-Loop Integration Controls (Supervisor/Leadership Only) */}
+          {user && (user.role === 'supervisor' || user.role === 'leadership') && (
+            <Card data-testid="card-closed-loop-controls">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Target className="w-5 h-5 mr-2" />
+                  Competency Management
+                </CardTitle>
+                <CardDescription>
+                  Analyze competency gaps and trigger automated learning path assignments
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex space-x-3">
+                  <Button
+                    onClick={() => competencyGapAnalysisMutation.mutate({ userId: user.id })}
+                    disabled={competencyGapAnalysisMutation.isPending}
+                    variant="outline"
+                    data-testid="button-gap-analysis"
+                  >
+                    <AlertCircle className="w-4 h-4 mr-2" />
+                    {competencyGapAnalysisMutation.isPending ? "Analyzing..." : "Analyze My Gaps"}
+                  </Button>
+                  <Button
+                    onClick={() => triggerClosedLoopMutation.mutate(user.id)}
+                    disabled={triggerClosedLoopMutation.isPending}
+                    data-testid="button-trigger-closed-loop"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    {triggerClosedLoopMutation.isPending ? "Processing..." : "Auto-Assign Learning"}
+                  </Button>
+                  {user.role === 'leadership' && (
+                    <Button
+                      onClick={() => triggerClosedLoopMutation.mutate()}
+                      disabled={triggerClosedLoopMutation.isPending}
+                      variant="secondary"
+                      data-testid="button-org-closed-loop"
+                    >
+                      <Building className="w-4 h-4 mr-2" />
+                      {triggerClosedLoopMutation.isPending ? "Processing..." : "Organization-wide"}
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Phase 1 Enhancement: Learning Path Enrollments with Due Dates */}
+          {learningPathEnrollments && learningPathEnrollments.length > 0 && (
+            <Card data-testid="card-learning-path-enrollments">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Route className="w-5 h-5 mr-2" />
+                  Learning Path Progress
+                </CardTitle>
+                <CardDescription>
+                  Your enrolled learning paths with completion deadlines
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {learningPathEnrollments.map((enrollment: any) => (
+                    <div key={enrollment.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors" data-testid={`enrollment-${enrollment.id}`}>
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h3 className="font-semibold">{enrollment.learningPath?.title || 'Learning Path'}</h3>
+                          <p className="text-sm text-muted-foreground">{enrollment.learningPath?.description}</p>
+                        </div>
+                        <Badge variant={
+                          enrollment.enrollmentStatus === 'completed' ? 'default' :
+                          enrollment.enrollmentStatus === 'in_progress' ? 'secondary' :
+                          'outline'
+                        }>
+                          {enrollment.enrollmentStatus}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4 text-sm">
+                          <div className="flex items-center">
+                            <Progress value={enrollment.progress || 0} className="w-20 h-2" />
+                            <span className="ml-2">{enrollment.progress || 0}%</span>
+                          </div>
+                          {enrollment.dueDate && (
+                            <div className="flex items-center text-amber-600">
+                              <Calendar className="w-4 h-4 mr-1" />
+                              Due: {new Date(enrollment.dueDate).toLocaleDateString()}
+                            </div>
+                          )}
+                          {enrollment.estimatedDuration && (
+                            <div className="flex items-center">
+                              <Clock className="w-4 h-4 mr-1" />
+                              {enrollment.estimatedDuration}min estimated
+                            </div>
+                          )}
+                        </div>
+                        <Button size="sm" variant="outline" data-testid={`button-continue-${enrollment.id}`}>
+                          {enrollment.enrollmentStatus === 'completed' ? 'Review' : 'Continue'}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Learning Progress Overview */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card data-testid="card-enrolled-courses" className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/learning/courses'}>
@@ -7496,7 +7670,8 @@ Authorized by Apex Learning Management System
                 <div className="text-center py-8">
                   <Award className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground mb-2">No certificates earned yet</p>
-                  <p className="text-sm text-muted-foreground">Complete courses to earn your first certificate</p>
+                  <p className="text-sm text-muted-foreground">Complete courses and learning paths to earn your first certificate</p>
+                  <p className="text-xs text-muted-foreground mt-1">🚀 Auto-certification: Certificates are automatically generated upon completion</p>
                 </div>
               )}
             </CardContent>
