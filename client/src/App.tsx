@@ -47,6 +47,7 @@ function Router() {
       <Route path="/meetings" component={Home} />
       <Route path="/profile" component={Home} />
       <Route path="/team" component={Home} />
+      <Route path="/company-objectives" component={Home} />
       <Route path="/team-objectives" component={Home} />
       <Route path="/reports" component={Home} />
       <Route path="/settings" component={Home} />

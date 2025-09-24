@@ -316,6 +316,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/team-objectives/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is supervisor or leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const { id } = req.params;
+      
+      // Get the existing objective to check ownership for supervisors
+      const existingObjective = await storage.getTeamObjectiveById(id);
+      if (!existingObjective) {
+        return res.status(404).json({ message: "Team objective not found" });
+      }
+
+      // For supervisors, ensure they can only edit their own team's objectives
+      if (user.role === 'supervisor' && existingObjective.supervisorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied. You can only edit your own team's objectives." });
+      }
+
+      // Validate the update data
+      const updateSchema = insertTeamObjectiveSchema.partial().omit({ supervisorId: true });
+      const updateData = updateSchema.parse(req.body);
+      
+      const objective = await storage.updateTeamObjective(id, updateData);
+      res.json(objective);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error updating team objective:", error);
+      res.status(500).json({ message: "Failed to update team objective" });
+    }
+  });
+
   app.delete('/api/team-objectives/:id', isAuthenticated, async (req: any, res) => {
     try {
       // Check if user is supervisor or leadership

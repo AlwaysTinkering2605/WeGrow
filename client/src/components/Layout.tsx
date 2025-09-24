@@ -26,11 +26,12 @@ import Learning from "./Learning";
 
 // Role-based components
 import TeamManagement from "./TeamManagement";
+import CompanyObjectives from "./CompanyObjectives";
 import TeamObjectives from "./TeamObjectives";
 import Reports from "./Reports";
 import CompanySettings from "./CompanySettings";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "team" | "team-objectives" | "reports" | "settings";
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "team" | "company-objectives" | "team-objectives" | "reports" | "settings";
 
 export default function Layout() {
   const [location] = useLocation();
@@ -47,6 +48,7 @@ export default function Layout() {
     if (location === "/meetings") return "meetings";
     if (location === "/profile") return "profile";
     if (location === "/team") return "team";
+    if (location === "/company-objectives") return "company-objectives";
     if (location === "/team-objectives") return "team-objectives";
     if (location === "/reports") return "reports";
     if (location === "/settings") return "settings";
@@ -75,6 +77,7 @@ export default function Layout() {
 
   const leadershipTabs = [
     { id: "team", label: "Team Management", icon: UsersRound, component: TeamManagement },
+    { id: "company-objectives", label: "Company Objectives", icon: Target, component: CompanyObjectives },
     { id: "team-objectives", label: "Team Objectives", icon: Target, component: TeamObjectives },
     { id: "reports", label: "Reports", icon: BarChart3, component: Reports },
     { id: "settings", label: "Company Settings", icon: Settings, component: CompanySettings },

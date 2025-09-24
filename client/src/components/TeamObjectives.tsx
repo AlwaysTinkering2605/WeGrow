@@ -22,7 +22,8 @@ import {
   Users,
   Building,
   Calendar,
-  AlertCircle 
+  AlertCircle,
+  Edit 
 } from "lucide-react";
 
 // Enhanced form schema with date validation
@@ -42,6 +43,8 @@ type TeamObjectiveForm = z.infer<typeof teamObjectiveSchema>;
 export default function TeamObjectives() {
   const { user } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingObjective, setEditingObjective] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -68,8 +71,21 @@ export default function TeamObjectives() {
     retry: false,
   });
 
-  // Form setup
+  // Form setup for creating objectives
   const teamObjectiveForm = useForm<TeamObjectiveForm>({
+    resolver: zodResolver(teamObjectiveSchema),
+    defaultValues: {
+      parentCompanyObjectiveId: "",
+      teamName: user?.teamName || "",
+      title: "",
+      description: "",
+      startDate: "",
+      endDate: "",
+    },
+  });
+
+  // Form setup for editing objectives
+  const editTeamObjectiveForm = useForm<TeamObjectiveForm>({
     resolver: zodResolver(teamObjectiveSchema),
     defaultValues: {
       parentCompanyObjectiveId: "",
@@ -109,6 +125,36 @@ export default function TeamObjectives() {
     },
   });
 
+  // Update team objective mutation
+  const updateTeamObjectiveMutation = useMutation({
+    mutationFn: async (data: TeamObjectiveForm) => {
+      if (!editingObjective?.id) throw new Error("No objective to update");
+      const payload = {
+        ...data,
+        startDate: new Date(data.startDate).toISOString(),
+        endDate: new Date(data.endDate).toISOString(),
+      };
+      await apiRequest("PUT", `/api/team-objectives/${editingObjective.id}`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/team-objectives"] });
+      setIsEditDialogOpen(false);
+      setEditingObjective(null);
+      editTeamObjectiveForm.reset();
+      toast({
+        title: "Team objective updated!",
+        description: "Team objective has been updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update team objective. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Delete team objective mutation
   const deleteTeamObjectiveMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -129,6 +175,22 @@ export default function TeamObjectives() {
       });
     },
   });
+
+  // Handle editing an objective
+  const handleEditObjective = (objective: any) => {
+    setEditingObjective(objective);
+    
+    editTeamObjectiveForm.reset({
+      parentCompanyObjectiveId: objective.parentCompanyObjectiveId || "",
+      teamName: objective.teamName || "",
+      title: objective.title || "",
+      description: objective.description || "",
+      startDate: objective.startDate ? new Date(objective.startDate).toISOString().split('T')[0] : "",
+      endDate: objective.endDate ? new Date(objective.endDate).toISOString().split('T')[0] : "",
+    });
+    
+    setIsEditDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -269,6 +331,132 @@ export default function TeamObjectives() {
         </Dialog>
       </div>
 
+      {/* Edit Team Objective Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Team Objective</DialogTitle>
+          </DialogHeader>
+          <Form {...editTeamObjectiveForm}>
+            <form onSubmit={editTeamObjectiveForm.handleSubmit((data) => updateTeamObjectiveMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={editTeamObjectiveForm.control}
+                name="parentCompanyObjectiveId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company Objective</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-company-objective">
+                          <SelectValue placeholder="Select company objective to support" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {(companyObjectives as any[])?.map((objective: any) => (
+                          <SelectItem key={objective.id} value={objective.id}>
+                            {objective.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editTeamObjectiveForm.control}
+                name="teamName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Team Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., David's North Glasgow Team" {...field} data-testid="input-edit-team-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editTeamObjectiveForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Team Objective Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Deliver flawless service and proactive support to North Glasgow clients" {...field} data-testid="input-edit-team-objective-title" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editTeamObjectiveForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Describe how this team objective supports the company objective..." 
+                        rows={3}
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="textarea-edit-team-objective-description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editTeamObjectiveForm.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Date</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="date" 
+                          {...field}
+                          data-testid="input-edit-team-objective-start-date"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editTeamObjectiveForm.control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Date</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="date" 
+                          {...field}
+                          data-testid="input-edit-team-objective-end-date"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)} data-testid="button-cancel-edit-team-objective">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateTeamObjectiveMutation.isPending} data-testid="button-submit-edit-team-objective">
+                  {updateTeamObjectiveMutation.isPending ? "Updating..." : "Update Objective"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
       {/* Team Objectives List */}
       <Card>
         <CardHeader>
@@ -318,15 +506,25 @@ export default function TeamObjectives() {
                         </span>
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteTeamObjectiveMutation.mutate(objective.id)}
-                      disabled={deleteTeamObjectiveMutation.isPending}
-                      data-testid={`button-delete-team-objective-${objective.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditObjective(objective)}
+                        data-testid={`button-edit-team-objective-${objective.id}`}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteTeamObjectiveMutation.mutate(objective.id)}
+                        disabled={deleteTeamObjectiveMutation.isPending}
+                        data-testid={`button-delete-team-objective-${objective.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
