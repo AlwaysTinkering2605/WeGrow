@@ -621,6 +621,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Badge icon upload endpoint (admin only)
+  app.post('/api/objects/badges/upload', isAuthenticated, async (req: any, res) => {
+    try {
+      const { filename, badgeId } = req.body;
+      const userId = req.user.claims.sub;
+      
+      // Check if user is admin (supervisor or leadership)
+      const user = await storage.getUser(userId);
+      if (!user || (user.role !== 'supervisor' && user.role !== 'leadership')) {
+        return res.status(403).json({ message: "Only admins can upload badge icons" });
+      }
+      
+      if (!filename || !badgeId) {
+        return res.status(400).json({ message: "Filename and badgeId are required" });
+      }
+      
+      const objectStorageService = new ObjectStorageService();
+      const result = await objectStorageService.getBadgeIconUploadURL(filename, badgeId);
+      
+      res.json({
+        uploadURL: result.uploadURL,
+        objectPath: result.objectPath,
+        iconKey: result.iconKey,
+        message: "Badge icon upload URL generated successfully"
+      });
+    } catch (error: any) {
+      console.error("Error getting badge icon upload URL:", error);
+      res.status(400).json({ message: error.message || "Failed to get badge icon upload URL" });
+    }
+  });
+
   // Upload PDF document for lesson content
   app.post('/api/lms/upload/lesson-pdf', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
     try {

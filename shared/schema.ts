@@ -423,8 +423,10 @@ export const badges = pgTable("badges", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
   description: text("description"),
-  iconUrl: varchar("icon_url"),
+  iconKey: varchar("icon_key"), // Object storage key for the badge icon
+  iconUrl: varchar("icon_url"), // Public URL for the badge icon
   criteria: text("criteria"), // How to earn this badge
+  color: varchar("color").default('#3b82f6'), // Badge color for display
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });

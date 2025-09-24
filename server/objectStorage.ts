@@ -166,7 +166,7 @@ export class ObjectStorageService {
   }
 
   // Validate file type and size
-  private validateFileUpload(filename: string, fileType: 'pdf' | 'certificate', maxSizeBytes: number = 10 * 1024 * 1024): void {
+  private validateFileUpload(filename: string, fileType: 'pdf' | 'certificate' | 'badge_icon', maxSizeBytes: number = 10 * 1024 * 1024): void {
     const extension = filename.toLowerCase().split('.').pop();
     
     if (fileType === 'pdf' && extension !== 'pdf') {
@@ -175,6 +175,10 @@ export class ObjectStorageService {
     
     if (fileType === 'certificate' && !['pdf', 'jpg', 'jpeg', 'png'].includes(extension || '')) {
       throw new Error('Only PDF, JPG, JPEG, or PNG files are allowed for certificates');
+    }
+    
+    if (fileType === 'badge_icon' && !['jpg', 'jpeg', 'png', 'svg', 'webp'].includes(extension || '')) {
+      throw new Error('Only JPG, JPEG, PNG, SVG, or WebP files are allowed for badge icons');
     }
   }
 
@@ -228,6 +232,34 @@ export class ObjectStorageService {
     return {
       uploadURL,
       objectPath: `/public/lessons/${uniqueFilename}`
+    };
+  }
+
+  // Get upload URL for badge icons (public storage)
+  async getBadgeIconUploadURL(originalFilename: string, badgeId: string): Promise<{ uploadURL: string, objectPath: string, iconKey: string }> {
+    this.validateFileUpload(originalFilename, 'badge_icon');
+    
+    const sanitizedFilename = this.sanitizeFilename(originalFilename);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const uniqueFilename = `badge_${badgeId}_${timestamp}_${sanitizedFilename}`;
+    
+    const publicObjectSearchPaths = this.getPublicObjectSearchPaths();
+    const publicPath = publicObjectSearchPaths[0]; // Use first public path
+    const fullPath = `${publicPath}/badges/${uniqueFilename}`;
+    
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    
+    const uploadURL = await signObjectURL({
+      bucketName,
+      objectName,
+      method: "PUT",
+      ttlSec: 900,
+    });
+    
+    return {
+      uploadURL,
+      objectPath: `/public/badges/${uniqueFilename}`,
+      iconKey: `badges/${uniqueFilename}`
     };
   }
 
