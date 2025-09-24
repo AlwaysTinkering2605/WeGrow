@@ -411,14 +411,23 @@ export const trainingRecords = pgTable("training_records", {
 export const certificates = pgTable("certificates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
-  courseVersionId: varchar("course_version_id").notNull(),
-  trainingRecordId: varchar("training_record_id").notNull(),
+  courseVersionId: varchar("course_version_id"), // Optional - for course certificates
+  trainingRecordId: varchar("training_record_id"), // Optional - for course certificates
+  learningPathId: varchar("learning_path_id"), // Optional - for learning path certificates
+  learningPathEnrollmentId: varchar("learning_path_enrollment_id"), // Optional - for learning path certificates
   certificateNumber: varchar("certificate_number").notNull(),
+  certificateType: varchar("certificate_type"), // "course" or "learning_path" - nullable for backward compatibility
+  title: varchar("title"), // Certificate title (course name or learning path name) - nullable for backward compatibility
   issuedAt: timestamp("issued_at").defaultNow(),
   expiresAt: timestamp("expires_at"),
   verificationHash: varchar("verification_hash"),
   metadata: jsonb("metadata"), // Additional certificate data
-});
+}, (table) => ({
+  // Unique constraint for learning path certificates to prevent duplicates
+  uniqueLearningPathEnrollment: uniqueIndex("ux_cert_lp_enrollment").on(table.learningPathEnrollmentId).where(sql`${table.learningPathEnrollmentId} IS NOT NULL`),
+  // Unique constraint for certificate numbers to ensure global uniqueness
+  uniqueCertificateNumber: uniqueIndex("ux_cert_number").on(table.certificateNumber),
+}));
 
 // Badges
 export const badges = pgTable("badges", {
@@ -485,6 +494,7 @@ export const learningPaths = pgTable("learning_paths", {
   pathType: varchar("path_type").notNull(), // "linear", "non_linear", "adaptive"
   category: varchar("category"), // e.g., "onboarding", "compliance", "professional_development"
   estimatedDuration: integer("estimated_duration"), // Minutes
+  relativeDueDays: integer("relative_due_days"), // Days from enrollment to completion (e.g., 30 = due 30 days after enrollment)
   isActive: boolean("is_active").default(true),
   isPublished: boolean("is_published").default(false),
   publishedAt: timestamp("published_at"), // When path was published
