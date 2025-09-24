@@ -31,6 +31,9 @@ import {
   insertUserBadgeSchema,
   insertTrainingRequirementSchema,
   insertPdpCourseLinkSchema,
+  // Learning Paths schemas
+  insertLearningPathSchema,
+  insertLearningPathStepSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -2215,6 +2218,334 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       return handleValidationError(error, res, "assign external course completion");
+    }
+  });
+
+  // ========================================
+  // LEARNING PATHS API ROUTES (Vertical Slice 1)
+  // ========================================
+
+  // Learning Paths Management
+  app.get('/api/learning-paths', isAuthenticated, async (req: any, res) => {
+    try {
+      const allPaths = await storage.getLearningPaths();
+      
+      // Check if user is admin to see all paths, otherwise filter to published only
+      const user = await storage.getUser(req.user.claims.sub);
+      const isAdmin = user?.role === 'supervisor' || user?.role === 'leadership';
+      
+      const filteredPaths = isAdmin ? allPaths : allPaths.filter(path => path.isPublished);
+      res.json(filteredPaths);
+    } catch (error) {
+      console.error("Error fetching learning paths:", error);
+      res.status(500).json({ message: "Failed to fetch learning paths" });
+    }
+  });
+
+  app.get('/api/learning-paths/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const path = await storage.getLearningPath(id);
+      
+      if (!path) {
+        return res.status(404).json({ message: "Learning path not found" });
+      }
+      
+      // Check if user is admin to see unpublished paths
+      const user = await storage.getUser(req.user.claims.sub);
+      const isAdmin = user?.role === 'supervisor' || user?.role === 'leadership';
+      
+      if (!isAdmin && !path.isPublished) {
+        return res.status(404).json({ message: "Learning path not found" });
+      }
+      
+      res.json(path);
+    } catch (error) {
+      console.error("Error fetching learning path:", error);
+      res.status(500).json({ message: "Failed to fetch learning path" });
+    }
+  });
+
+  app.get('/api/learning-paths/:id/with-steps', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const pathWithSteps = await storage.getLearningPathWithSteps(id);
+      
+      if (!pathWithSteps) {
+        return res.status(404).json({ message: "Learning path not found" });
+      }
+      
+      // Check if user is admin to see unpublished paths
+      const user = await storage.getUser(req.user.claims.sub);
+      const isAdmin = user?.role === 'supervisor' || user?.role === 'leadership';
+      
+      if (!isAdmin && !pathWithSteps.isPublished) {
+        return res.status(404).json({ message: "Learning path not found" });
+      }
+      
+      res.json(pathWithSteps);
+    } catch (error: any) {
+      console.error("Error fetching learning path with steps:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to fetch learning path with steps" });
+    }
+  });
+
+  app.post('/api/learning-paths', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = insertLearningPathSchema.parse({
+        ...req.body,
+        createdBy: userId
+      });
+      
+      const newPath = await storage.createLearningPath(validatedData);
+      res.status(201).json(newPath);
+    } catch (error: any) {
+      return handleValidationError(error, res, "create learning path");
+    }
+  });
+
+  app.put('/api/learning-paths/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { id } = req.params;
+      // Use dedicated update schema that omits immutable fields
+      const updateLearningPathSchema = insertLearningPathSchema.omit({
+        createdBy: true,
+        isPublished: true,
+        publishedAt: true,
+      }).partial();
+      
+      const validatedData = updateLearningPathSchema.parse(req.body);
+      const updatedPath = await storage.updateLearningPath(id, validatedData);
+      res.json(updatedPath);
+    } catch (error: any) {
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      return handleValidationError(error, res, "update learning path");
+    }
+  });
+
+  app.delete('/api/learning-paths/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteLearningPath(id);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Error deleting learning path:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to delete learning path" });
+    }
+  });
+
+  app.post('/api/learning-paths/:id/publish', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const publishedPath = await storage.publishLearningPath(id);
+      res.json(publishedPath);
+    } catch (error: any) {
+      console.error("Error publishing learning path:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message.includes("without steps")) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to publish learning path" });
+    }
+  });
+
+  app.post('/api/learning-paths/:id/unpublish', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const unpublishedPath = await storage.unpublishLearningPath(id);
+      res.json(unpublishedPath);
+    } catch (error: any) {
+      console.error("Error unpublishing learning path:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to unpublish learning path" });
+    }
+  });
+
+  // Learning Path Steps Management
+  app.get('/api/learning-paths/:pathId/steps', isAuthenticated, async (req: any, res) => {
+    try {
+      const { pathId } = req.params;
+      
+      // Check parent path exists and visibility permissions
+      const parentPath = await storage.getLearningPath(pathId);
+      if (!parentPath) {
+        return res.status(404).json({ message: "Learning path not found" });
+      }
+      
+      // Enforce visibility: non-admins can only see steps for published paths
+      const user = await storage.getUser(req.user.claims.sub);
+      const isAdmin = user?.role === 'supervisor' || user?.role === 'leadership';
+      
+      if (!isAdmin && !parentPath.isPublished) {
+        return res.status(404).json({ message: "Learning path not found" });
+      }
+      
+      const steps = await storage.getLearningPathSteps(pathId);
+      res.json(steps);
+    } catch (error) {
+      console.error("Error fetching learning path steps:", error);
+      res.status(500).json({ message: "Failed to fetch learning path steps" });
+    }
+  });
+
+  app.get('/api/learning-paths/:pathId/steps/:stepId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { stepId, pathId } = req.params;
+      const step = await storage.getLearningPathStep(stepId);
+      
+      if (!step || step.pathId !== pathId) {
+        return res.status(404).json({ message: "Learning path step not found" });
+      }
+      
+      // Check parent path visibility permissions  
+      const parentPath = await storage.getLearningPath(pathId);
+      if (!parentPath) {
+        return res.status(404).json({ message: "Learning path not found" });
+      }
+      
+      // Enforce visibility: non-admins can only see steps for published paths
+      const user = await storage.getUser(req.user.claims.sub);
+      const isAdmin = user?.role === 'supervisor' || user?.role === 'leadership';
+      
+      if (!isAdmin && !parentPath.isPublished) {
+        return res.status(404).json({ message: "Learning path step not found" });
+      }
+      
+      res.json(step);
+    } catch (error) {
+      console.error("Error fetching learning path step:", error);
+      res.status(500).json({ message: "Failed to fetch learning path step" });
+    }
+  });
+
+  app.post('/api/learning-paths/:pathId/steps', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { pathId } = req.params;
+      // Omit pathId from validation to prevent client spoofing, inject from params
+      const stepSchema = insertLearningPathStepSchema.omit({ pathId: true });
+      const validatedBodyData = stepSchema.parse(req.body);
+      
+      const validatedData = {
+        ...validatedBodyData,
+        pathId // Inject pathId from URL params
+      };
+      
+      const newStep = await storage.createLearningPathStep(validatedData);
+      res.status(201).json(newStep);
+    } catch (error: any) {
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      return handleValidationError(error, res, "create learning path step");
+    }
+  });
+
+  app.put('/api/learning-paths/:pathId/steps/:stepId', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { stepId, pathId } = req.params;
+      
+      // Verify step exists and belongs to specified path BEFORE mutation (prevent TOCTOU)
+      const existingStep = await storage.getLearningPathStep(stepId);
+      if (!existingStep || existingStep.pathId !== pathId) {
+        return res.status(404).json({ message: "Step not found in specified path" });
+      }
+      
+      // Create update schema that omits immutable fields and pathId
+      const updateStepSchema = insertLearningPathStepSchema.omit({
+        pathId: true,
+        stepOrder: true, // Prevent direct stepOrder changes, use reorder endpoint
+      }).partial();
+      
+      const validatedData = updateStepSchema.parse(req.body);
+      const updatedStep = await storage.updateLearningPathStep(stepId, validatedData);
+      
+      res.json(updatedStep);
+    } catch (error: any) {
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      return handleValidationError(error, res, "update learning path step");
+    }
+  });
+
+  app.delete('/api/learning-paths/:pathId/steps/:stepId', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { stepId, pathId } = req.params;
+      
+      // Verify step exists and belongs to specified path before deletion
+      const existingStep = await storage.getLearningPathStep(stepId);
+      if (!existingStep || existingStep.pathId !== pathId) {
+        return res.status(404).json({ message: "Step not found in specified path" });
+      }
+      
+      await storage.deleteLearningPathStep(stepId);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Error deleting learning path step:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to delete learning path step" });
+    }
+  });
+
+  app.put('/api/learning-paths/:pathId/steps/reorder', isAuthenticated, requireSupervisorOrLeadership(), async (req, res) => {
+    try {
+      const { pathId } = req.params;
+      const { stepIds } = req.body;
+      
+      if (!Array.isArray(stepIds)) {
+        return res.status(400).json({ message: "stepIds must be an array" });
+      }
+      
+      if (stepIds.length === 0) {
+        return res.status(400).json({ message: "stepIds cannot be empty" });
+      }
+      
+      // Verify all stepIds are unique
+      const uniqueStepIds = new Set(stepIds);
+      if (uniqueStepIds.size !== stepIds.length) {
+        return res.status(400).json({ message: "stepIds must be unique" });
+      }
+      
+      // Verify all steps belong to the specified path
+      const existingSteps = await storage.getLearningPathSteps(pathId);
+      const existingStepIds = new Set(existingSteps.map(step => step.id));
+      
+      if (stepIds.length !== existingSteps.length) {
+        return res.status(400).json({ message: "stepIds count must match existing steps count" });
+      }
+      
+      for (const stepId of stepIds) {
+        if (!existingStepIds.has(stepId)) {
+          return res.status(400).json({ message: `Step ${stepId} does not belong to path ${pathId}` });
+        }
+      }
+      
+      await storage.reorderLearningPathSteps(pathId, stepIds);
+      res.json({ message: "Steps reordered successfully" });
+    } catch (error: any) {
+      console.error("Error reordering learning path steps:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message.includes("provide all current steps")) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to reorder learning path steps" });
     }
   });
 
