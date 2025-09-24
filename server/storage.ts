@@ -88,7 +88,7 @@ import {
   updateUserProfileSchema,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, isNull, max } from "drizzle-orm";
 
 export interface IStorage {
   // User operations - required for Replit Auth
@@ -2569,60 +2569,277 @@ export class DatabaseStorage implements IStorage {
 
   // Learning Paths Management (Vertical Slice 1)
   async getLearningPaths(): Promise<LearningPath[]> {
-    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+    return await db
+      .select()
+      .from(learningPaths)
+      .where(isNull(learningPaths.deletedAt))
+      .orderBy(learningPaths.title);
   }
 
   async getLearningPath(pathId: string): Promise<LearningPath | undefined> {
-    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+    const [path] = await db
+      .select()
+      .from(learningPaths)
+      .where(and(eq(learningPaths.id, pathId), isNull(learningPaths.deletedAt)));
+    return path;
   }
 
   async getLearningPathWithSteps(pathId: string): Promise<LearningPath & { steps: LearningPathStep[] }> {
-    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+    const path = await this.getLearningPath(pathId);
+    if (!path) {
+      throw new Error(`Learning path not found: ${pathId}`);
+    }
+    
+    const steps = await this.getLearningPathSteps(pathId);
+    return { ...path, steps };
   }
 
   async createLearningPath(path: InsertLearningPath): Promise<LearningPath> {
-    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+    const [newPath] = await db
+      .insert(learningPaths)
+      .values({
+        ...path,
+        isPublished: false,
+        publishedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+    return newPath;
   }
 
   async updateLearningPath(pathId: string, updates: Partial<InsertLearningPath>): Promise<LearningPath> {
-    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+    const [updatedPath] = await db
+      .update(learningPaths)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(learningPaths.id, pathId), isNull(learningPaths.deletedAt)))
+      .returning();
+      
+    if (!updatedPath) {
+      throw new Error(`Learning path not found: ${pathId}`);
+    }
+    
+    return updatedPath;
   }
 
   async deleteLearningPath(pathId: string): Promise<void> {
-    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+    // Soft delete the path and all its steps
+    await db.transaction(async (tx) => {
+      // Soft delete all steps first
+      await tx
+        .update(learningPathSteps)
+        .set({ deletedAt: new Date() })
+        .where(and(eq(learningPathSteps.pathId, pathId), isNull(learningPathSteps.deletedAt)));
+        
+      // Then soft delete the path
+      const [deletedPath] = await tx
+        .update(learningPaths)
+        .set({ deletedAt: new Date() })
+        .where(and(eq(learningPaths.id, pathId), isNull(learningPaths.deletedAt)))
+        .returning();
+        
+      if (!deletedPath) {
+        throw new Error(`Learning path not found: ${pathId}`);
+      }
+    });
   }
 
   async publishLearningPath(pathId: string): Promise<LearningPath> {
-    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+    // First, verify the path exists and is not deleted
+    const path = await this.getLearningPath(pathId);
+    if (!path) {
+      throw new Error(`Learning path not found: ${pathId}`);
+    }
+    
+    // Ensure path has at least one step before publishing
+    const steps = await this.getLearningPathSteps(pathId);
+    if (steps.length === 0) {
+      throw new Error("Cannot publish learning path without steps");
+    }
+    
+    const [publishedPath] = await db
+      .update(learningPaths)
+      .set({
+        isPublished: true,
+        publishedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(learningPaths.id, pathId), isNull(learningPaths.deletedAt)))
+      .returning();
+      
+    // This should always succeed since we verified path exists above
+    if (!publishedPath) {
+      throw new Error(`Unexpected error: learning path disappeared during publish: ${pathId}`);
+    }
+    
+    return publishedPath;
   }
 
   async unpublishLearningPath(pathId: string): Promise<LearningPath> {
-    throw new Error("Learning paths management not yet implemented - will be added in Vertical Slice 1");
+    // First, verify the path exists and is not deleted
+    const path = await this.getLearningPath(pathId);
+    if (!path) {
+      throw new Error(`Learning path not found: ${pathId}`);
+    }
+    
+    const [unpublishedPath] = await db
+      .update(learningPaths)
+      .set({
+        isPublished: false,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(learningPaths.id, pathId), isNull(learningPaths.deletedAt)))
+      .returning();
+      
+    // This should always succeed since we verified path exists above
+    if (!unpublishedPath) {
+      throw new Error(`Unexpected error: learning path disappeared during unpublish: ${pathId}`);
+    }
+    
+    return unpublishedPath;
   }
 
   // Learning Path Steps Management (Vertical Slice 1)
   async getLearningPathSteps(pathId: string): Promise<LearningPathStep[]> {
-    throw new Error("Learning path steps management not yet implemented - will be added in Vertical Slice 1");
+    return await db
+      .select()
+      .from(learningPathSteps)
+      .where(and(eq(learningPathSteps.pathId, pathId), isNull(learningPathSteps.deletedAt)))
+      .orderBy(learningPathSteps.stepOrder);
   }
 
   async getLearningPathStep(stepId: string): Promise<LearningPathStep | undefined> {
-    throw new Error("Learning path steps management not yet implemented - will be added in Vertical Slice 1");
+    const [step] = await db
+      .select()
+      .from(learningPathSteps)
+      .where(and(eq(learningPathSteps.id, stepId), isNull(learningPathSteps.deletedAt)));
+    return step;
   }
 
   async createLearningPathStep(step: InsertLearningPathStep): Promise<LearningPathStep> {
-    throw new Error("Learning path steps management not yet implemented - will be added in Vertical Slice 1");
+    return await db.transaction(async (tx) => {
+      // If no step order provided, get the next available order
+      let stepOrder = step.stepOrder;
+      if (!stepOrder) {
+        const [maxOrderResult] = await tx
+          .select({ maxOrder: max(learningPathSteps.stepOrder) })
+          .from(learningPathSteps)
+          .where(and(eq(learningPathSteps.pathId, step.pathId), isNull(learningPathSteps.deletedAt)));
+        
+        stepOrder = (maxOrderResult?.maxOrder ?? 0) + 1;
+      }
+      
+      // Ensure the path exists
+      const path = await this.getLearningPath(step.pathId);
+      if (!path) {
+        throw new Error(`Learning path not found: ${step.pathId}`);
+      }
+      
+      const [newStep] = await tx
+        .insert(learningPathSteps)
+        .values({
+          ...step,
+          stepOrder,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+        
+      return newStep;
+    });
   }
 
   async updateLearningPathStep(stepId: string, updates: Partial<InsertLearningPathStep>): Promise<LearningPathStep> {
-    throw new Error("Learning path steps management not yet implemented - will be added in Vertical Slice 1");
+    const [updatedStep] = await db
+      .update(learningPathSteps)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(learningPathSteps.id, stepId), isNull(learningPathSteps.deletedAt)))
+      .returning();
+      
+    if (!updatedStep) {
+      throw new Error(`Learning path step not found: ${stepId}`);
+    }
+    
+    return updatedStep;
   }
 
   async deleteLearningPathStep(stepId: string): Promise<void> {
-    throw new Error("Learning path steps management not yet implemented - will be added in Vertical Slice 1");
+    const [deletedStep] = await db
+      .update(learningPathSteps)
+      .set({ deletedAt: new Date() })
+      .where(and(eq(learningPathSteps.id, stepId), isNull(learningPathSteps.deletedAt)))
+      .returning();
+      
+    if (!deletedStep) {
+      throw new Error(`Learning path step not found: ${stepId}`);
+    }
   }
 
   async reorderLearningPathSteps(pathId: string, stepIds: string[]): Promise<void> {
-    throw new Error("Learning path steps management not yet implemented - will be added in Vertical Slice 1");
+    await db.transaction(async (tx) => {
+      // Verify path exists
+      const path = await tx
+        .select({ id: learningPaths.id })
+        .from(learningPaths)
+        .where(and(eq(learningPaths.id, pathId), isNull(learningPaths.deletedAt)));
+      
+      if (path.length === 0) {
+        throw new Error(`Learning path not found: ${pathId}`);
+      }
+      
+      // Get all current steps for this path to ensure we're reordering the complete set
+      const allCurrentSteps = await tx
+        .select({ id: learningPathSteps.id })
+        .from(learningPathSteps)
+        .where(and(eq(learningPathSteps.pathId, pathId), isNull(learningPathSteps.deletedAt)));
+      
+      // Verify all steps belong to the path and we're reordering the complete set
+      const currentStepIds = allCurrentSteps.map(s => s.id).sort();
+      const providedStepIds = [...stepIds].sort();
+      
+      if (currentStepIds.length !== providedStepIds.length || 
+          !currentStepIds.every((id, index) => id === providedStepIds[index])) {
+        throw new Error("Must provide all current steps when reordering");
+      }
+      
+      // Two-phase update to avoid unique constraint violations:
+      // Phase 1: Add large offset to all affected steps to temporarily clear conflicts
+      const tempOffset = 100000;
+      for (let i = 0; i < stepIds.length; i++) {
+        await tx
+          .update(learningPathSteps)
+          .set({ 
+            stepOrder: tempOffset + i,
+            updatedAt: new Date()
+          })
+          .where(and(
+            eq(learningPathSteps.id, stepIds[i]),
+            eq(learningPathSteps.pathId, pathId),
+            isNull(learningPathSteps.deletedAt)
+          ));
+      }
+      
+      // Phase 2: Set final step orders
+      for (let i = 0; i < stepIds.length; i++) {
+        await tx
+          .update(learningPathSteps)
+          .set({ 
+            stepOrder: i + 1,
+            updatedAt: new Date()
+          })
+          .where(and(
+            eq(learningPathSteps.id, stepIds[i]),
+            eq(learningPathSteps.pathId, pathId),
+            isNull(learningPathSteps.deletedAt)
+          ));
+      }
+    });
   }
 
   // Learning Path Enrollments and Progress (Vertical Slice 2)
