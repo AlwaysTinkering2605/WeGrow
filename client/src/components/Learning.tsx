@@ -52,9 +52,15 @@ import {
   Layers,
   PlayCircle,
   Circle,
-  Lock
+  Lock,
+  Route,
+  ArrowRight,
+  MoveUp,
+  MoveDown,
+  X,
+  PenTool
 } from "lucide-react";
-import { insertLessonSchema } from "@shared/schema";
+import { insertLessonSchema, insertLearningPathSchema, insertLearningPathStepSchema } from "@shared/schema";
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -143,8 +149,15 @@ const badgeSchema = z.object({
   color: z.string().default("#3B82F6"),
 });
 
+// Learning Paths Form Schemas
+const learningPathSchema = insertLearningPathSchema.omit({ id: true, createdAt: true, updatedAt: true, createdBy: true, publishedAt: true });
+
+const learningPathStepSchema = insertLearningPathStepSchema.omit({ id: true, createdAt: true, updatedAt: true, pathId: true });
+
 // Type definitions for form schemas
 type LessonFormType = z.infer<typeof lessonSchema>;
+type LearningPathFormType = z.infer<typeof learningPathSchema>;
+type LearningPathStepFormType = z.infer<typeof learningPathStepSchema>;
 
 // Vimeo Player Component with Progress Tracking and Manual Completion
 function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComplete, onDurationReceived, onTestModeProgress, onCompletionEligibilityChange, onCompletionUpdate }: {
@@ -1024,6 +1037,13 @@ export default function Learning() {
   const [adminTab, setAdminTab] = useState("courses");
   const [isAdminMode, setIsAdminMode] = useState(false);
 
+  // Learning Paths Management State
+  const [isCreatePathOpen, setIsCreatePathOpen] = useState(false);
+  const [selectedPathForEdit, setSelectedPathForEdit] = useState<any>(null);
+  const [selectedPathForSteps, setSelectedPathForSteps] = useState<string>("");
+  const [isCreateStepOpen, setIsCreateStepOpen] = useState(false);
+  const [selectedStepForEdit, setSelectedStepForEdit] = useState<any>(null);
+
   // Assessment viewing state
   const [selectedCourseForViewing, setSelectedCourseForViewing] = useState<string>("all");
   const [selectedLessonForViewing, setSelectedLessonForViewing] = useState<string>("all");
@@ -1860,6 +1880,158 @@ export default function Learning() {
     },
   });
 
+  // ADMIN MUTATIONS - Learning Paths Management
+  const createLearningPathMutation = useMutation({
+    mutationFn: async (pathData: LearningPathFormType) => {
+      const response = await apiRequest("POST", "/api/learning-paths", pathData);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/learning-paths"] });
+      toast({
+        title: "Learning Path Created",
+        description: "Learning path has been created successfully.",
+      });
+      setIsCreatePathOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Creation Failed",
+        description: error.message || "Failed to create learning path.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const updateLearningPathMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<LearningPathFormType> }) => {
+      const response = await apiRequest("PUT", `/api/learning-paths/${id}`, data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/learning-paths"] });
+      toast({
+        title: "Learning Path Updated",
+        description: "Learning path has been updated successfully.",
+      });
+      setSelectedPathForEdit(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update learning path.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const publishLearningPathMutation = useMutation({
+    mutationFn: async (pathId: string) => {
+      const response = await apiRequest("POST", `/api/learning-paths/${pathId}/publish`, {});
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/learning-paths"] });
+      toast({
+        title: "Learning Path Published",
+        description: "Learning path is now available to learners.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Publish Failed",
+        description: error.message || "Failed to publish learning path.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const unpublishLearningPathMutation = useMutation({
+    mutationFn: async (pathId: string) => {
+      const response = await apiRequest("POST", `/api/learning-paths/${pathId}/unpublish`, {});
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/learning-paths"] });
+      toast({
+        title: "Learning Path Unpublished",
+        description: "Learning path is no longer available to learners.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Unpublish Failed",
+        description: error.message || "Failed to unpublish learning path.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const createStepMutation = useMutation({
+    mutationFn: async ({ pathId, stepData }: { pathId: string; stepData: LearningPathStepFormType }) => {
+      const response = await apiRequest("POST", `/api/learning-paths/${pathId}/steps`, stepData);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/learning-paths", selectedPathForSteps, "steps"] });
+      toast({
+        title: "Step Created",
+        description: "Learning path step has been created successfully.",
+      });
+      setIsCreateStepOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Creation Failed", 
+        description: error.message || "Failed to create step.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const updateStepMutation = useMutation({
+    mutationFn: async ({ pathId, stepId, stepData }: { pathId: string; stepId: string; stepData: Partial<LearningPathStepFormType> }) => {
+      const response = await apiRequest("PUT", `/api/learning-paths/${pathId}/steps/${stepId}`, stepData);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/learning-paths", selectedPathForSteps, "steps"] });
+      toast({
+        title: "Step Updated",
+        description: "Learning path step has been updated successfully.",
+      });
+      setSelectedStepForEdit(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update step.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const deleteStepMutation = useMutation({
+    mutationFn: async ({ pathId, stepId }: { pathId: string; stepId: string }) => {
+      const response = await apiRequest("DELETE", `/api/learning-paths/${pathId}/steps/${stepId}`, {});
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/learning-paths", selectedPathForSteps, "steps"] });
+      toast({
+        title: "Step Deleted",
+        description: "Learning path step has been deleted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Failed to delete step.",
+        variant: "destructive",
+      });
+    }
+  });
+
   // Admin data queries
   const { data: adminCourses, isLoading: adminCoursesLoading } = useQuery<any[]>({
     queryKey: ["/api/lms/admin/courses"],
@@ -2003,6 +2175,24 @@ export default function Learning() {
   // Use real training matrix data or fallback to empty array
   const complianceData = Array.isArray(trainingMatrix) ? trainingMatrix : [];
   const upcomingTraining = complianceData.filter((item: any) => item.status === 'required').slice(0, 5);
+
+  // Learning Paths Management Queries
+  const { data: learningPaths, isLoading: learningPathsLoading, refetch: refetchLearningPaths } = useQuery<any[]>({
+    queryKey: ["/api/learning-paths"],
+    enabled: !!(user?.role === 'supervisor' || user?.role === 'leadership'),
+    retry: false,
+  });
+
+  const { data: selectedPathSteps, isLoading: selectedPathStepsLoading } = useQuery<any[]>({
+    queryKey: ["/api/learning-paths", selectedPathForSteps, "steps"],
+    queryFn: async () => {
+      if (!selectedPathForSteps) return [];
+      const response = await apiRequest("GET", `/api/learning-paths/${selectedPathForSteps}/steps`);
+      return await response.json();
+    },
+    enabled: !!(selectedPathForSteps && (user?.role === 'supervisor' || user?.role === 'leadership')),
+    retry: false,
+  });
 
   // Filter and search logic for course catalog
   const filteredCourses = Array.isArray(availableCourses) ? availableCourses.filter((course: any) => {
@@ -3908,7 +4098,7 @@ export default function Learning() {
             </div>
             
             <Tabs value={adminTab} onValueChange={setAdminTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="courses" data-testid="admin-tab-courses">
                   <GraduationCap className="w-4 h-4 mr-2" />
                   Courses
@@ -3920,6 +4110,10 @@ export default function Learning() {
                 <TabsTrigger value="assessments" data-testid="admin-tab-assessments">
                   <FileText className="w-4 h-4 mr-2" />
                   Assessments
+                </TabsTrigger>
+                <TabsTrigger value="learning-paths" data-testid="admin-tab-learning-paths">
+                  <Route className="w-4 h-4 mr-2" />
+                  Learning Paths
                 </TabsTrigger>
                 <TabsTrigger value="badges" data-testid="admin-tab-badges">
                   <Trophy className="w-4 h-4 mr-2" />
@@ -6218,7 +6412,7 @@ export default function Learning() {
                                   </>
                                 ) : (
                                   <>
-                                    <Pen className="w-4 h-4 mr-2" />
+                                    <PenTool className="w-4 h-4 mr-2" />
                                     Update Badge
                                   </>
                                 )}
@@ -6268,7 +6462,7 @@ export default function Learning() {
                                 }}
                                 data-testid={`button-edit-badge-${badge.id}`}
                               >
-                                <Pen className="w-4 h-4" />
+                                <PenTool className="w-4 h-4" />
                               </Button>
                             </div>
                           </CardHeader>
@@ -6298,6 +6492,320 @@ export default function Learning() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="learning-paths" className="space-y-6">
+              {/* Learning Paths Management Interface */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card data-testid="card-total-paths">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Paths</CardTitle>
+                    <Route className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{learningPaths?.length || 0}</div>
+                    <p className="text-xs text-muted-foreground">Learning paths created</p>
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-published-paths">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Published</CardTitle>
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">
+                      {learningPaths?.filter(path => path.isPublished).length || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Available to learners</p>
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-draft-paths">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Drafts</CardTitle>
+                    <Edit className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {learningPaths?.filter(path => !path.isPublished).length || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Work in progress</p>
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-total-steps">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Steps</CardTitle>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {learningPaths?.reduce((total, path) => total + (path.totalSteps || 0), 0) || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Across all paths</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Learning Paths Management */}
+              <Card data-testid="card-learning-paths-management">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Learning Paths Management</CardTitle>
+                      <CardDescription>Create and manage guided learning journeys</CardDescription>
+                    </div>
+                    <Dialog open={isCreatePathOpen} onOpenChange={setIsCreatePathOpen}>
+                      <DialogTrigger asChild>
+                        <Button data-testid="button-create-path">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Create Learning Path
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[600px]">
+                        <DialogHeader>
+                          <DialogTitle>Create New Learning Path</DialogTitle>
+                          <DialogDescription>
+                            Design a structured learning journey with sequential steps
+                          </DialogDescription>
+                        </DialogHeader>
+                        {/* Learning Path Create Form will go here */}
+                        <div className="space-y-4">
+                          <p className="text-sm text-muted-foreground">Learning path creation form coming soon...</p>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {learningPathsLoading ? (
+                    <div className="space-y-4">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="flex items-center justify-between p-4 border rounded-lg animate-pulse">
+                          <div className="flex-1">
+                            <Skeleton className="h-5 w-48 mb-2" />
+                            <Skeleton className="h-4 w-32 mb-2" />
+                            <div className="flex gap-2">
+                              <Skeleton className="h-6 w-16" />
+                              <Skeleton className="h-6 w-20" />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Skeleton className="h-9 w-20" />
+                            <Skeleton className="h-9 w-20" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : learningPaths && learningPaths.length > 0 ? (
+                    <div className="space-y-4">
+                      {learningPaths.map((path: any) => (
+                        <div key={path.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors" data-testid={`path-item-${path.id}`}>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="font-semibold">{path.title}</h3>
+                              {path.isPublished ? (
+                                <Badge variant="default" className="bg-green-100 text-green-800">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  Published
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary">
+                                  <Edit className="w-3 h-3 mr-1" />
+                                  Draft
+                                </Badge>
+                              )}
+                              <Badge variant="outline">
+                                {path.pathType || 'Sequential'}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-2">{path.description}</p>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <span>{path.totalSteps || 0} steps</span>
+                              <span>{path.estimatedDuration ? `${path.estimatedDuration} min` : 'Duration TBD'}</span>
+                              <span>Created {new Date(path.createdAt).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedPathForSteps(path.id)}
+                              data-testid={`button-manage-steps-${path.id}`}
+                            >
+                              <ArrowRight className="w-4 h-4 mr-2" />
+                              Steps
+                            </Button>
+                            {path.isPublished ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => unpublishLearningPathMutation.mutate(path.id)}
+                                disabled={unpublishLearningPathMutation.isPending}
+                                data-testid={`button-unpublish-${path.id}`}
+                              >
+                                {unpublishLearningPathMutation.isPending ? (
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Unpublish
+                                  </>
+                                )}
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={() => publishLearningPathMutation.mutate(path.id)}
+                                disabled={publishLearningPathMutation.isPending || !path.totalSteps || path.totalSteps === 0}
+                                data-testid={`button-publish-${path.id}`}
+                              >
+                                {publishLearningPathMutation.isPending ? (
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                    Publish
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedPathForEdit(path)}
+                              data-testid={`button-edit-${path.id}`}
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Route className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">No Learning Paths Yet</h3>
+                      <p className="text-muted-foreground mb-4">Create your first guided learning journey to help learners follow a structured path</p>
+                      <Button onClick={() => setIsCreatePathOpen(true)} data-testid="button-create-first-path">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Your First Learning Path
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Steps Management for Selected Path */}
+              {selectedPathForSteps && (
+                <Card data-testid="card-path-steps-management">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>
+                          Steps Management
+                        </CardTitle>
+                        <CardDescription>
+                          Configure learning steps for {learningPaths?.find(p => p.id === selectedPathForSteps)?.title}
+                        </CardDescription>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => setSelectedPathForSteps("")}
+                          data-testid="button-close-steps-management"
+                        >
+                          <ArrowRight className="w-4 h-4 mr-2 rotate-180" />
+                          Back to Paths
+                        </Button>
+                        <Button
+                          onClick={() => setIsCreateStepOpen(true)}
+                          data-testid="button-create-step"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Step
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedPathStepsLoading ? (
+                      <div className="space-y-4">
+                        {[...Array(3)].map((_, i) => (
+                          <div key={i} className="flex items-center gap-4 p-4 border rounded-lg animate-pulse">
+                            <Skeleton className="w-8 h-8 rounded-full" />
+                            <div className="flex-1">
+                              <Skeleton className="h-5 w-48 mb-2" />
+                              <Skeleton className="h-4 w-32" />
+                            </div>
+                            <Skeleton className="h-9 w-20" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : selectedPathSteps && selectedPathSteps.length > 0 ? (
+                      <div className="space-y-4">
+                        {selectedPathSteps.map((step: any, index: number) => (
+                          <div key={step.id} className="flex items-center gap-4 p-4 border rounded-lg" data-testid={`step-item-${step.id}`}>
+                            <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-semibold">
+                              {step.stepOrder}
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-semibold">{step.title}</h4>
+                              <p className="text-sm text-muted-foreground">{step.description}</p>
+                              <div className="flex gap-2 mt-2">
+                                <Badge variant="outline">{step.contentType}</Badge>
+                                {step.isRequired && <Badge variant="secondary">Required</Badge>}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              {index > 0 && (
+                                <Button variant="outline" size="sm" disabled data-testid={`button-move-up-${step.id}`}>
+                                  <MoveUp className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {index < selectedPathSteps.length - 1 && (
+                                <Button variant="outline" size="sm" disabled data-testid={`button-move-down-${step.id}`}>
+                                  <MoveDown className="w-4 h-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedStepForEdit(step)}
+                                data-testid={`button-edit-step-${step.id}`}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => deleteStepMutation.mutate({ pathId: selectedPathForSteps, stepId: step.id })}
+                                disabled={deleteStepMutation.isPending}
+                                data-testid={`button-delete-step-${step.id}`}
+                              >
+                                {deleteStepMutation.isPending ? (
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <ArrowRight className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold mb-2">No Steps Yet</h3>
+                        <p className="text-muted-foreground mb-4">Add learning steps to create a structured path</p>
+                        <Button onClick={() => setIsCreateStepOpen(true)} data-testid="button-create-first-step">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add First Step
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-6">
