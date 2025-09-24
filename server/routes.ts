@@ -2019,6 +2019,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get specific certificate by ID
+  app.get('/api/lms/certificates/:certificateId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { certificateId } = req.params;
+      const certificate = await storage.getCertificate(certificateId);
+      
+      if (!certificate) {
+        return res.status(404).json({ message: "Certificate not found" });
+      }
+
+      const requestingUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(requestingUserId);
+      
+      // Users can only see their own certificates unless they're supervisor/leadership
+      if (certificate.userId !== requestingUserId && currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      res.json(certificate);
+    } catch (error) {
+      console.error("Error fetching certificate:", error);
+      res.status(500).json({ message: "Failed to fetch certificate" });
+    }
+  });
+
   app.get('/api/lms/badges/me', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -3532,6 +3557,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error executing automation rules for user:", error);
       res.status(500).json({ message: "Failed to execute automation rules for user" });
+    }
+  });
+
+  // Manual competency gap analysis and learning path assignment
+  app.post('/api/lms/competency-gap-analysis', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { userId, teamId, role } = req.body;
+      
+      if (userId) {
+        // Single user gap analysis
+        const gaps = await storage.getCompetencyGapAnalysis(userId);
+        res.json({
+          userId,
+          gaps,
+          gapCount: gaps.length,
+          analysisDate: new Date().toISOString(),
+          triggeredBy: req.user.claims.sub
+        });
+      } else {
+        // Bulk gap analysis for team or role
+        let users: any[] = [];
+        if (teamId) {
+          users = await storage.getUsersByTeam(teamId);
+        } else if (role) {
+          users = await storage.getUsersByRole(role);
+        } else {
+          users = await storage.getUsers();
+        }
+
+        const results = [];
+        for (const user of users) {
+          try {
+            const gaps = await storage.getCompetencyGapAnalysis(user.id);
+            results.push({
+              userId: user.id,
+              userName: `${user.firstName} ${user.lastName}`,
+              email: user.email,
+              gaps,
+              gapCount: gaps.length
+            });
+          } catch (error: any) {
+            results.push({
+              userId: user.id,
+              error: `Failed to analyze gaps: ${error.message}`
+            });
+          }
+        }
+
+        res.json({
+          analysisType: teamId ? 'team' : role ? 'role' : 'organization',
+          filters: { teamId, role },
+          totalUsers: users.length,
+          results,
+          analysisDate: new Date().toISOString(),
+          triggeredBy: req.user.claims.sub
+        });
+      }
+
+      // ISO 9001:2015 Audit Trail - Log gap analysis
+      console.log(`[AUDIT] Manual competency gap analysis triggered by ${req.user.claims.sub} - Scope: ${userId ? 'single user' : teamId ? 'team' : role ? 'role' : 'organization'}`);
+    } catch (error: any) {
+      console.error("Error performing competency gap analysis:", error);
+      res.status(500).json({ message: "Failed to perform competency gap analysis" });
     }
   });
 
