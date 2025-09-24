@@ -42,6 +42,7 @@ import {
   insertTrainingMatrixRecordSchema,
   insertCompetencyStatusHistorySchema,
   insertCompetencyEvidenceRecordSchema,
+  insertAutomationRuleSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -174,7 +175,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      console.log("[DEBUG] /api/auth/user - userId:", userId);
       const user = await storage.getUser(userId);
+      console.log("[DEBUG] /api/auth/user - user found:", !!user, user ? `${user.firstName} ${user.lastName}` : 'none');
+      
+      if (!user) {
+        console.log("[DEBUG] User not found in database, attempting to create from claims");
+        const claims = req.user.claims;
+        console.log("[DEBUG] Available claims:", Object.keys(claims));
+        
+        // Create user from current claims if missing - ALWAYS default to operative for security
+        await storage.upsertUser({
+          id: claims.sub,
+          email: claims.email || `${claims.sub}@apex.com`,
+          firstName: claims.first_name || "Test",
+          lastName: claims.last_name || "User", 
+          profileImageUrl: claims.profile_image_url,
+          role: claims.role || "operative", // SECURITY: Default to least privilege
+        });
+        
+        const newUser = await storage.getUser(userId);
+        console.log("[DEBUG] Created user:", !!newUser);
+        return res.json(newUser);
+      }
+      
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
@@ -3280,6 +3304,192 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to skip step" });
+    }
+  });
+
+  // ========================
+  // AUTOMATION RULES API
+  // ========================
+
+  // Get all automation rules
+  app.get('/api/automation-rules', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { active } = req.query;
+      const isActive = active === 'true' ? true : active === 'false' ? false : undefined;
+      const rules = await storage.getAutomationRules(isActive);
+      res.json(rules);
+    } catch (error: any) {
+      console.error("Error fetching automation rules:", error);
+      res.status(500).json({ message: "Failed to fetch automation rules" });
+    }
+  });
+
+  // Get single automation rule
+  app.get('/api/automation-rules/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const rule = await storage.getAutomationRule(id);
+      if (!rule) {
+        return res.status(404).json({ message: "Automation rule not found" });
+      }
+      res.json(rule);
+    } catch (error: any) {
+      console.error("Error fetching automation rule:", error);
+      res.status(500).json({ message: "Failed to fetch automation rule" });
+    }
+  });
+
+  // Create automation rule
+  app.post('/api/automation-rules', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const ruleData = req.body;
+      const createdBy = req.user.claims.sub;
+      
+      // Validate request body with Zod schema
+      const validatedData = insertAutomationRuleSchema.parse({
+        ...ruleData,
+        createdBy
+      });
+      
+      const rule = await storage.createAutomationRule(validatedData);
+      
+      // ISO 9001:2015 Audit Trail - Log rule creation
+      console.log(`[AUDIT] Automation rule created: ${rule.id} by ${createdBy} - ${rule.name}`);
+      
+      res.status(201).json(rule);
+    } catch (error: any) {
+      console.error("Error creating automation rule:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create automation rule" });
+    }
+  });
+
+  // Update automation rule
+  app.put('/api/automation-rules/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      // Validate request body with partial schema for updates
+      const validatedUpdates = insertAutomationRuleSchema.partial().parse(updates);
+      
+      const updatedRule = await storage.updateAutomationRule(id, validatedUpdates);
+      
+      // ISO 9001:2015 Audit Trail - Log rule update
+      const updatedBy = req.user.claims.sub;
+      console.log(`[AUDIT] Automation rule updated: ${id} by ${updatedBy} - Changes: ${JSON.stringify(validatedUpdates)}`);
+      
+      res.json(updatedRule);
+    } catch (error: any) {
+      console.error("Error updating automation rule:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to update automation rule" });
+    }
+  });
+
+  // Delete automation rule
+  app.delete('/api/automation-rules/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteAutomationRule(id);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Error deleting automation rule:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to delete automation rule" });
+    }
+  });
+
+  // Activate automation rule
+  app.post('/api/automation-rules/:id/activate', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const activatedRule = await storage.activateAutomationRule(id);
+      
+      // ISO 9001:2015 Audit Trail - Log rule activation
+      const activatedBy = req.user.claims.sub;
+      console.log(`[AUDIT] Automation rule activated: ${id} by ${activatedBy} - ${activatedRule.name}`);
+      
+      res.json(activatedRule);
+    } catch (error: any) {
+      console.error("Error activating automation rule:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to activate automation rule" });
+    }
+  });
+
+  // Deactivate automation rule
+  app.post('/api/automation-rules/:id/deactivate', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const deactivatedRule = await storage.deactivateAutomationRule(id);
+      
+      // ISO 9001:2015 Audit Trail - Log rule deactivation
+      const deactivatedBy = req.user.claims.sub;
+      console.log(`[AUDIT] Automation rule deactivated: ${id} by ${deactivatedBy} - ${deactivatedRule.name}`);
+      
+      res.json(deactivatedRule);
+    } catch (error: any) {
+      console.error("Error deactivating automation rule:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to deactivate automation rule" });
+    }
+  });
+
+  // Execute automation rule manually
+  app.post('/api/automation-rules/:id/execute', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { triggerData } = req.body;
+      
+      const result = await storage.executeAutomationRule(id, triggerData);
+      
+      // ISO 9001:2015 Audit Trail - Log rule execution
+      const executedBy = req.user.claims.sub;
+      console.log(`[AUDIT] Automation rule executed: ${id} by ${executedBy} - Executed: ${result.executed}, Enrollments: ${result.enrollments}`);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error executing automation rule:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to execute automation rule" });
+    }
+  });
+
+  // Execute automation rules for specific user and trigger
+  app.post('/api/automation-rules/execute-for-user', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { userId, triggerEvent } = req.body;
+      
+      if (!userId || !triggerEvent) {
+        return res.status(400).json({ message: "userId and triggerEvent are required" });
+      }
+      
+      const result = await storage.executeAutomationRulesForUser(userId, triggerEvent);
+      
+      // ISO 9001:2015 Audit Trail - Log user automation execution
+      const executedBy = req.user.claims.sub;
+      console.log(`[AUDIT] User automation executed: User ${userId}, Event: ${triggerEvent} by ${executedBy} - Rules: ${result.totalRules}, Executed: ${result.executed}, Enrollments: ${result.enrollments}`);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error executing automation rules for user:", error);
+      res.status(500).json({ message: "Failed to execute automation rules for user" });
     }
   });
 

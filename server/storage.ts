@@ -457,42 +457,41 @@ export class DatabaseStorage implements IStorage {
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     try {
-      // Check if user already exists by ID or email
-      const existingUserById = userData.id ? await this.getUser(userData.id) : undefined;
-      const [existingUserByEmail] = userData.email 
-        ? await db.select().from(users).where(eq(users.email, userData.email))
-        : [undefined];
+      console.log("[DEBUG] upsertUser - Input data:", JSON.stringify(userData, null, 2));
       
-      const existingUser = existingUserById || existingUserByEmail;
-      
-      if (existingUser) {
-        // User exists - update profile info including role from OIDC claims
-        const [user] = await db
-          .update(users)
-          .set({
+      // Use proper PostgreSQL upsert with INSERT ... ON CONFLICT DO UPDATE
+      const [user] = await db
+        .insert(users)
+        .values({
+          id: userData.id,
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          profileImageUrl: userData.profileImageUrl,
+          role: userData.role || 'operative',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: users.id,
+          set: {
             email: userData.email,
             firstName: userData.firstName,
             lastName: userData.lastName,
             profileImageUrl: userData.profileImageUrl,
-            role: userData.role, // Update role from OIDC claims
+            role: userData.role || 'operative',
             updatedAt: new Date(),
-          })
-          .where(eq(users.id, existingUser.id))
-          .returning();
-        return user;
-      } else {
-        // New user - create with all provided data
-        const [user] = await db
-          .insert(users)
-          .values({
-            ...userData,
-          })
-          .returning();
-        return user;
-      }
+          },
+        })
+        .returning();
+        
+      console.log("[DEBUG] upsertUser - Created/Updated user:", !!user, user ? `${user.firstName} ${user.lastName} (${user.role})` : 'none');
+      return user;
     } catch (error: unknown) {
       // Handle unique constraint violations gracefully
-      if (error.code === '23505') { // PostgreSQL unique violation
+      const pgError = error as any; // Type assertion for PostgreSQL error
+      console.log("[DEBUG] upsertUser - Error occurred:", pgError.message || String(error));
+      if (pgError.code === '23505') { // PostgreSQL unique violation
         console.warn('Unique constraint violation in upsertUser, attempting to find existing user:', error.message);
         
         // Try to find the existing user and update it

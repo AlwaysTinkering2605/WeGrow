@@ -8,14 +8,20 @@ async function throwIfResNotOk(res: Response) {
 }
 
 export async function apiRequest(
-  method: string,
   url: string,
-  data?: unknown | undefined,
+  options?: {
+    method?: string;
+    body?: string;
+    headers?: Record<string, string>;
+  }
 ): Promise<Response> {
   const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    method: options?.method || 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+    body: options?.body,
     credentials: "include",
   });
 
@@ -48,9 +54,9 @@ export const queryClient = new QueryClient({
       refetchInterval: false,
       refetchOnWindowFocus: false,
       staleTime: (query) => {
-        // Allow user auth data to be refetched more frequently
+        // Auth data should refetch frequently to detect login/logout changes
         if (query.queryKey[0] === '/api/auth/user') {
-          return 1000 * 60 * 5; // 5 minutes for user data
+          return 1000 * 10; // 10 seconds for auth data to allow quick state changes
         }
         return Infinity; // Keep other queries cached indefinitely
       },

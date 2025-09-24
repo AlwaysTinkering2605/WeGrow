@@ -1370,6 +1370,11 @@ export const insertAutomationRuleSchema = createInsertSchema(automationRules).om
   lastRun: true,
   totalExecutions: true,
   successfulExecutions: true,
+}).extend({
+  triggerEvent: z.enum(["user_created", "user_updated", "role_changed", "team_changed", "scheduled"]),
+  conditions: z.record(z.string(), z.any()).optional(),
+  actions: z.record(z.string(), z.any()).optional(),
+  scheduleConfig: z.record(z.string(), z.any()).optional(),
 });
 
 export const insertTrainingMatrixRecordSchema = createInsertSchema(trainingMatrixRecords).omit({
@@ -1733,7 +1738,25 @@ export const recognitionFeedItemSchema = z.object({
   })
 });
 
-export const teamHierarchyNodeSchema = z.object({
+export const teamHierarchyNodeSchema: z.ZodType<{
+  id: string;
+  name: string;
+  description: string | null;
+  parentTeamId: string | null;
+  teamLeadId: string;
+  department: string | null;
+  isActive: boolean;
+  children?: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    parentTeamId: string | null;
+    teamLeadId: string;
+    department: string | null;
+    isActive: boolean;
+    children?: any[];
+  }>;
+}> = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string().nullable(),

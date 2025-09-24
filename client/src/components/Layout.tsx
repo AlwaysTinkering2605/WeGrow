@@ -16,6 +16,8 @@ import {
   UsersRound,
   GraduationCap,
   Layers,
+  Zap,
+  Route,
 } from "lucide-react";
 import Dashboard from "./Dashboard";
 import Goals from "./Goals";
@@ -33,8 +35,10 @@ import Reports from "./Reports";
 import CompanySettings from "./CompanySettings";
 import CompetencyManagement from "./CompetencyManagement";
 import TrainingMatrixDashboard from "./TrainingMatrixDashboard";
+import LearningPathsManagement from "./LearningPathsManagement";
+import AutomationEngine from "./AutomationEngine";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "team" | "company-objectives" | "team-objectives" | "reports" | "settings" | "competency-management" | "training-matrix";
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "team" | "company-objectives" | "team-objectives" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine";
 
 export default function Layout() {
   const [location] = useLocation();
@@ -46,6 +50,9 @@ export default function Layout() {
     if (location === "/" || location === "/dashboard") return "dashboard";
     if (location === "/goals") return "goals";
     if (location === "/development") return "development";
+    // Check specific learning routes BEFORE generic learning check
+    if (location === "/learning-paths") return "learning-paths";
+    if (location === "/automation-engine") return "automation-engine";
     if (location.startsWith("/learning")) return "learning";
     if (location === "/recognition") return "recognition";
     if (location === "/meetings") return "meetings";
@@ -78,6 +85,7 @@ export default function Layout() {
   const supervisorTabs = [
     { id: "team", label: "Team Management", icon: UsersRound, component: TeamManagement },
     { id: "team-objectives", label: "Team Objectives", icon: Target, component: TeamObjectives },
+    { id: "learning-paths", label: "Learning Paths", icon: Route, component: LearningPathsManagement },
     { id: "training-matrix", label: "Training Matrix", icon: BarChart3, component: TrainingMatrixDashboard },
   ];
 
@@ -85,6 +93,8 @@ export default function Layout() {
     { id: "team", label: "Team Management", icon: UsersRound, component: TeamManagement },
     { id: "company-objectives", label: "Company Objectives", icon: Target, component: CompanyObjectives },
     { id: "team-objectives", label: "Team Objectives", icon: Target, component: TeamObjectives },
+    { id: "learning-paths", label: "Learning Paths", icon: Route, component: LearningPathsManagement },
+    { id: "automation-engine", label: "Automation Engine", icon: Zap, component: AutomationEngine },
     { id: "competency-management", label: "Competency Management", icon: Layers, component: CompetencyManagement },
     { id: "training-matrix", label: "Training Matrix", icon: BarChart3, component: TrainingMatrixDashboard },
     { id: "reports", label: "Reports", icon: BarChart3, component: Reports },
