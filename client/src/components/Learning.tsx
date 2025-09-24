@@ -5773,9 +5773,9 @@ export default function Learning() {
                                   </FormDescription>
                                   <FormControl>
                                     <div className="space-y-2" data-testid="multiselect-badge-courses">
-                                      {coursesData && coursesData.length > 0 ? (
+                                      {availableCourses && availableCourses.length > 0 ? (
                                         <div className="border rounded-md p-3 max-h-40 overflow-y-auto">
-                                          {coursesData.map((course) => (
+                                          {availableCourses.map((course) => (
                                             <div key={course.id} className="flex items-center space-x-2">
                                               <input
                                                 type="checkbox"
