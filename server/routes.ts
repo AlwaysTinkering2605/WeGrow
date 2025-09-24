@@ -3471,6 +3471,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Closed-Loop Integration API Endpoints
+  
+  // Trigger closed-loop integration for specific user
+  app.post('/api/automation/trigger/user/:userId', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      
+      // Verify user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const result = await storage.triggerClosedLoopIntegration(userId);
+      
+      // ISO 9001:2015 Audit Trail - Log closed-loop trigger
+      const triggeredBy = req.user.claims.sub;
+      console.log(`[AUDIT] Closed-loop integration triggered for user ${userId} by ${triggeredBy} - Gaps: ${result.gapsIdentified}, Paths: ${result.pathsAssigned}`);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error triggering closed-loop integration for user:", error);
+      res.status(500).json({ message: "Failed to trigger closed-loop integration for user" });
+    }
+  });
+
+  // Trigger organization-wide closed-loop integration
+  app.post('/api/automation/trigger/organization', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const result = await storage.triggerOrganizationClosedLoopIntegration();
+      
+      // ISO 9001:2015 Audit Trail - Log organization-wide trigger
+      const triggeredBy = req.user.claims.sub;
+      console.log(`[AUDIT] Organization-wide closed-loop integration triggered by ${triggeredBy} - Users: ${result.usersProcessed}, Gaps: ${result.totalGapsIdentified}, Paths: ${result.totalPathsAssigned}`);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error triggering organization-wide closed-loop integration:", error);
+      res.status(500).json({ message: "Failed to trigger organization-wide closed-loop integration" });
+    }
+  });
+
   // Execute automation rules for specific user and trigger
   app.post('/api/automation-rules/execute-for-user', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
     try {

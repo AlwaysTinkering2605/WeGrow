@@ -427,6 +427,10 @@ export interface IStorage {
   deactivateAutomationRule(ruleId: string): Promise<AutomationRule>;
   executeAutomationRule(ruleId: string, triggerData?: AutomationTriggerData): Promise<{ executed: boolean; enrollments: number; errors?: string[] }>;
   executeAutomationRulesForUser(userId: string, triggerEvent: string): Promise<{ totalRules: number; executed: number; enrollments: number }>;
+  
+  // Closed-Loop Integration - Auto-assign learning paths based on competency gaps
+  triggerClosedLoopIntegration(userId: string): Promise<{ gapsIdentified: number; pathsAssigned: number; automationResults: any; errors?: string[]; }>;
+  triggerOrganizationClosedLoopIntegration(): Promise<{ usersProcessed: number; totalGapsIdentified: number; totalPathsAssigned: number; errors?: string[]; }>;
 
   // Competency Audit Trail - ISO 9001:2015 Compliance
   getCompetencyStatusHistory(userId: string, competencyLibraryId?: string): Promise<CompetencyStatusHistory[]>;
@@ -1671,6 +1675,15 @@ export class DatabaseStorage implements IStorage {
           eq(lessonProgress.lessonId, progress.lessonId)
         ))
         .returning();
+        
+      // Sync Training Matrix only when lesson is completed
+      if (progress.status === "completed") {
+        const lesson = await this.getLesson(progress.lessonId);
+        if (lesson) {
+          await this.syncTrainingMatrixOnLessonCompletion(progress.enrollmentId, progress.lessonId, lesson);
+        }
+      }
+      
       return updated;
     } else {
       // Create new progress record
@@ -1680,6 +1693,15 @@ export class DatabaseStorage implements IStorage {
           ...progress,
         })
         .returning();
+        
+      // Sync Training Matrix only when lesson is completed
+      if (progress.status === "completed") {
+        const lesson = await this.getLesson(progress.lessonId);
+        if (lesson) {
+          await this.syncTrainingMatrixOnLessonCompletion(progress.enrollmentId, progress.lessonId, lesson);
+        }
+      }
+      
       return created;
     }
   }
@@ -1739,6 +1761,12 @@ export class DatabaseStorage implements IStorage {
             timeSpent: 0, // Quiz time will be tracked separately
             completedAt: new Date(),
           });
+      }
+      
+      // Sync Training Matrix for quiz-based lesson completion
+      const lesson = await this.getLesson(quiz.lessonId);
+      if (lesson) {
+        await this.syncTrainingMatrixOnLessonCompletion(enrollmentId, quiz.lessonId, lesson);
       }
     } catch (error) {
       console.error("Error updating lesson progress from quiz:", error);
@@ -1823,10 +1851,32 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
+      // Sync Training Matrix for incremental progress (lesson completion)
+      await this.syncTrainingMatrixOnLessonCompletion(enrollmentId, lessonId, lesson);
+
       return { success: true, message: "Lesson marked as complete!" };
     } catch (error) {
       console.error("Error completing lesson manually:", error);
       return { success: false, message: "Error completing lesson. Please try again." };
+    }
+  }
+
+  // Real-time Training Matrix Sync - updates training matrix for incremental lesson completion progress
+  private async syncTrainingMatrixOnLessonCompletion(
+    enrollmentId: string, 
+    lessonId: string, 
+    lesson: any
+  ): Promise<void> {
+    try {
+      // For now, lesson completion sync is disabled since we need proper competency mapping
+      // In a production system, this would require explicit mappings between courses/lessons and competencies
+      // The current implementation focuses on learning path completion which has explicit competency links
+      console.log(`Lesson completion sync placeholder: enrollmentId=${enrollmentId}, lessonId=${lessonId}`);
+      
+      // TODO: Implement proper lesson-to-competency mapping when competency library is fully configured
+    } catch (error) {
+      console.error("Error syncing training matrix on lesson completion:", error);
+      // Don't throw error to avoid breaking lesson completion flow
     }
   }
 
@@ -3078,8 +3128,95 @@ export class DatabaseStorage implements IStorage {
           .onConflictDoNothing({ target: certificates.learningPathEnrollmentId });
       }
       
+      // Sync Training Matrix records when learning path is completed
+      await this.syncTrainingMatrixOnLearningPathCompletion(tx, completedEnrollment, learningPath);
+      
       return completedEnrollment;
     });
+  }
+
+  // Real-time Training Matrix Sync - updates training matrix when learning paths are completed
+  private async syncTrainingMatrixOnLearningPathCompletion(
+    tx: any, 
+    completedEnrollment: LearningPathEnrollment, 
+    learningPath: any
+  ): Promise<void> {
+    // Find competency library items linked to this learning path
+    const linkedCompetencies = await tx.select()
+      .from(competencyLibrary)
+      .where(sql`${competencyLibrary.linkedLearningPaths} IS NOT NULL AND ${completedEnrollment.pathId} = ANY(${competencyLibrary.linkedLearningPaths})`);
+
+    for (const competency of linkedCompetencies) {
+      // Check if training matrix record exists for this user-competency combination
+      const existingRecords = await tx.select()
+        .from(trainingMatrixRecords)
+        .where(and(
+          eq(trainingMatrixRecords.userId, completedEnrollment.userId),
+          eq(trainingMatrixRecords.competencyLibraryId, competency.id)
+        ));
+
+      const completionEvidence = {
+        type: "learning_path_completion",
+        learningPathId: learningPath.id,
+        learningPathTitle: learningPath.title,
+        enrollmentId: completedEnrollment.id,
+        completionDate: completedEnrollment.completionDate,
+        pathType: learningPath.pathType,
+        category: learningPath.category,
+        estimatedDuration: learningPath.estimatedDuration
+      };
+
+      const trainingHistoryEntry = {
+        type: "learning_path",
+        learningPathId: learningPath.id,
+        title: learningPath.title,
+        completionDate: completedEnrollment.completionDate,
+        pathType: learningPath.pathType,
+        category: learningPath.category
+      };
+
+      if (existingRecords.length === 0) {
+        // Create new training matrix record
+        await tx.insert(trainingMatrixRecords).values({
+          userId: completedEnrollment.userId,
+          competencyLibraryId: competency.id,
+          currentStatus: "competent", // Learning path completion indicates competency
+          proficiencyLevel: "basic", // Default to basic, can be enhanced later
+          lastAssessmentDate: completedEnrollment.completionDate,
+          lastAssessmentScore: 100, // Learning path completion = 100%
+          evidenceRecords: [completionEvidence],
+          trainingHistory: [trainingHistoryEntry],
+          riskLevel: "low",
+          nextActionRequired: "monitor_renewal",
+          nextActionDueDate: competency.renewalPeriodDays 
+            ? new Date(Date.now() + (competency.renewalPeriodDays * 24 * 60 * 60 * 1000))
+            : null,
+          updatedBy: "system_auto_sync"
+        });
+      } else {
+        // Update existing training matrix record
+        const existingRecord = existingRecords[0];
+        const updatedEvidenceRecords = [...(existingRecord.evidenceRecords || []), completionEvidence];
+        const updatedTrainingHistory = [...(existingRecord.trainingHistory || []), trainingHistoryEntry];
+
+        await tx.update(trainingMatrixRecords)
+          .set({
+            currentStatus: "competent", // Update status to competent
+            lastAssessmentDate: completedEnrollment.completionDate,
+            lastAssessmentScore: 100,
+            evidenceRecords: updatedEvidenceRecords,
+            trainingHistory: updatedTrainingHistory,
+            riskLevel: "low",
+            nextActionRequired: "monitor_renewal",
+            nextActionDueDate: competency.renewalPeriodDays 
+              ? new Date(Date.now() + (competency.renewalPeriodDays * 24 * 60 * 60 * 1000))
+              : null,
+            updatedBy: "system_auto_sync",
+            updatedAt: new Date()
+          })
+          .where(eq(trainingMatrixRecords.id, existingRecord.id));
+      }
+    }
   }
 
   async suspendLearningPathEnrollment(enrollmentId: string, reason?: string): Promise<LearningPathEnrollment> {
@@ -3588,39 +3725,248 @@ export class DatabaseStorage implements IStorage {
 
   // Automation Rules Engine (Vertical Slice 5)
   async getAutomationRules(isActive?: boolean): Promise<AutomationRule[]> {
-    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+    let query = db.select().from(automationRules);
+    
+    if (isActive !== undefined) {
+      query = query.where(eq(automationRules.isActive, isActive));
+    }
+    
+    return await query.orderBy(automationRules.priority, desc(automationRules.createdAt));
   }
 
   async getAutomationRule(ruleId: string): Promise<AutomationRule | undefined> {
-    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+    const [rule] = await db.select().from(automationRules).where(eq(automationRules.id, ruleId));
+    return rule;
   }
 
   async createAutomationRule(rule: InsertAutomationRule): Promise<AutomationRule> {
-    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+    const [newRule] = await db.insert(automationRules).values(rule).returning();
+    return newRule;
   }
 
   async updateAutomationRule(ruleId: string, updates: Partial<InsertAutomationRule>): Promise<AutomationRule> {
-    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+    const [updatedRule] = await db.update(automationRules)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(automationRules.id, ruleId))
+      .returning();
+    return updatedRule;
   }
 
   async deleteAutomationRule(ruleId: string): Promise<void> {
-    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+    await db.delete(automationRules).where(eq(automationRules.id, ruleId));
   }
 
   async activateAutomationRule(ruleId: string): Promise<AutomationRule> {
-    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+    return await this.updateAutomationRule(ruleId, { isActive: true });
   }
 
   async deactivateAutomationRule(ruleId: string): Promise<AutomationRule> {
-    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+    return await this.updateAutomationRule(ruleId, { isActive: false });
   }
 
   async executeAutomationRule(ruleId: string, triggerData?: AutomationTriggerData): Promise<{ executed: boolean; enrollments: number; errors?: string[] }> {
-    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+    const rule = await this.getAutomationRule(ruleId);
+    if (!rule || !rule.isActive) {
+      return { executed: false, enrollments: 0, errors: ["Rule not found or inactive"] };
+    }
+
+    let enrollmentCount = 0;
+    const errors: string[] = [];
+
+    try {
+      // Update rule execution stats
+      await this.updateAutomationRule(ruleId, {
+        lastRun: new Date(),
+        totalExecutions: (rule.totalExecutions || 0) + 1
+      });
+
+      // Handle different trigger events
+      if (rule.triggerEvent === "competency_gap_identified") {
+        // Closed-loop integration: assign learning paths based on competency gaps
+        const targetUserId = triggerData?.userId;
+        if (!targetUserId) {
+          errors.push("User ID required for competency gap trigger");
+          return { executed: false, enrollments: 0, errors };
+        }
+
+        // Get competency gap analysis for the user
+        const gapAnalysis = await this.getCompetencyGapAnalysis(targetUserId);
+        
+        // Auto-assign learning paths for identified gaps
+        for (const gapDetail of gapAnalysis.gapDetails || []) {
+          const recommendedPaths = gapDetail.recommendedPaths || [];
+          
+          for (const pathId of recommendedPaths) {
+            try {
+              // Check if user is already enrolled in this path
+              const existingEnrollments = await this.getLearningPathEnrollments(targetUserId, pathId);
+              if (existingEnrollments.length === 0) {
+                // Enroll user in learning path
+                await this.enrollUserInLearningPath({
+                  userId: targetUserId,
+                  pathId: pathId,
+                  enrollmentSource: "automation_rule",
+                  startDate: new Date(),
+                  metadata: {
+                    automationRuleId: ruleId,
+                    competencyGap: gapDetail.competency.id,
+                    autoAssigned: true
+                  }
+                });
+                enrollmentCount++;
+              }
+            } catch (error: any) {
+              errors.push(`Failed to enroll user ${targetUserId} in path ${pathId}: ${error.message}`);
+            }
+          }
+        }
+      } else {
+        // Other trigger events can be implemented here
+        errors.push(`Trigger event '${rule.triggerEvent}' not yet implemented`);
+      }
+
+      // Update successful execution count
+      if (errors.length === 0) {
+        await this.updateAutomationRule(ruleId, {
+          successfulExecutions: (rule.successfulExecutions || 0) + 1
+        });
+      }
+
+      return { 
+        executed: true, 
+        enrollments: enrollmentCount, 
+        errors: errors.length > 0 ? errors : undefined 
+      };
+    } catch (error: any) {
+      errors.push(`Rule execution failed: ${error.message}`);
+      return { executed: false, enrollments: 0, errors };
+    }
   }
 
   async executeAutomationRulesForUser(userId: string, triggerEvent: string): Promise<{ totalRules: number; executed: number; enrollments: number }> {
-    throw new Error("Automation rules not yet implemented - will be added in Vertical Slice 5");
+    // Get all active automation rules for this trigger event
+    const allRules = await this.getAutomationRules(true);
+    const applicableRules = allRules.filter(rule => rule.triggerEvent === triggerEvent);
+
+    let totalExecuted = 0;
+    let totalEnrollments = 0;
+
+    for (const rule of applicableRules) {
+      try {
+        const result = await this.executeAutomationRule(rule.id, { userId, triggerEvent });
+        if (result.executed) {
+          totalExecuted++;
+          totalEnrollments += result.enrollments;
+        }
+      } catch (error: any) {
+        console.error(`Failed to execute automation rule ${rule.id} for user ${userId}:`, error);
+      }
+    }
+
+    return {
+      totalRules: applicableRules.length,
+      executed: totalExecuted,
+      enrollments: totalEnrollments
+    };
+  }
+
+  // Closed-Loop Integration - Trigger gap analysis and automation for training matrix updates
+  async triggerClosedLoopIntegration(userId: string): Promise<{
+    gapsIdentified: number;
+    pathsAssigned: number;
+    automationResults: any;
+    errors?: string[];
+  }> {
+    const errors: string[] = [];
+    let pathsAssigned = 0;
+
+    try {
+      // Step 1: Run competency gap analysis for the user
+      const gapAnalysis = await this.getCompetencyGapAnalysis(userId);
+      const gapsIdentified = gapAnalysis.gaps || 0;
+
+      if (gapsIdentified === 0) {
+        return {
+          gapsIdentified: 0,
+          pathsAssigned: 0,
+          automationResults: { message: "No competency gaps identified" }
+        };
+      }
+
+      // Step 2: Execute automation rules for competency gap trigger
+      const automationResults = await this.executeAutomationRulesForUser(userId, "competency_gap_identified");
+      pathsAssigned = automationResults.enrollments;
+
+      // Step 3: Log the closed-loop integration activity for audit trail
+      console.log(`[CLOSED-LOOP] User ${userId}: ${gapsIdentified} gaps identified, ${pathsAssigned} paths assigned`);
+
+      return {
+        gapsIdentified,
+        pathsAssigned,
+        automationResults,
+        errors: errors.length > 0 ? errors : undefined
+      };
+    } catch (error: any) {
+      errors.push(`Closed-loop integration failed: ${error.message}`);
+      return {
+        gapsIdentified: 0,
+        pathsAssigned: 0,
+        automationResults: null,
+        errors
+      };
+    }
+  }
+
+  // Organization-wide closed-loop integration trigger
+  async triggerOrganizationClosedLoopIntegration(): Promise<{
+    usersProcessed: number;
+    totalGapsIdentified: number;
+    totalPathsAssigned: number;
+    errors?: string[];
+  }> {
+    const errors: string[] = [];
+    let usersProcessed = 0;
+    let totalGapsIdentified = 0;
+    let totalPathsAssigned = 0;
+
+    try {
+      // Get all users for organization-wide processing
+      const allUsers = await this.getAllUsers();
+
+      for (const user of allUsers) {
+        if (user.id) {
+          try {
+            const result = await this.triggerClosedLoopIntegration(user.id);
+            usersProcessed++;
+            totalGapsIdentified += result.gapsIdentified;
+            totalPathsAssigned += result.pathsAssigned;
+
+            if (result.errors) {
+              errors.push(...result.errors);
+            }
+          } catch (error: any) {
+            errors.push(`Failed to process user ${user.id}: ${error.message}`);
+          }
+        }
+      }
+
+      console.log(`[CLOSED-LOOP-ORG] Processed ${usersProcessed} users, ${totalGapsIdentified} gaps, ${totalPathsAssigned} paths assigned`);
+
+      return {
+        usersProcessed,
+        totalGapsIdentified,
+        totalPathsAssigned,
+        errors: errors.length > 0 ? errors : undefined
+      };
+    } catch (error: any) {
+      errors.push(`Organization-wide closed-loop integration failed: ${error.message}`);
+      return {
+        usersProcessed: 0,
+        totalGapsIdentified: 0,
+        totalPathsAssigned: 0,
+        errors
+      };
+    }
   }
 
   // Competency Audit Trail - ISO 9001:2015 Compliance Implementation
