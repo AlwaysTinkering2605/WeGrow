@@ -40,8 +40,8 @@ import {
   Download,
   RefreshCw,
   Move,
-  Tree,
-  TreeHorizontal
+  Network,
+  MoreHorizontal
 } from "lucide-react";
 
 // Form schemas for competency management
@@ -1435,7 +1435,7 @@ export default function CompetencyManagement() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <TreeHorizontal className="w-5 h-5" />
+                <MoreHorizontal className="w-5 h-5" />
                 Hierarchical Competency Library
               </CardTitle>
               <CardDescription>
@@ -1458,7 +1458,7 @@ export default function CompetencyManagement() {
                 />
               ) : (
                 <div className="text-center py-8">
-                  <Tree className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <Network className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="font-medium mb-2">No competencies found</h3>
                   <p className="text-sm text-muted-foreground">Create your first competency to get started</p>
                 </div>

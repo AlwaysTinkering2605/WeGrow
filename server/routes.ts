@@ -43,6 +43,10 @@ import {
   insertCompetencyStatusHistorySchema,
   insertCompetencyEvidenceRecordSchema,
   insertAutomationRuleSchema,
+  // Time-based automation schemas
+  insertRelativeDueDateConfigSchema,
+  insertRecurringAssignmentSchema,
+  insertAutomationRunLogSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -1610,10 +1614,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/lms/enrollments', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      console.log("[DEBUG] Enrollment request - userId:", userId, "body:", req.body);
+      
       const enrollmentData = insertEnrollmentSchema.parse({ ...req.body, userId });
+      console.log("[DEBUG] Parsed enrollment data:", enrollmentData);
+      
       const enrollment = await storage.enrollUser(enrollmentData);
+      console.log("[DEBUG] Enrollment created successfully:", enrollment);
+      
       res.json(enrollment);
     } catch (error: any) {
+      console.error("[ERROR] Enrollment failed:", error);
+      console.error("[ERROR] Error stack:", error.stack);
       return handleValidationError(error, res, "create enrollment");
     }
   });
@@ -3790,11 +3802,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Bulk gap analysis for team or role
         let users: any[] = [];
         if (teamId) {
-          users = await storage.getUsersByTeam(teamId);
+          users = await storage.getUsersInTeam(teamId);
         } else if (role) {
-          users = await storage.getUsersByRole(role);
+          users = await storage.getAllUsers(); // Temporary - filter by role later
+          users = users.filter((user: any) => user.role === role);
         } else {
-          users = await storage.getUsers();
+          users = await storage.getAllUsers();
         }
 
         const results = [];
@@ -3831,6 +3844,209 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error performing competency gap analysis:", error);
       res.status(500).json({ message: "Failed to perform competency gap analysis" });
+    }
+  });
+
+  // Time-Based Automation API Routes
+  
+  // Relative Due Date Configurations
+  app.get('/api/learning-paths/relative-due-dates', isAuthenticated, async (req: any, res) => {
+    try {
+      const configs = await storage.getAllRelativeDueDateConfigs();
+      res.json(configs);
+    } catch (error: any) {
+      console.error("Error fetching relative due date configs:", error);
+      res.status(500).json({ message: "Failed to fetch relative due date configurations" });
+    }
+  });
+
+  app.get('/api/learning-paths/:pathId/relative-due-date', isAuthenticated, async (req: any, res) => {
+    try {
+      const { pathId } = req.params;
+      const config = await storage.getRelativeDueDateConfig(pathId);
+      if (!config) {
+        return res.status(404).json({ message: "Relative due date configuration not found" });
+      }
+      res.json(config);
+    } catch (error: any) {
+      console.error("Error fetching relative due date config:", error);
+      res.status(500).json({ message: "Failed to fetch relative due date configuration" });
+    }
+  });
+
+  app.post('/api/learning-paths/:pathId/relative-due-date', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { pathId } = req.params;
+      const configData = insertRelativeDueDateConfigSchema.parse({
+        ...req.body,
+        pathId,
+        createdBy: req.user.claims.sub
+      });
+      
+      const config = await storage.createRelativeDueDateConfig(configData);
+      res.status(201).json(config);
+
+      // ISO 9001:2015 Audit Trail
+      console.log(`[AUDIT] Relative due date config created for path ${pathId} by ${req.user.claims.sub}`);
+    } catch (error: any) {
+      console.error("Error creating relative due date config:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid configuration data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create relative due date configuration" });
+    }
+  });
+
+  app.put('/api/learning-paths/:pathId/relative-due-date', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { pathId } = req.params;
+      const updates = insertRelativeDueDateConfigSchema.partial().parse(req.body);
+      
+      const config = await storage.updateRelativeDueDateConfig(pathId, updates);
+      res.json(config);
+
+      // ISO 9001:2015 Audit Trail
+      console.log(`[AUDIT] Relative due date config updated for path ${pathId} by ${req.user.claims.sub}`);
+    } catch (error: any) {
+      console.error("Error updating relative due date config:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid configuration data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update relative due date configuration" });
+    }
+  });
+
+  app.delete('/api/learning-paths/:pathId/relative-due-date', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { pathId } = req.params;
+      await storage.deleteRelativeDueDateConfig(pathId);
+      res.status(204).send();
+
+      // ISO 9001:2015 Audit Trail
+      console.log(`[AUDIT] Relative due date config deleted for path ${pathId} by ${req.user.claims.sub}`);
+    } catch (error: any) {
+      console.error("Error deleting relative due date config:", error);
+      res.status(500).json({ message: "Failed to delete relative due date configuration" });
+    }
+  });
+
+  // Recurring Assignments
+  app.get('/api/recurring-assignments', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { activeOnly } = req.query;
+      const assignments = await storage.getAllRecurringAssignments(activeOnly === 'true');
+      res.json(assignments);
+    } catch (error: any) {
+      console.error("Error fetching recurring assignments:", error);
+      res.status(500).json({ message: "Failed to fetch recurring assignments" });
+    }
+  });
+
+  app.get('/api/recurring-assignments/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const assignment = await storage.getRecurringAssignment(id);
+      if (!assignment) {
+        return res.status(404).json({ message: "Recurring assignment not found" });
+      }
+      res.json(assignment);
+    } catch (error: any) {
+      console.error("Error fetching recurring assignment:", error);
+      res.status(500).json({ message: "Failed to fetch recurring assignment" });
+    }
+  });
+
+  app.get('/api/learning-paths/:pathId/recurring-assignments', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { pathId } = req.params;
+      const assignments = await storage.getRecurringAssignmentsByPath(pathId);
+      res.json(assignments);
+    } catch (error: any) {
+      console.error("Error fetching path recurring assignments:", error);
+      res.status(500).json({ message: "Failed to fetch recurring assignments for path" });
+    }
+  });
+
+  app.post('/api/recurring-assignments', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const assignmentData = insertRecurringAssignmentSchema.parse({
+        ...req.body,
+        createdBy: req.user.claims.sub
+      });
+      
+      const assignment = await storage.createRecurringAssignment(assignmentData);
+      res.status(201).json(assignment);
+
+      // ISO 9001:2015 Audit Trail
+      console.log(`[AUDIT] Recurring assignment created "${assignment.name}" by ${req.user.claims.sub}`);
+    } catch (error: any) {
+      console.error("Error creating recurring assignment:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid assignment data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create recurring assignment" });
+    }
+  });
+
+  app.put('/api/recurring-assignments/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const updates = insertRecurringAssignmentSchema.partial().parse(req.body);
+      
+      const assignment = await storage.updateRecurringAssignment(id, updates);
+      res.json(assignment);
+
+      // ISO 9001:2015 Audit Trail
+      console.log(`[AUDIT] Recurring assignment ${id} updated by ${req.user.claims.sub}`);
+    } catch (error: any) {
+      console.error("Error updating recurring assignment:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid assignment data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update recurring assignment" });
+    }
+  });
+
+  app.delete('/api/recurring-assignments/:id', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteRecurringAssignment(id);
+      res.status(204).send();
+
+      // ISO 9001:2015 Audit Trail
+      console.log(`[AUDIT] Recurring assignment ${id} deleted by ${req.user.claims.sub}`);
+    } catch (error: any) {
+      console.error("Error deleting recurring assignment:", error);
+      res.status(500).json({ message: "Failed to delete recurring assignment" });
+    }
+  });
+
+  // Automation Execution Logs (read-only for monitoring and compliance)
+  app.get('/api/automation-logs', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { entityId, entityType, limit } = req.query;
+      const logs = await storage.getAutomationRunLogs(
+        entityId as string,
+        entityType as string,
+        limit ? parseInt(limit as string) : undefined
+      );
+      res.json(logs);
+    } catch (error: any) {
+      console.error("Error fetching automation logs:", error);
+      res.status(500).json({ message: "Failed to fetch automation logs" });
+    }
+  });
+
+  app.get('/api/automation-logs/failed', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { limit } = req.query;
+      const logs = await storage.getFailedAutomationRuns(
+        limit ? parseInt(limit as string) : undefined
+      );
+      res.json(logs);
+    } catch (error: any) {
+      console.error("Error fetching failed automation logs:", error);
+      res.status(500).json({ message: "Failed to fetch failed automation logs" });
     }
   });
 

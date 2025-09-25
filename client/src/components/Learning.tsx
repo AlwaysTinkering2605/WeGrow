@@ -456,6 +456,35 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
       onCompletionEligibilityChangeRef.current(newCanComplete, targetProgress);
     }
     
+    // Save simulated progress to backend database (CRITICAL FIX)
+    // This ensures Test Mode progress persists to database for manual completion
+    if (enrollmentId && lessonId) {
+      try {
+        const response = await fetch('/api/lms/progress', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            enrollmentId,
+            lessonId,
+            progressPercentage: targetProgress,
+            lastPosition: simulatedCurrentTime,
+            timeSpent: simulatedTimeSpent,
+            status: targetProgress >= 100 ? 'completed' : 'in_progress'
+          })
+        });
+        
+        if (response.ok) {
+          console.log(`TEST MODE: Progress saved to backend - ${targetProgress}% for lesson ${lessonId}`);
+        } else {
+          console.error('Failed to save test mode progress to backend:', await response.text());
+        }
+      } catch (error) {
+        console.error('Error saving test mode progress:', error);
+      }
+    }
+    
     // Notify parent component about test mode progress
     if (onTestModeProgress) {
       onTestModeProgress(targetProgress, true);
@@ -1383,8 +1412,9 @@ export default function Learning() {
         throw new Error("Course is missing version information. Please contact support.");
       }
       const courseVersionId = course.currentVersionId;
-      const response = await apiRequest("POST", "/api/lms/enrollments", {
-        courseVersionId
+      const response = await apiRequest("/api/lms/enrollments", {
+        method: "POST",
+        body: JSON.stringify({ courseVersionId })
       });
       return await response.json();
     },
@@ -1519,7 +1549,10 @@ export default function Learning() {
   // Course completion mutation
   const completeCourseMutation = useMutation({
     mutationFn: async (enrollmentId: string) => {
-      const response = await apiRequest("POST", "/api/lms/enrollments/" + enrollmentId + "/complete", {});
+      const response = await apiRequest("/api/lms/enrollments/" + enrollmentId + "/complete", {
+        method: "POST",
+        body: JSON.stringify({})
+      });
       return await response.json();
     },
     onSuccess: () => {
@@ -1909,8 +1942,9 @@ export default function Learning() {
       enrollmentId: string; 
       lessonId: string; 
     }) => {
-      const response = await apiRequest("POST", `/api/lms/lessons/${lessonId}/complete`, {
-        enrollmentId
+      const response = await apiRequest(`/api/lms/lessons/${lessonId}/complete`, {
+        method: "POST",
+        body: JSON.stringify({ enrollmentId })
       });
       return await response.json();
     },

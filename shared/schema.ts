@@ -1100,6 +1100,100 @@ export const competencyEvidenceRecordsRelations = relations(competencyEvidenceRe
   }),
 }));
 
+// Time-Based Automation Tables
+
+// Relative due date configurations for learning paths
+export const relativeDueDateConfigs = pgTable("relative_due_date_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pathId: varchar("path_id").notNull().unique(),
+  relativeDueDays: integer("relative_due_days").notNull(),
+  enableGracePeriod: boolean("enable_grace_period").default(false),
+  gracePeriodDays: integer("grace_period_days").default(0),
+  enableReminders: boolean("enable_reminders").default(true),
+  reminderDaysBefore: jsonb("reminder_days_before").default([7, 3, 1]),
+  autoExtensionDays: integer("auto_extension_days").default(0),
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.pathId],
+    foreignColumns: [learningPaths.id],
+    name: "relative_due_date_configs_path_fk"
+  }),
+  foreignKey({
+    columns: [table.createdBy],
+    foreignColumns: [users.id],
+    name: "relative_due_date_configs_creator_fk"
+  }),
+  index("relative_due_date_configs_path_idx").on(table.pathId),
+  index("relative_due_date_configs_active_idx").on(table.isActive),
+]);
+
+// Recurring assignment configurations
+export const recurringAssignments = pgTable("recurring_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  pathId: varchar("path_id").notNull(),
+  targetAudience: varchar("target_audience").notNull(), // "all_users", "by_role", "by_team", "specific_users"
+  targetRoles: jsonb("target_roles"), // Array of role names
+  targetTeams: jsonb("target_teams"), // Array of team IDs
+  targetUsers: jsonb("target_users"), // Array of user IDs
+  recurrenceType: varchar("recurrence_type").notNull(), // "daily", "weekly", "monthly", "quarterly", "yearly"
+  recurrenceInterval: integer("recurrence_interval").default(1),
+  recurrenceWeekdays: jsonb("recurrence_weekdays"), // Array of weekday numbers (0=Sunday)
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  nextRun: timestamp("next_run").notNull(),
+  relativeDueDays: integer("relative_due_days").default(30),
+  isActive: boolean("is_active").default(true),
+  description: text("description"),
+  totalExecutions: integer("total_executions").default(0),
+  successfulExecutions: integer("successful_executions").default(0),
+  lastRun: timestamp("last_run"),
+  lastError: text("last_error"),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.pathId],
+    foreignColumns: [learningPaths.id],
+    name: "recurring_assignments_path_fk"
+  }),
+  foreignKey({
+    columns: [table.createdBy],
+    foreignColumns: [users.id],
+    name: "recurring_assignments_creator_fk"
+  }),
+  index("recurring_assignments_path_idx").on(table.pathId),
+  index("recurring_assignments_active_idx").on(table.isActive),
+  index("recurring_assignments_next_run_idx").on(table.nextRun),
+]);
+
+// Automation execution logs for audit trail
+export const automationRunLogs = pgTable("automation_run_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  runType: varchar("run_type").notNull(), // "recurring_assignment", "due_date_reminder", "overdue_notification"
+  entityId: varchar("entity_id").notNull(), // ID of the recurring assignment or config
+  entityType: varchar("entity_type").notNull(), // "recurring_assignment", "due_date_config"
+  status: varchar("status").notNull(), // "started", "completed", "failed", "skipped"
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  affectedUsers: jsonb("affected_users"), // Array of user IDs processed
+  assignmentsCreated: integer("assignments_created").default(0),
+  notificationsSent: integer("notifications_sent").default(0),
+  errors: jsonb("errors"), // Array of error objects
+  executionDetails: jsonb("execution_details"), // Additional run metadata
+  duration: integer("duration"), // Execution time in milliseconds
+}, (table) => [
+  index("automation_run_logs_run_type_idx").on(table.runType),
+  index("automation_run_logs_entity_idx").on(table.entityId, table.entityType),
+  index("automation_run_logs_started_at_idx").on(table.startedAt),
+  index("automation_run_logs_status_idx").on(table.status),
+]);
+
 // Phase 2: Gamification Tables
 
 // Badges available in the system
@@ -2143,6 +2237,35 @@ export const automationTriggerDataSchema = z.object({
   competencyId: z.string().optional(),
   context: z.record(z.string(), z.any()).optional()
 });
+
+// Time-Based Automation Zod Schemas
+export const insertRelativeDueDateConfigSchema = createInsertSchema(relativeDueDateConfigs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertRecurringAssignmentSchema = createInsertSchema(recurringAssignments).omit({
+  id: true,
+  totalExecutions: true,
+  successfulExecutions: true,
+  lastRun: true,
+  lastError: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertAutomationRunLogSchema = createInsertSchema(automationRunLogs).omit({
+  id: true
+});
+
+// Time-Based Automation Types
+export type RelativeDueDateConfig = typeof relativeDueDateConfigs.$inferSelect;
+export type InsertRelativeDueDateConfig = z.infer<typeof insertRelativeDueDateConfigSchema>;
+export type RecurringAssignment = typeof recurringAssignments.$inferSelect;
+export type InsertRecurringAssignment = z.infer<typeof insertRecurringAssignmentSchema>;
+export type AutomationRunLog = typeof automationRunLogs.$inferSelect;
+export type InsertAutomationRunLog = z.infer<typeof insertAutomationRunLogSchema>;
 
 // Re-export types for storage interface to avoid z import
 export type InsertTeam = z.infer<typeof insertTeamSchema>;

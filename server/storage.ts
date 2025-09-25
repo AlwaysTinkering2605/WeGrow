@@ -46,6 +46,10 @@ import {
   competencyStatusHistory,
   competencyEvidenceRecords,
   automationRules,
+  // Time-based automation tables
+  relativeDueDateConfigs,
+  recurringAssignments,
+  automationRunLogs,
   type User,
   type UpsertUser,
   type CompanyObjective,
@@ -133,6 +137,13 @@ import {
   type InsertCompetencyStatusHistory,
   type InsertCompetencyEvidenceRecord,
   type InsertAutomationRule,
+  // Time-based automation types
+  type RelativeDueDateConfig,
+  type InsertRelativeDueDateConfig,
+  type RecurringAssignment,
+  type InsertRecurringAssignment,
+  type AutomationRunLog,
+  type InsertAutomationRunLog,
   insertTeamSchema,
   updateUserProfileSchema,
   // Enhanced Competency Management types
@@ -562,6 +573,29 @@ export interface IStorage {
   // Gamification Analytics
   getGamificationStats(userId: string): Promise<{totalPoints: number; badgeCount: number; achievementCount: number; level: number}>;
   getSystemGamificationStats(): Promise<{totalUsers: number; totalPoints: number; totalBadges: number; totalAchievements: number}>;
+
+  // Time-Based Automation - Relative Due Date Configurations
+  getRelativeDueDateConfig(pathId: string): Promise<RelativeDueDateConfig | undefined>;
+  getAllRelativeDueDateConfigs(): Promise<RelativeDueDateConfig[]>;
+  createRelativeDueDateConfig(config: InsertRelativeDueDateConfig): Promise<RelativeDueDateConfig>;
+  updateRelativeDueDateConfig(pathId: string, updates: Partial<InsertRelativeDueDateConfig>): Promise<RelativeDueDateConfig>;
+  deleteRelativeDueDateConfig(pathId: string): Promise<void>;
+
+  // Time-Based Automation - Recurring Assignments
+  getRecurringAssignment(id: string): Promise<RecurringAssignment | undefined>;
+  getAllRecurringAssignments(activeOnly?: boolean): Promise<RecurringAssignment[]>;
+  getRecurringAssignmentsByPath(pathId: string): Promise<RecurringAssignment[]>;
+  getDueRecurringAssignments(): Promise<RecurringAssignment[]>;
+  createRecurringAssignment(assignment: InsertRecurringAssignment): Promise<RecurringAssignment>;
+  updateRecurringAssignment(id: string, updates: Partial<InsertRecurringAssignment>): Promise<RecurringAssignment>;
+  deleteRecurringAssignment(id: string): Promise<void>;
+  updateRecurringAssignmentNextRun(id: string, nextRun: Date, lastRun?: Date, error?: string): Promise<void>;
+
+  // Time-Based Automation - Execution Logs
+  createAutomationRunLog(log: InsertAutomationRunLog): Promise<AutomationRunLog>;
+  updateAutomationRunLog(id: string, updates: Partial<InsertAutomationRunLog>): Promise<AutomationRunLog>;
+  getAutomationRunLogs(entityId?: string, entityType?: string, limit?: number): Promise<AutomationRunLog[]>;
+  getFailedAutomationRuns(limit?: number): Promise<AutomationRunLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1246,7 +1280,22 @@ export class DatabaseStorage implements IStorage {
     let completedLessons = 0;
     
     for (const module of modules) {
-      const moduleLessons = await db.select()
+      const moduleLessons = await db.select({
+        id: lessons.id,
+        title: lessons.title,
+        description: lessons.description,
+        contentType: lessons.contentType,
+        orderIndex: lessons.orderIndex,
+        estimatedDuration: lessons.estimatedDuration,
+        isRequired: lessons.isRequired,
+        moduleId: lessons.moduleId,
+        vimeoVideoId: lessons.vimeoVideoId,
+        richTextContent: lessons.richTextContent,
+        pdfContentUrl: lessons.pdfContentUrl,
+        resourceUrl: lessons.resourceUrl,
+        type: lessons.type,
+        createdAt: lessons.createdAt,
+      })
         .from(lessons)
         .where(eq(lessons.moduleId, module.id))
         .orderBy(lessons.orderIndex);
@@ -1438,16 +1487,61 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLessons(moduleId: string): Promise<Lesson[]> {
-    return await db.select().from(lessons).where(eq(lessons.moduleId, moduleId)).orderBy(lessons.orderIndex);
+    return await db.select({
+      id: lessons.id,
+      title: lessons.title,
+      description: lessons.description,
+      contentType: lessons.contentType,
+      orderIndex: lessons.orderIndex,
+      estimatedDuration: lessons.estimatedDuration,
+      isRequired: lessons.isRequired,
+      moduleId: lessons.moduleId,
+      vimeoVideoId: lessons.vimeoVideoId,
+      richTextContent: lessons.richTextContent,
+      pdfContentUrl: lessons.pdfContentUrl,
+      resourceUrl: lessons.resourceUrl,
+      type: lessons.type,
+      createdAt: lessons.createdAt,
+    }).from(lessons).where(eq(lessons.moduleId, moduleId)).orderBy(lessons.orderIndex);
   }
 
   async getLesson(lessonId: string): Promise<Lesson | undefined> {
-    const [lesson] = await db.select().from(lessons).where(eq(lessons.id, lessonId));
+    const [lesson] = await db.select({
+      id: lessons.id,
+      title: lessons.title,
+      description: lessons.description,
+      contentType: lessons.contentType,
+      orderIndex: lessons.orderIndex,
+      estimatedDuration: lessons.estimatedDuration,
+      isRequired: lessons.isRequired,
+      moduleId: lessons.moduleId,
+      vimeoVideoId: lessons.vimeoVideoId,
+      richTextContent: lessons.richTextContent,
+      pdfContentUrl: lessons.pdfContentUrl,
+      resourceUrl: lessons.resourceUrl,
+      type: lessons.type,
+      createdAt: lessons.createdAt,
+    }).from(lessons).where(eq(lessons.id, lessonId));
     return lesson;
   }
 
   async getDefaultLesson(moduleId: string): Promise<Lesson | undefined> {
-    const [lesson] = await db.select().from(lessons)
+    const [lesson] = await db.select({
+      id: lessons.id,
+      title: lessons.title,
+      description: lessons.description,
+      contentType: lessons.contentType,
+      orderIndex: lessons.orderIndex,
+      estimatedDuration: lessons.estimatedDuration,
+      isRequired: lessons.isRequired,
+      moduleId: lessons.moduleId,
+      vimeoVideoId: lessons.vimeoVideoId,
+      richTextContent: lessons.richTextContent,
+      pdfContentUrl: lessons.pdfContentUrl,
+      resourceUrl: lessons.resourceUrl,
+      type: lessons.type,
+      createdAt: lessons.createdAt,
+    }).from(lessons)
       .where(eq(lessons.moduleId, moduleId))
       .orderBy(lessons.orderIndex)
       .limit(1);
@@ -5532,6 +5626,139 @@ export class DatabaseStorage implements IStorage {
       totalBadges: badgeCount[0]?.count || 0,
       totalAchievements: achievementCount[0]?.count || 0
     };
+  }
+
+  // Time-Based Automation - Relative Due Date Configurations
+  async getRelativeDueDateConfig(pathId: string): Promise<RelativeDueDateConfig | undefined> {
+    const [config] = await db.select().from(relativeDueDateConfigs).where(eq(relativeDueDateConfigs.pathId, pathId));
+    return config;
+  }
+
+  async getAllRelativeDueDateConfigs(): Promise<RelativeDueDateConfig[]> {
+    return await db.select().from(relativeDueDateConfigs).where(eq(relativeDueDateConfigs.isActive, true))
+      .orderBy(desc(relativeDueDateConfigs.createdAt));
+  }
+
+  async createRelativeDueDateConfig(config: InsertRelativeDueDateConfig): Promise<RelativeDueDateConfig> {
+    const [created] = await db.insert(relativeDueDateConfigs).values(config).returning();
+    return created;
+  }
+
+  async updateRelativeDueDateConfig(pathId: string, updates: Partial<InsertRelativeDueDateConfig>): Promise<RelativeDueDateConfig> {
+    const [updated] = await db.update(relativeDueDateConfigs)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(relativeDueDateConfigs.pathId, pathId))
+      .returning();
+    return updated;
+  }
+
+  async deleteRelativeDueDateConfig(pathId: string): Promise<void> {
+    await db.delete(relativeDueDateConfigs).where(eq(relativeDueDateConfigs.pathId, pathId));
+  }
+
+  // Time-Based Automation - Recurring Assignments
+  async getRecurringAssignment(id: string): Promise<RecurringAssignment | undefined> {
+    const [assignment] = await db.select().from(recurringAssignments).where(eq(recurringAssignments.id, id));
+    return assignment;
+  }
+
+  async getAllRecurringAssignments(activeOnly: boolean = false): Promise<RecurringAssignment[]> {
+    const query = db.select().from(recurringAssignments);
+    if (activeOnly) {
+      query.where(eq(recurringAssignments.isActive, true));
+    }
+    return await query.orderBy(desc(recurringAssignments.createdAt));
+  }
+
+  async getRecurringAssignmentsByPath(pathId: string): Promise<RecurringAssignment[]> {
+    return await db.select().from(recurringAssignments)
+      .where(and(eq(recurringAssignments.pathId, pathId), eq(recurringAssignments.isActive, true)))
+      .orderBy(desc(recurringAssignments.createdAt));
+  }
+
+  async getDueRecurringAssignments(): Promise<RecurringAssignment[]> {
+    return await db.select().from(recurringAssignments)
+      .where(and(
+        eq(recurringAssignments.isActive, true),
+        sql`${recurringAssignments.nextRun} <= NOW()`
+      ))
+      .orderBy(asc(recurringAssignments.nextRun));
+  }
+
+  async createRecurringAssignment(assignment: InsertRecurringAssignment): Promise<RecurringAssignment> {
+    const [created] = await db.insert(recurringAssignments).values(assignment).returning();
+    return created;
+  }
+
+  async updateRecurringAssignment(id: string, updates: Partial<InsertRecurringAssignment>): Promise<RecurringAssignment> {
+    const [updated] = await db.update(recurringAssignments)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(recurringAssignments.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRecurringAssignment(id: string): Promise<void> {
+    await db.delete(recurringAssignments).where(eq(recurringAssignments.id, id));
+  }
+
+  async updateRecurringAssignmentNextRun(id: string, nextRun: Date, lastRun?: Date, error?: string): Promise<void> {
+    const updates: any = {
+      nextRun,
+      updatedAt: new Date(),
+      totalExecutions: sql`${recurringAssignments.totalExecutions} + 1`
+    };
+    
+    if (lastRun) {
+      updates.lastRun = lastRun;
+    }
+    
+    if (error) {
+      updates.lastError = error;
+    } else {
+      updates.successfulExecutions = sql`${recurringAssignments.successfulExecutions} + 1`;
+      updates.lastError = null;
+    }
+
+    await db.update(recurringAssignments)
+      .set(updates)
+      .where(eq(recurringAssignments.id, id));
+  }
+
+  // Time-Based Automation - Execution Logs
+  async createAutomationRunLog(log: InsertAutomationRunLog): Promise<AutomationRunLog> {
+    const [created] = await db.insert(automationRunLogs).values(log).returning();
+    return created;
+  }
+
+  async updateAutomationRunLog(id: string, updates: Partial<InsertAutomationRunLog>): Promise<AutomationRunLog> {
+    const [updated] = await db.update(automationRunLogs)
+      .set(updates)
+      .where(eq(automationRunLogs.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getAutomationRunLogs(entityId?: string, entityType?: string, limit: number = 100): Promise<AutomationRunLog[]> {
+    const query = db.select().from(automationRunLogs);
+    
+    if (entityId && entityType) {
+      query.where(and(
+        eq(automationRunLogs.entityId, entityId),
+        eq(automationRunLogs.entityType, entityType)
+      ));
+    }
+    
+    return await query
+      .orderBy(desc(automationRunLogs.startedAt))
+      .limit(limit);
+  }
+
+  async getFailedAutomationRuns(limit: number = 50): Promise<AutomationRunLog[]> {
+    return await db.select().from(automationRunLogs)
+      .where(eq(automationRunLogs.status, "failed"))
+      .orderBy(desc(automationRunLogs.startedAt))
+      .limit(limit);
   }
 }
 
