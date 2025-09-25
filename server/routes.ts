@@ -1689,41 +1689,207 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You don't have permission to access these insights" });
       }
       
-      const insights = [
-        {
+      // Fetch real user performance data
+      const [
+        userCompetencies,
+        learningPathEnrollments,
+        enrollments // Course enrollments
+      ] = await Promise.all([
+        storage.getUserCompetencies(userId),
+        storage.getLearningPathEnrollments(userId),
+        storage.getUserEnrollments(userId)
+      ]);
+      
+      const insights = [];
+      
+      // Calculate completion rates and trends
+      const completedEnrollments = learningPathEnrollments.filter(e => e.enrollmentStatus === 'completed');
+      const totalEnrollments = learningPathEnrollments.length;
+      const completionRate = totalEnrollments > 0 ? (completedEnrollments.length / totalEnrollments) * 100 : 0;
+      
+      // Learning velocity analysis
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      
+      const recentEnrollments = learningPathEnrollments.filter(e => new Date(e.enrolledAt) >= thirtyDaysAgo).length;
+      const olderEnrollments = learningPathEnrollments.filter(e => 
+        new Date(e.enrolledAt) >= ninetyDaysAgo && new Date(e.enrolledAt) < thirtyDaysAgo
+      ).length;
+      
+      // 1. Completion rate insight
+      if (completionRate > 80) {
+        insights.push({
           category: 'strength',
-          title: 'Strong Learning Consistency',
-          description: 'You maintain regular learning activity with 92% engagement',
-          impact: 'medium',
-          actionable: false,
-          suggestedActions: [],
-          data: { engagementLevel: 92 }
-        },
-        {
-          category: 'improvement',
-          title: 'Quiz Performance Variability',
-          description: 'Your quiz scores vary significantly between topics',
-          impact: 'medium',
-          actionable: true,
-          suggestedActions: [
-            'Focus on consistent study habits',
-            'Review challenging topics more frequently',
-            'Use practice quizzes before assessments'
-          ],
-          data: { scoreVariance: 15, averageScore: 78 }
-        },
-        {
-          category: 'trend',
-          title: 'Improving Completion Rate',
-          description: 'Your learning path completion rate has improved 20% this quarter',
+          title: 'Excellent Completion Rate',
+          description: `You have an impressive ${Math.round(completionRate)}% completion rate across learning paths`,
           impact: 'high',
           actionable: false,
           suggestedActions: [],
-          data: { completionTrend: 'up', improvement: 20 }
-        }
-      ];
+          data: { completionRate: Math.round(completionRate) }
+        });
+      } else if (completionRate > 50) {
+        insights.push({
+          category: 'improvement',
+          title: 'Good Completion Progress',
+          description: `Your ${Math.round(completionRate)}% completion rate shows steady progress with room for improvement`,
+          impact: 'medium',
+          actionable: true,
+          suggestedActions: [
+            'Set aside dedicated time for learning each week',
+            'Break down learning paths into smaller, manageable sessions',
+            'Track your progress regularly to maintain momentum'
+          ],
+          data: { completionRate: Math.round(completionRate) }
+        });
+      } else if (totalEnrollments > 0) {
+        insights.push({
+          category: 'concern',
+          title: 'Low Completion Rate',
+          description: `Your ${Math.round(completionRate)}% completion rate suggests difficulty finishing learning paths`,
+          impact: 'high',
+          actionable: true,
+          suggestedActions: [
+            'Focus on completing one learning path at a time',
+            'Consider switching to shorter, more focused modules',
+            'Schedule regular check-ins with your supervisor for support',
+            'Review learning path difficulty and adjust as needed'
+          ],
+          data: { completionRate: Math.round(completionRate) }
+        });
+      }
       
-      res.json(insights);
+      // 2. Learning velocity trend
+      const velocityTrend = recentEnrollments > olderEnrollments ? 'increasing' : 
+                           recentEnrollments < olderEnrollments ? 'decreasing' : 'stable';
+      
+      if (velocityTrend === 'increasing' && recentEnrollments > 1) {
+        insights.push({
+          category: 'trend',
+          title: 'Accelerating Learning Pace',
+          description: `Your learning activity has increased with ${recentEnrollments} new enrollments in the last 30 days`,
+          impact: 'medium',
+          actionable: false,
+          suggestedActions: [],
+          data: { recentEnrollments, trend: 'up' }
+        });
+      } else if (velocityTrend === 'decreasing' && olderEnrollments > 1) {
+        insights.push({
+          category: 'concern',
+          title: 'Declining Learning Activity',
+          description: `Your learning pace has slowed - only ${recentEnrollments} new enrollments in the last 30 days compared to ${olderEnrollments} before`,
+          impact: 'medium',
+          actionable: true,
+          suggestedActions: [
+            'Set a weekly learning goal to maintain consistency',
+            'Explore new learning formats that match your preferences',
+            'Schedule learning time in your calendar as non-negotiable appointments'
+          ],
+          data: { recentEnrollments, olderEnrollments, trend: 'down' }
+        });
+      }
+      
+      // 3. Competency development insights
+      const competenciesAtTarget = userCompetencies.filter((uc: any) => 
+        uc.currentLevel && uc.targetLevel && uc.currentLevel >= uc.targetLevel
+      ).length;
+      
+      const competenciesBelowTarget = userCompetencies.filter((uc: any) => 
+        uc.currentLevel && uc.targetLevel && uc.currentLevel < uc.targetLevel
+      ).length;
+      
+      if (competenciesAtTarget > competenciesBelowTarget && competenciesAtTarget > 0) {
+        insights.push({
+          category: 'strength',
+          title: 'Strong Competency Development',
+          description: `You've achieved target levels in ${competenciesAtTarget} out of ${userCompetencies.length} competencies`,
+          impact: 'high',
+          actionable: false,
+          suggestedActions: [],
+          data: { competenciesAtTarget, totalCompetencies: userCompetencies.length }
+        });
+      } else if (competenciesBelowTarget > 0) {
+        insights.push({
+          category: 'improvement',
+          title: 'Competency Development Opportunities',
+          description: `${competenciesBelowTarget} competencies need attention to reach target levels`,
+          impact: 'medium',
+          actionable: true,
+          suggestedActions: [
+            'Focus on one competency at a time for targeted development',
+            'Seek mentoring for challenging competencies',
+            'Practice skills through real-world applications',
+            'Request additional training resources if needed'
+          ],
+          data: { competenciesBelowTarget, totalCompetencies: userCompetencies.length }
+        });
+      }
+      
+      // 4. Engagement consistency
+      const inProgressEnrollments = learningPathEnrollments.filter(e => e.enrollmentStatus === 'in_progress');
+      const averageProgress = inProgressEnrollments.length > 0 
+        ? inProgressEnrollments.reduce((sum, e) => sum + (e.progress || 0), 0) / inProgressEnrollments.length 
+        : 0;
+      
+      if (averageProgress > 75) {
+        insights.push({
+          category: 'strength',
+          title: 'High Engagement Level',
+          description: `Your average progress of ${Math.round(averageProgress)}% across active learning paths shows excellent engagement`,
+          impact: 'medium',
+          actionable: false,
+          suggestedActions: [],
+          data: { averageProgress: Math.round(averageProgress) }
+        });
+      } else if (averageProgress > 25 && averageProgress <= 75) {
+        insights.push({
+          category: 'improvement',
+          title: 'Moderate Progress Consistency',
+          description: `Your ${Math.round(averageProgress)}% average progress suggests room for more consistent engagement`,
+          impact: 'medium',
+          actionable: true,
+          suggestedActions: [
+            'Set specific daily or weekly learning targets',
+            'Use progress tracking tools to monitor advancement',
+            'Celebrate small milestones to maintain motivation'
+          ],
+          data: { averageProgress: Math.round(averageProgress) }
+        });
+      } else if (inProgressEnrollments.length > 0 && averageProgress <= 25) {
+        insights.push({
+          category: 'concern',
+          title: 'Low Progress Across Learning Paths',
+          description: `Your ${Math.round(averageProgress)}% average progress indicates difficulty maintaining engagement`,
+          impact: 'high',
+          actionable: true,
+          suggestedActions: [
+            'Review learning path difficulty - consider easier alternatives',
+            'Break learning into shorter, more manageable sessions',
+            'Identify and address barriers preventing progress',
+            'Discuss learning challenges with your supervisor'
+          ],
+          data: { averageProgress: Math.round(averageProgress) }
+        });
+      }
+      
+      // 5. Default positive insight if no specific patterns found
+      if (insights.length === 0) {
+        insights.push({
+          category: 'trend',
+          title: 'Learning Journey in Progress',
+          description: 'You\'re building a foundation for professional development through continuous learning',
+          impact: 'medium',
+          actionable: true,
+          suggestedActions: [
+            'Explore learning paths that align with your career goals',
+            'Set regular learning milestones to track progress',
+            'Connect with colleagues to share learning experiences'
+          ],
+          data: { status: 'building_foundation' }
+        });
+      }
+      
+      res.json(insights.slice(0, 4)); // Return top 4 insights
     } catch (error) {
       console.error("Error fetching performance insights:", error);
       res.status(500).json({ message: "Failed to fetch performance insights" });
