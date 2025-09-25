@@ -1543,6 +1543,87 @@ export const insertRoleCompetencyMappingSchema = createInsertSchema(roleCompeten
   updatedAt: true,
 });
 
+// Enhanced automation trigger events for Phase 2
+export const automationTriggerEventEnum = z.enum([
+  // User lifecycle events
+  "user_created",
+  "user_updated", 
+  "role_changed",
+  "team_changed",
+  // Learning & Performance events
+  "course_completed",
+  "learning_path_completed",
+  "quiz_passed",
+  "quiz_failed",
+  "competency_gap_identified",
+  "assessment_score_threshold",
+  "badge_earned",
+  "achievement_unlocked",
+  // Time-based events
+  "scheduled",
+  "due_date_approaching",
+  "compliance_renewal_due",
+  // Engagement events
+  "login_streak_reached",
+  "inactive_user_detected",
+  "high_performer_identified"
+]);
+
+// Condition operators for smart segmentation
+export const conditionOperatorEnum = z.enum([
+  "equals", "not_equals", "contains", "not_contains", 
+  "greater_than", "less_than", "greater_than_equal", "less_than_equal",
+  "is_empty", "is_not_empty", "in_list", "not_in_list",
+  "date_before", "date_after", "date_between"
+]);
+
+// Condition schema for complex multi-part queries
+export const conditionSchema = z.object({
+  id: z.string(),
+  field: z.enum([
+    "role", "team", "department", "hire_date", "last_login",
+    "completion_rate", "quiz_average", "points_total", "badges_count",
+    "competency_status", "learning_path_progress", "user_tag"
+  ]),
+  operator: conditionOperatorEnum,
+  value: z.union([z.string(), z.number(), z.array(z.string()), z.object({
+    from: z.string(),
+    to: z.string()
+  })]),
+  logicalOperator: z.enum(["AND", "OR"]).optional()
+});
+
+// Condition group for nested logic (smart segmentation)
+export const conditionGroupSchema = z.object({
+  id: z.string(),
+  logicalOperator: z.enum(["AND", "OR"]),
+  conditions: z.array(conditionSchema),
+  groups: z.array(z.lazy(() => conditionGroupSchema)).optional()
+});
+
+// Action types for automation
+export const actionTypeEnum = z.enum([
+  "assign_learning_path",
+  "enroll_in_course", 
+  "send_notification",
+  "update_user_role",
+  "add_user_tag",
+  "create_development_plan",
+  "schedule_meeting",
+  "assign_badge",
+  "award_points",
+  "trigger_assessment"
+]);
+
+// Action schema for various action types
+export const actionSchema = z.object({
+  id: z.string(),
+  type: actionTypeEnum,
+  config: z.record(z.string(), z.any()), // Type-specific configuration
+  delayMinutes: z.number().optional(), // Delay before execution
+  conditions: z.array(conditionSchema).optional() // Additional conditions for this action
+});
+
 export const insertAutomationRuleSchema = createInsertSchema(automationRules).omit({
   id: true,
   createdAt: true,
@@ -1551,10 +1632,19 @@ export const insertAutomationRuleSchema = createInsertSchema(automationRules).om
   totalExecutions: true,
   successfulExecutions: true,
 }).extend({
-  triggerEvent: z.enum(["user_created", "user_updated", "role_changed", "team_changed", "scheduled"]),
-  conditions: z.record(z.string(), z.any()).optional(),
-  actions: z.record(z.string(), z.any()).optional(),
-  scheduleConfig: z.record(z.string(), z.any()).optional(),
+  triggerEvent: automationTriggerEventEnum,
+  conditions: z.object({
+    logicalOperator: z.enum(["AND", "OR"]).default("AND"),
+    groups: z.array(conditionGroupSchema).optional(),
+    conditions: z.array(conditionSchema).optional()
+  }).optional(),
+  actions: z.array(actionSchema),
+  scheduleConfig: z.object({
+    frequency: z.enum(["once", "daily", "weekly", "monthly"]).optional(),
+    time: z.string().optional(), // Time of day for scheduled triggers
+    daysOfWeek: z.array(z.number().min(0).max(6)).optional(), // 0-6 for Sun-Sat
+    timezone: z.string().default("UTC")
+  }).optional(),
 });
 
 export const insertTrainingMatrixRecordSchema = createInsertSchema(trainingMatrixRecords).omit({

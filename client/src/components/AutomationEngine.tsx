@@ -18,15 +18,35 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-// Form schemas
+// Import enhanced schemas from shared
+import { 
+  automationTriggerEventEnum, 
+  conditionSchema, 
+  conditionGroupSchema, 
+  actionSchema,
+  actionTypeEnum,
+  conditionOperatorEnum
+} from "@shared/schema";
+
+// Enhanced form schemas for Phase 2
 const automationRuleSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
-  triggerEvent: z.enum(["user_created", "user_updated", "role_changed", "team_changed", "scheduled"]),
-  conditions: z.record(z.any()).optional(),
-  actions: z.record(z.any()).optional(),
-  scheduleConfig: z.record(z.any()).optional(),
+  triggerEvent: automationTriggerEventEnum,
+  conditions: z.object({
+    logicalOperator: z.enum(["AND", "OR"]).default("AND"),
+    groups: z.array(conditionGroupSchema).optional(),
+    conditions: z.array(conditionSchema).optional()
+  }).optional(),
+  actions: z.array(actionSchema).min(1, "At least one action is required"),
+  scheduleConfig: z.object({
+    frequency: z.enum(["once", "daily", "weekly", "monthly"]).optional(),
+    time: z.string().optional(),
+    daysOfWeek: z.array(z.number().min(0).max(6)).optional(),
+    timezone: z.string().default("UTC")
+  }).optional(),
   isActive: z.boolean().default(true),
+  priority: z.number().default(100),
 });
 
 const triggerTestSchema = z.object({
@@ -44,16 +64,32 @@ export default function AutomationEngine() {
   const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<any>(null);
 
-  // Automation Rules queries
-  const { data: automationRules = [], isLoading } = useQuery({
+  // Automation Rules queries - properly typed with shared schemas
+  const { data: automationRules = [], isLoading } = useQuery<Array<{
+    id: string;
+    name: string;
+    description?: string;
+    isActive: boolean;
+    triggerEvent: string;
+    conditions?: any;
+    actions?: any;
+    scheduleConfig?: any;
+    priority?: number;
+    lastRun?: string;
+    totalExecutions?: number;
+    successfulExecutions?: number;
+    createdBy: string;
+    createdAt: string;
+    updatedAt: string;
+  }>>({
     queryKey: ['/api/automation-rules'],
   });
 
-  const { data: learningPaths = [] } = useQuery({
+  const { data: learningPaths = [] } = useQuery<Array<{ id: string; name: string; description?: string }>>({
     queryKey: ['/api/learning-paths'],
   });
 
-  const { data: users = [] } = useQuery({
+  const { data: users = [] } = useQuery<Array<{ id: string; firstName: string; lastName: string; email: string }>>({
     queryKey: ['/api/users'],
   });
 
@@ -64,10 +100,18 @@ export default function AutomationEngine() {
       name: "",
       description: "",
       triggerEvent: "user_created",
-      conditions: {},
-      actions: {},
-      scheduleConfig: {},
+      conditions: {
+        logicalOperator: "AND",
+        groups: [],
+        conditions: []
+      },
+      actions: [],
+      scheduleConfig: {
+        frequency: "once",
+        timezone: "UTC"
+      },
       isActive: true,
+      priority: 100,
     },
   });
 
@@ -138,10 +182,11 @@ export default function AutomationEngine() {
 
   const executeRuleMutation = useMutation({
     mutationFn: (id: string) => apiRequest(`/api/automation-rules/${id}/execute`, { method: 'POST' }),
-    onSuccess: (result) => {
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/automation-rules'] });
       toast({ 
         title: "Execution Complete", 
-        description: `Rule executed: ${result.executed ? 'Success' : 'Failed'} - ${result.enrollments || 0} enrollments created` 
+        description: "Automation rule executed successfully" 
       });
     },
   });
@@ -151,10 +196,11 @@ export default function AutomationEngine() {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    onSuccess: (result) => {
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/automation-rules'] });
       toast({ 
         title: "Test Complete", 
-        description: `${result.totalRules} rules evaluated, ${result.executed} executed, ${result.enrollments} enrollments created` 
+        description: "Automation rules executed successfully for test user" 
       });
       setIsTestDialogOpen(false);
       testForm.reset();
@@ -171,10 +217,18 @@ export default function AutomationEngine() {
       name: rule.name,
       description: rule.description || "",
       triggerEvent: rule.triggerEvent,
-      conditions: rule.conditions || {},
-      actions: rule.actions || {},
-      scheduleConfig: rule.scheduleConfig || {},
+      conditions: rule.conditions || {
+        logicalOperator: "AND",
+        groups: [],
+        conditions: []
+      },
+      actions: Array.isArray(rule.actions) ? rule.actions : [],
+      scheduleConfig: rule.scheduleConfig || {
+        frequency: "once",
+        timezone: "UTC"
+      },
       isActive: rule.isActive,
+      priority: rule.priority || 100,
     });
     setIsCreateDialogOpen(true);
   };
@@ -191,22 +245,56 @@ export default function AutomationEngine() {
 
   const getTriggerEventLabel = (event: string) => {
     switch (event) {
+      // User lifecycle events
       case "user_created": return "User Created";
       case "user_updated": return "User Updated";
       case "role_changed": return "Role Changed";
       case "team_changed": return "Team Changed";
+      // Learning & Performance events
+      case "course_completed": return "Course Completed";
+      case "learning_path_completed": return "Learning Path Completed";
+      case "quiz_passed": return "Quiz Passed";
+      case "quiz_failed": return "Quiz Failed";
+      case "competency_gap_identified": return "Competency Gap Identified";
+      case "assessment_score_threshold": return "Assessment Score Threshold";
+      case "badge_earned": return "Badge Earned";
+      case "achievement_unlocked": return "Achievement Unlocked";
+      // Time-based events
       case "scheduled": return "Scheduled";
+      case "due_date_approaching": return "Due Date Approaching";
+      case "compliance_renewal_due": return "Compliance Renewal Due";
+      // Engagement events
+      case "login_streak_reached": return "Login Streak Reached";
+      case "inactive_user_detected": return "Inactive User Detected";
+      case "high_performer_identified": return "High Performer Identified";
       default: return event;
     }
   };
 
   const getTriggerEventIcon = (event: string) => {
     switch (event) {
+      // User lifecycle events
       case "user_created": return <Users className="h-4 w-4" />;
       case "user_updated": return <Edit className="h-4 w-4" />;
       case "role_changed": return <Target className="h-4 w-4" />;
       case "team_changed": return <Users className="h-4 w-4" />;
+      // Learning & Performance events
+      case "course_completed": return <Play className="h-4 w-4" />;
+      case "learning_path_completed": return <Settings className="h-4 w-4" />;
+      case "quiz_passed": return <Target className="h-4 w-4" />;
+      case "quiz_failed": return <Target className="h-4 w-4" />;
+      case "competency_gap_identified": return <Zap className="h-4 w-4" />;
+      case "assessment_score_threshold": return <Target className="h-4 w-4" />;
+      case "badge_earned": return <Users className="h-4 w-4" />;
+      case "achievement_unlocked": return <Settings className="h-4 w-4" />;
+      // Time-based events
       case "scheduled": return <Clock className="h-4 w-4" />;
+      case "due_date_approaching": return <Clock className="h-4 w-4" />;
+      case "compliance_renewal_due": return <Clock className="h-4 w-4" />;
+      // Engagement events
+      case "login_streak_reached": return <Zap className="h-4 w-4" />;
+      case "inactive_user_detected": return <Users className="h-4 w-4" />;
+      case "high_performer_identified": return <Target className="h-4 w-4" />;
       default: return <Zap className="h-4 w-4" />;
     }
   };
@@ -278,11 +366,28 @@ export default function AutomationEngine() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="user_created">User Created</SelectItem>
-                            <SelectItem value="user_updated">User Updated</SelectItem>
-                            <SelectItem value="role_changed">Role Changed</SelectItem>
-                            <SelectItem value="team_changed">Team Changed</SelectItem>
-                            <SelectItem value="scheduled">Scheduled</SelectItem>
+                            {/* User lifecycle events */}
+                            <SelectItem value="user_created">👤 User Created</SelectItem>
+                            <SelectItem value="user_updated">✏️ User Updated</SelectItem>
+                            <SelectItem value="role_changed">🎯 Role Changed</SelectItem>
+                            <SelectItem value="team_changed">👥 Team Changed</SelectItem>
+                            {/* Learning & Performance events */}
+                            <SelectItem value="course_completed">🎓 Course Completed</SelectItem>
+                            <SelectItem value="learning_path_completed">🛤️ Learning Path Completed</SelectItem>
+                            <SelectItem value="quiz_passed">✅ Quiz Passed</SelectItem>
+                            <SelectItem value="quiz_failed">❌ Quiz Failed</SelectItem>
+                            <SelectItem value="competency_gap_identified">⚡ Competency Gap Identified</SelectItem>
+                            <SelectItem value="assessment_score_threshold">📊 Assessment Score Threshold</SelectItem>
+                            <SelectItem value="badge_earned">🏆 Badge Earned</SelectItem>
+                            <SelectItem value="achievement_unlocked">🏅 Achievement Unlocked</SelectItem>
+                            {/* Time-based events */}
+                            <SelectItem value="scheduled">⏰ Scheduled</SelectItem>
+                            <SelectItem value="due_date_approaching">⏱️ Due Date Approaching</SelectItem>
+                            <SelectItem value="compliance_renewal_due">📅 Compliance Renewal Due</SelectItem>
+                            {/* Engagement events */}
+                            <SelectItem value="login_streak_reached">🔥 Login Streak Reached</SelectItem>
+                            <SelectItem value="inactive_user_detected">😴 Inactive User Detected</SelectItem>
+                            <SelectItem value="high_performer_identified">⭐ High Performer Identified</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -360,11 +465,28 @@ export default function AutomationEngine() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="user_created">User Created</SelectItem>
-                            <SelectItem value="user_updated">User Updated</SelectItem>
-                            <SelectItem value="role_changed">Role Changed</SelectItem>
-                            <SelectItem value="team_changed">Team Changed</SelectItem>
-                            <SelectItem value="scheduled">Scheduled</SelectItem>
+                            {/* User lifecycle events */}
+                            <SelectItem value="user_created">👤 User Created</SelectItem>
+                            <SelectItem value="user_updated">✏️ User Updated</SelectItem>
+                            <SelectItem value="role_changed">🎯 Role Changed</SelectItem>
+                            <SelectItem value="team_changed">👥 Team Changed</SelectItem>
+                            {/* Learning & Performance events */}
+                            <SelectItem value="course_completed">🎓 Course Completed</SelectItem>
+                            <SelectItem value="learning_path_completed">🛤️ Learning Path Completed</SelectItem>
+                            <SelectItem value="quiz_passed">✅ Quiz Passed</SelectItem>
+                            <SelectItem value="quiz_failed">❌ Quiz Failed</SelectItem>
+                            <SelectItem value="competency_gap_identified">⚡ Competency Gap Identified</SelectItem>
+                            <SelectItem value="assessment_score_threshold">📊 Assessment Score Threshold</SelectItem>
+                            <SelectItem value="badge_earned">🏆 Badge Earned</SelectItem>
+                            <SelectItem value="achievement_unlocked">🏅 Achievement Unlocked</SelectItem>
+                            {/* Time-based events */}
+                            <SelectItem value="scheduled">⏰ Scheduled</SelectItem>
+                            <SelectItem value="due_date_approaching">⏱️ Due Date Approaching</SelectItem>
+                            <SelectItem value="compliance_renewal_due">📅 Compliance Renewal Due</SelectItem>
+                            {/* Engagement events */}
+                            <SelectItem value="login_streak_reached">🔥 Login Streak Reached</SelectItem>
+                            <SelectItem value="inactive_user_detected">😴 Inactive User Detected</SelectItem>
+                            <SelectItem value="high_performer_identified">⭐ High Performer Identified</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormDescription>
@@ -374,6 +496,215 @@ export default function AutomationEngine() {
                       </FormItem>
                     )}
                   />
+
+                  {/* Advanced Condition Builder */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Smart Segmentation</FormLabel>
+                      <Badge variant="secondary">Advanced Conditions</Badge>
+                    </div>
+                    <Card className="p-4">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Match:</span>
+                          <Select defaultValue="AND">
+                            <SelectTrigger className="w-24">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="AND">ALL</SelectItem>
+                              <SelectItem value="OR">ANY</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <span className="text-sm text-muted-foreground">of the following conditions</span>
+                        </div>
+                        
+                        {/* Sample Condition Row */}
+                        <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                          <Select defaultValue="role">
+                            <SelectTrigger className="w-36">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="role">👤 Role</SelectItem>
+                              <SelectItem value="team">👥 Team</SelectItem>
+                              <SelectItem value="department">🏢 Department</SelectItem>
+                              <SelectItem value="hire_date">📅 Hire Date</SelectItem>
+                              <SelectItem value="completion_rate">📊 Completion Rate</SelectItem>
+                              <SelectItem value="quiz_average">🎯 Quiz Average</SelectItem>
+                              <SelectItem value="points_total">⭐ Points Total</SelectItem>
+                              <SelectItem value="competency_status">🎓 Competency Status</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          
+                          <Select defaultValue="equals">
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="equals">Equals</SelectItem>
+                              <SelectItem value="not_equals">Not Equals</SelectItem>
+                              <SelectItem value="contains">Contains</SelectItem>
+                              <SelectItem value="greater_than">Greater Than</SelectItem>
+                              <SelectItem value="less_than">Less Than</SelectItem>
+                              <SelectItem value="in_list">In List</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          
+                          <Input placeholder="Value" className="flex-1" />
+                          
+                          <Button variant="ghost" size="sm">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" data-testid="button-add-condition">
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Condition
+                          </Button>
+                          <Button variant="outline" size="sm" data-testid="button-add-group">
+                            <Settings className="h-4 w-4 mr-1" />
+                            Add Group
+                          </Button>
+                        </div>
+                        
+                        <div className="text-xs text-muted-foreground">
+                          💡 Use groups to create complex logic like (Role = Supervisor AND Team = Cleaning) OR (Completion Rate &gt; 80%)
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+
+                  {/* Advanced Action Configurator */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Automation Actions</FormLabel>
+                      <Badge variant="secondary">Multiple Actions</Badge>
+                    </div>
+                    <Card className="p-4">
+                      <div className="space-y-4">
+                        {/* Sample Action Row */}
+                        <div className="flex items-start gap-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border">
+                          <div className="flex-1 space-y-3">
+                            <div className="flex items-center gap-2">
+                              <Select defaultValue="assign_learning_path">
+                                <SelectTrigger className="w-48">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="assign_learning_path">🛤️ Assign Learning Path</SelectItem>
+                                  <SelectItem value="enroll_in_course">🎓 Enroll in Course</SelectItem>
+                                  <SelectItem value="send_notification">📧 Send Notification</SelectItem>
+                                  <SelectItem value="update_user_role">👤 Update User Role</SelectItem>
+                                  <SelectItem value="add_user_tag">🏷️ Add User Tag</SelectItem>
+                                  <SelectItem value="create_development_plan">📋 Create Development Plan</SelectItem>
+                                  <SelectItem value="schedule_meeting">📅 Schedule Meeting</SelectItem>
+                                  <SelectItem value="assign_badge">🏆 Assign Badge</SelectItem>
+                                  <SelectItem value="award_points">⭐ Award Points</SelectItem>
+                                  <SelectItem value="trigger_assessment">📊 Trigger Assessment</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Button variant="ghost" size="sm">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <Label className="text-xs">Learning Path</Label>
+                                <Select>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select path" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {learningPaths.map((path: any) => (
+                                      <SelectItem key={path.id} value={path.id}>
+                                        {path.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label className="text-xs">Delay (minutes)</Label>
+                                <Input type="number" placeholder="0" min="0" />
+                              </div>
+                            </div>
+                            
+                            <div className="text-xs text-muted-foreground">
+                              🎯 This action will assign the selected learning path to users matching the conditions
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" data-testid="button-add-action">
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Action
+                          </Button>
+                        </div>
+                        
+                        <div className="text-xs text-muted-foreground">
+                          ⚡ Actions are executed in order. Add delays between actions if needed for proper sequencing.
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+
+                  {/* Priority and Schedule Configuration */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={ruleForm.control}
+                      name="priority"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Priority</FormLabel>
+                          <Select value={String(field.value)} onValueChange={(value) => field.onChange(Number(value))}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-rule-priority">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="10">🔴 Critical (10)</SelectItem>
+                              <SelectItem value="50">🟡 High (50)</SelectItem>
+                              <SelectItem value="100">🟢 Normal (100)</SelectItem>
+                              <SelectItem value="200">🔵 Low (200)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Lower numbers = higher priority
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={ruleForm.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                          <div className="space-y-0.5">
+                            <FormLabel>Active Rule</FormLabel>
+                            <FormDescription>
+                              Enable this automation rule
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4"
+                              data-testid="checkbox-rule-active"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   
                   <div className="flex justify-end space-x-2">
                     <Button type="button" variant="outline" onClick={() => {
