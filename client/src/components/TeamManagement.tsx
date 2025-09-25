@@ -89,19 +89,19 @@ export default function TeamManagement() {
   const { data: teams = [], isLoading: teamsLoading } = useQuery({
     queryKey: ["/api/teams"],
     retry: false,
-  });
+  }) as { data: Team[]; isLoading: boolean };
 
   // Fetch team hierarchy
   const { data: teamHierarchy = [], isLoading: hierarchyLoading } = useQuery({
     queryKey: ["/api/teams/hierarchy"],
     retry: false,
-  });
+  }) as { data: Team[]; isLoading: boolean };
 
   // Fetch all users for assignment
   const { data: allUsers = [], isLoading: usersLoading } = useQuery({
     queryKey: ["/api/users"],
     retry: false,
-  });
+  }) as { data: User[]; isLoading: boolean };
 
   // Fetch team members for current user (if supervisor)
   const { data: teamMembers = [] } = useQuery({
@@ -111,7 +111,7 @@ export default function TeamManagement() {
 
   // Create team mutation
   const createTeamMutation = useMutation({
-    mutationFn: (teamData: InsertTeamData) => apiRequest("POST", "/api/teams", teamData),
+    mutationFn: (teamData: InsertTeamData) => apiRequest("/api/teams", { method: "POST", body: JSON.stringify(teamData) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teams/hierarchy"] });
@@ -134,7 +134,7 @@ export default function TeamManagement() {
   // Update team mutation
   const updateTeamMutation = useMutation({
     mutationFn: ({ id, ...updates }: { id: string } & Partial<InsertTeamData>) => 
-      apiRequest("PUT", `/api/teams/${id}`, updates),
+      apiRequest(`/api/teams/${id}`, { method: "PUT", body: JSON.stringify(updates) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teams/hierarchy"] });
@@ -157,7 +157,7 @@ export default function TeamManagement() {
 
   // Delete team mutation (leadership only)
   const deleteTeamMutation = useMutation({
-    mutationFn: (teamId: string) => apiRequest("DELETE", `/api/teams/${teamId}`),
+    mutationFn: (teamId: string) => apiRequest(`/api/teams/${teamId}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teams/hierarchy"] });
@@ -415,13 +415,13 @@ export default function TeamManagement() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {allUsers.filter((user: User) => 
+                          {(allUsers as User[]).filter((user: User) => 
                             user.role === 'supervisor' || user.role === 'leadership'
                           ).map((user: User) => (
                             <SelectItem key={user.id} value={user.id}>
                               {user.firstName && user.lastName 
                                 ? `${user.firstName} ${user.lastName}` 
-                                : user.email}
+                                : user.email || 'Unknown User'}
                             </SelectItem>
                           ))}
                         </SelectContent>
