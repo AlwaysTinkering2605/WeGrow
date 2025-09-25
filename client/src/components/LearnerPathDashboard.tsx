@@ -98,13 +98,13 @@ export default function LearnerPathDashboard() {
 
   // Fetch user's learning path enrollments
   const { data: myEnrollments = [], isLoading: enrollmentsLoading } = useQuery({
-    queryKey: ['/api/users', user?.id, 'learning-path-enrollments'],
+    queryKey: [`/api/users/${user?.id}/learning-path-enrollments`],
     enabled: !!user?.id,
   });
 
   // Fetch learning statistics
   const { data: learningStats, isLoading: statsLoading } = useQuery({
-    queryKey: ['/api/users', user?.id, 'learning-stats'],
+    queryKey: [`/api/users/${user?.id}/learning-stats`],
     enabled: !!user?.id,
     initialData: {
       totalEnrollments: myEnrollments?.length || 0,
@@ -128,7 +128,7 @@ export default function LearnerPathDashboard() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/users', user?.id, 'learning-path-enrollments'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${user?.id}/learning-path-enrollments`] });
       toast({
         title: "Enrolled Successfully!",
         description: "You have been enrolled in the learning path.",
@@ -168,7 +168,7 @@ export default function LearnerPathDashboard() {
       const averageProgress = Math.round(totalProgress / myEnrollments.length);
       
       // Update the query data without refetching
-      queryClient.setQueryData(['/api/users', user?.id, 'learning-stats'], (oldData: LearningStats) => ({
+      queryClient.setQueryData([`/api/users/${user?.id}/learning-stats`], (oldData: LearningStats) => ({
         ...oldData,
         totalEnrollments: myEnrollments.length,
         activeEnrollments: myEnrollments.filter((e: PathEnrollment) => e.status === 'in_progress').length,
@@ -184,20 +184,32 @@ export default function LearnerPathDashboard() {
     value: string | number;
     subtitle?: string;
     color?: string;
-  }) => (
+  }) => {
+    // Fix dynamic Tailwind classes with explicit mapping
+    const colorClasses = {
+      blue: { icon: "text-blue-600", text: "text-blue-600" },
+      green: { icon: "text-green-600", text: "text-green-600" },
+      purple: { icon: "text-purple-600", text: "text-purple-600" },
+      yellow: { icon: "text-yellow-600", text: "text-yellow-600" },
+      red: { icon: "text-red-600", text: "text-red-600" },
+    };
+    const selectedColor = colorClasses[color as keyof typeof colorClasses] || colorClasses.blue;
+    
+    return (
     <Card>
       <CardContent className="p-6">
         <div className="flex items-center space-x-2">
-          <Icon className={`h-8 w-8 text-${color}-600`} />
+          <Icon className={`h-8 w-8 ${selectedColor.icon}`} />
           <div>
-            <div className={`text-2xl font-bold text-${color}-600`}>{value}</div>
+            <div className={`text-2xl font-bold ${selectedColor.text}`}>{value}</div>
             <p className="text-sm text-muted-foreground">{title}</p>
             {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
           </div>
         </div>
       </CardContent>
     </Card>
-  );
+    );
+  };
 
   const PathCard = ({ path, enrolled = false, enrollment }: {
     path: LearningPath;

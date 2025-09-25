@@ -154,12 +154,12 @@ export default function ComplianceReportingSuite() {
   // Fetch audit trail
   const { data: auditTrail = [], isLoading: auditLoading } = useQuery({
     queryKey: ['/api/compliance/audit-trail', dateRange],
-  });
+  }) as { data: AuditTrailEntry[]; isLoading: boolean };
 
   // Fetch non-conformance issues
   const { data: nonConformances = [], isLoading: ncLoading } = useQuery({
     queryKey: ['/api/compliance/non-conformances'],
-  });
+  }) as { data: NonConformanceIssue[]; isLoading: boolean };
 
   // Fetch executive summary
   const { data: executiveSummary, isLoading: summaryLoading } = useQuery({
@@ -177,7 +177,7 @@ export default function ComplianceReportingSuite() {
   // Fetch available reports
   const { data: availableReports = [], isLoading: reportsLoading } = useQuery({
     queryKey: ['/api/compliance/reports'],
-  });
+  }) as { data: ComplianceReport[]; isLoading: boolean };
 
   // Generate report mutation
   const generateReportMutation = useMutation({
@@ -223,24 +223,24 @@ export default function ComplianceReportingSuite() {
   };
 
   const getComplianceRatingColor = (rating: string) => {
-    switch (rating) {
-      case 'A': return 'text-green-600 bg-green-100';
-      case 'B': return 'text-blue-600 bg-blue-100';
-      case 'C': return 'text-yellow-600 bg-yellow-100';
-      case 'D': return 'text-orange-600 bg-orange-100';
-      case 'F': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
+    const ratingColors = {
+      'A': 'text-green-600 bg-green-100',
+      'B': 'text-blue-600 bg-blue-100',
+      'C': 'text-yellow-600 bg-yellow-100',
+      'D': 'text-orange-600 bg-orange-100',
+      'F': 'text-red-600 bg-red-100',
+    };
+    return ratingColors[rating as keyof typeof ratingColors] || 'text-gray-600 bg-gray-100';
   };
 
   const getRiskColor = (risk: string) => {
-    switch (risk) {
-      case 'low': return 'text-green-600 bg-green-100';
-      case 'medium': return 'text-yellow-600 bg-yellow-100';
-      case 'high': return 'text-orange-600 bg-orange-100';
-      case 'critical': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
+    const riskColors = {
+      'low': 'text-green-600 bg-green-100',
+      'medium': 'text-yellow-600 bg-yellow-100',
+      'high': 'text-orange-600 bg-orange-100',
+      'critical': 'text-red-600 bg-red-100',
+    };
+    return riskColors[risk as keyof typeof riskColors] || 'text-gray-600 bg-gray-100';
   };
 
   const ComplianceMetricCard = ({ title, value, target, icon: Icon, trend }: {

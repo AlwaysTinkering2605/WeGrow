@@ -124,7 +124,7 @@ export default function TrainingMatrixMobile() {
   const { data: teamSummaries = [], isLoading: teamsLoading } = useQuery({
     queryKey: ['/api/training-matrix/team-summaries'],
     refetchInterval: isOffline ? false : 120000,
-  });
+  }) as { data: TeamSummary[]; isLoading: boolean };
 
   // Fetch competency statuses with filters
   const { data: competencyStatuses = [], isLoading: statusesLoading } = useQuery({
@@ -134,13 +134,13 @@ export default function TrainingMatrixMobile() {
       status: statusFilter 
     }],
     refetchInterval: isOffline ? false : 90000,
-  });
+  }) as { data: CompetencyStatus[]; isLoading: boolean };
 
   // Fetch user roles for filter
   const { data: roles = [] } = useQuery({
     queryKey: ['/api/users/roles'],
     staleTime: 300000, // Cache for 5 minutes
-  });
+  }) as { data: string[] };
 
   // Filter and process data
   const filteredStatuses = competencyStatuses.filter((status: CompetencyStatus) => {
@@ -210,16 +210,27 @@ export default function TrainingMatrixMobile() {
     subtitle?: string;
     trend?: "up" | "down" | "stable";
     color?: string;
-  }) => (
+  }) => {
+    // Fix dynamic Tailwind classes - use explicit class mapping
+    const colorClasses = {
+      blue: { bg: "bg-blue-100", text: "text-blue-600" },
+      green: { bg: "bg-green-100", text: "text-green-600" },
+      red: { bg: "bg-red-100", text: "text-red-600" },
+      yellow: { bg: "bg-yellow-100", text: "text-yellow-600" },
+      purple: { bg: "bg-purple-100", text: "text-purple-600" },
+    };
+    const selectedColor = colorClasses[color as keyof typeof colorClasses] || colorClasses.blue;
+    
+    return (
     <Card className="relative overflow-hidden">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className={`p-2 rounded-lg bg-${color}-100`}>
-              <Icon className={`h-5 w-5 text-${color}-600`} />
+            <div className={`p-2 rounded-lg ${selectedColor.bg}`}>
+              <Icon className={`h-5 w-5 ${selectedColor.text}`} />
             </div>
             <div>
-              <div className={`text-lg font-bold text-${color}-600`}>{value}</div>
+              <div className={`text-lg font-bold ${selectedColor.text}`}>{value}</div>
               <p className="text-sm text-muted-foreground">{title}</p>
             </div>
           </div>
@@ -241,7 +252,8 @@ export default function TrainingMatrixMobile() {
         </div>
       )}
     </Card>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20" data-testid="training-matrix-mobile">

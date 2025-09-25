@@ -86,38 +86,47 @@ export default function PathProgressVisualization({
 
   // Fetch learning path with steps
   const { data: pathData, isLoading } = useQuery({
-    queryKey: ['/api/learning-paths', pathId, 'with-steps'],
+    queryKey: [`/api/learning-paths/${pathId}/with-steps`],
     enabled: !!pathId,
   });
 
   // Fetch user enrollment if enrollmentId provided
   const { data: enrollment } = useQuery({
-    queryKey: ['/api/learning-path-enrollments', enrollmentId],
+    queryKey: [`/api/learning-path-enrollments/${enrollmentId}`],
     enabled: !!enrollmentId,
   });
 
   // Fetch step progress for this enrollment
   const { data: stepProgress = [] } = useQuery({
-    queryKey: ['/api/learning-path-enrollments', enrollmentId, 'progress'],
+    queryKey: [`/api/learning-path-enrollments/${enrollmentId}/progress`],
     enabled: !!enrollmentId,
   });
 
-  // Process steps with progress data
-  const processedSteps = pathData?.steps?.map((step: PathStep, index: number) => {
+  // Process steps with progress data - fix circular reference bug
+  const processedSteps = pathData?.steps?.reduce((acc: PathStep[], step: PathStep, index: number) => {
     const progress = stepProgress.find((p: any) => p.stepId === step.id);
     const isCompleted = progress?.status === 'completed' || progress?.isCompleted;
     const isInProgress = progress?.status === 'in_progress';
-    const isLocked = !isCompleted && index > 0 && !processedSteps?.[index - 1]?.isCompleted;
     
-    return {
+    // Check if previous step is completed (for linear paths)
+    const prevStepCompleted = index === 0 || (acc[index - 1]?.isCompleted || step.isOptional);
+    const isLocked = !isCompleted && !isInProgress && !prevStepCompleted;
+    
+    const processedStep = {
       ...step,
       isCompleted,
       progress: progress?.progress || 0,
-      status: isCompleted ? 'completed' : isInProgress ? 'in_progress' : isLocked ? 'locked' : 'not_started',
+      status: (isCompleted ? 'completed' : 
+               isInProgress ? 'in_progress' : 
+               isLocked ? 'locked' : 
+               'not_started') as 'completed' | 'in_progress' | 'locked' | 'not_started',
       completedAt: progress?.completedAt,
       score: progress?.score,
     };
-  }) || [];
+    
+    acc.push(processedStep);
+    return acc;
+  }, []) || [];
 
   // Calculate overall progress
   const completedSteps = processedSteps.filter(step => step.isCompleted).length;
@@ -151,7 +160,7 @@ export default function PathProgressVisualization({
     }
   };
 
-  // Draw journey visualization on canvas
+  // Draw journey visualization on canvas with resize handling
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || processedSteps.length === 0) return;
@@ -159,14 +168,18 @@ export default function PathProgressVisualization({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size
-    const containerWidth = canvas.offsetWidth;
-    const containerHeight = compact ? 120 : 200;
-    canvas.width = containerWidth * window.devicePixelRatio;
-    canvas.height = containerHeight * window.devicePixelRatio;
-    canvas.style.width = `${containerWidth}px`;
-    canvas.style.height = `${containerHeight}px`;
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    const drawCanvas = () => {
+      // Set canvas size
+      const containerWidth = canvas.offsetWidth;
+      const containerHeight = compact ? 120 : 200;
+      canvas.width = containerWidth * window.devicePixelRatio;
+      canvas.height = containerHeight * window.devicePixelRatio;
+      canvas.style.width = `${containerWidth}px`;
+      canvas.style.height = `${containerHeight}px`;
+      
+      // Reset transform before scaling to prevent accumulation
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
     // Clear canvas
     ctx.clearRect(0, 0, containerWidth, containerHeight);
@@ -262,7 +275,21 @@ export default function PathProgressVisualization({
         ctx.fill();
       }
     });
+    };
 
+    // Initial draw
+    drawCanvas();
+
+    // Add resize observer for responsiveness
+    const resizeObserver = new ResizeObserver(() => {
+      drawCanvas();
+    });
+    
+    resizeObserver.observe(canvas);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
   }, [processedSteps, completedSteps, compact]);
 
   if (isLoading) {
