@@ -5419,6 +5419,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Real-Time Learning Path Optimization API
+  app.get('/api/learning-paths/optimization-status/:enrollmentId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId } = req.params;
+      const currentUserId = req.user.claims.sub;
+      
+      // Verify enrollment access
+      const enrollment = await storage.getLearningPathEnrollment(enrollmentId);
+      if (!enrollment) {
+        return res.status(404).json({ message: "Learning path enrollment not found" });
+      }
+      
+      const hasAccess = enrollment.userId === currentUserId || 
+                       req.user.claims.role === 'supervisor' || 
+                       req.user.claims.role === 'leadership';
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: "You don't have permission to access this learning path" });
+      }
+      
+      const status = await storage.getOptimizationStatus(enrollmentId);
+      res.json(status);
+      
+    } catch (error) {
+      console.error('Error getting learning path optimization status:', error);
+      res.status(500).json({ message: "Failed to get optimization status" });
+    }
+  });
+
+  app.post('/api/learning-paths/optimize/:enrollmentId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId } = req.params;
+      const { triggeredByStepCompletion = false } = req.body;
+      const currentUserId = req.user.claims.sub;
+      
+      console.log(`[REAL-TIME-OPT] Optimizing learning path for enrollment ${enrollmentId}`);
+      
+      // Verify enrollment access
+      const enrollment = await storage.getLearningPathEnrollment(enrollmentId);
+      if (!enrollment) {
+        return res.status(404).json({ message: "Learning path enrollment not found" });
+      }
+      
+      const hasAccess = enrollment.userId === currentUserId || 
+                       req.user.claims.role === 'supervisor' || 
+                       req.user.claims.role === 'leadership';
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: "You don't have permission to access this learning path" });
+      }
+      
+      // Trigger real-time optimization
+      const optimization = await storage.optimizeLearningPathRealTime(enrollmentId, triggeredByStepCompletion);
+      
+      console.log(`[REAL-TIME-OPT] Completed optimization with ${optimization.optimizations.stepReordering.length + optimization.optimizations.contentAdjustments.length} adjustments`);
+      
+      res.json({
+        message: "Learning path optimization completed successfully",
+        ...optimization
+      });
+      
+    } catch (error) {
+      console.error('Error in real-time learning path optimization:', error);
+      res.status(500).json({ message: "Failed to optimize learning path" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

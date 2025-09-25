@@ -477,6 +477,52 @@ export interface IStorage {
     baseStepsRequired?: number;
     adaptationEnabled?: boolean;
   }): Promise<LearningPath>;
+  // Optimization status method for UI
+  getOptimizationStatus(enrollmentId: string): Promise<{
+    enrollmentId: string;
+    pathType: string;
+    currentProgress: {
+      completedSteps: number;
+      isCompleted: boolean;
+      progressPercentage: number;
+    };
+    performance: {
+      averageScore: number;
+      trend: 'improving' | 'declining' | 'stable';
+      consistencyScore: number;
+      recentScores: number[];
+    };
+    adaptations: {
+      skipBasics: boolean;
+      addRemedial: boolean;
+      originalRequirement: number;
+      adaptedRequirement: number;
+    };
+    lastOptimized: string;
+    optimizationEnabled: boolean;
+  }>;
+
+  // Real-time optimization methods
+  optimizeLearningPathRealTime(enrollmentId: string, triggeredByStepCompletion?: boolean): Promise<{
+    enrollmentId: string;
+    pathType: string;
+    optimizations: {
+      stepReordering: Array<{stepId: string; newOrder: number; reason: string}>;
+      contentAdjustments: Array<{stepId: string; adjustmentType: 'skip' | 'add_prerequisite' | 'increase_difficulty' | 'decrease_difficulty'; reason: string}>;
+      competencySync: Array<{competencyId: string; updatedLevel: number; triggeredBy: string}>;
+      personalizedRecommendations: Array<{stepId: string; customContent: string; priority: 'high' | 'medium' | 'low'}>;
+    };
+    performance: {
+      averageScore: number;
+      learningVelocity: number;
+      retentionRate: number;
+      engagementLevel: number;
+      difficultyPreference: 'challenging' | 'moderate' | 'supportive';
+    };
+    nextOptimalSteps: Array<{stepId: string; priority: number; estimatedCompletionTime: number}>;
+    adaptationHistory: Array<{timestamp: Date; changeType: string; reason: string; impact: string}>;
+  }>;
+
   getAdaptivePathProgress(enrollmentId: string): Promise<{
     enrollmentId: string;
     pathType: string;
@@ -3731,6 +3777,370 @@ export class DatabaseStorage implements IStorage {
 
     return updatedPath;
   }
+
+  // Real-Time Learning Path Optimization - Enhanced Capabilities
+  async optimizeLearningPathRealTime(enrollmentId: string, triggeredByStepCompletion: boolean = false): Promise<{
+    enrollmentId: string;
+    pathType: string;
+    optimizations: {
+      stepReordering: Array<{stepId: string; newOrder: number; reason: string}>;
+      contentAdjustments: Array<{stepId: string; adjustmentType: 'skip' | 'add_prerequisite' | 'increase_difficulty' | 'decrease_difficulty'; reason: string}>;
+      competencySync: Array<{competencyId: string; updatedLevel: number; triggeredBy: string}>;
+      personalizedRecommendations: Array<{stepId: string; customContent: string; priority: 'high' | 'medium' | 'low'}>;
+    };
+    performance: {
+      averageScore: number;
+      learningVelocity: number; // Steps per day
+      retentionRate: number; // % of previously learned content retained
+      engagementLevel: number; // Based on time spent, interactions
+      difficultyPreference: 'challenging' | 'moderate' | 'supportive';
+    };
+    nextOptimalSteps: Array<{stepId: string; priority: number; estimatedCompletionTime: number}>;
+    adaptationHistory: Array<{timestamp: Date; changeType: string; reason: string; impact: string}>;
+  }> {
+    console.log(`[REAL-TIME-OPT] Starting real-time optimization for enrollment ${enrollmentId}`);
+    
+    // Get current adaptive path data
+    const adaptiveProgress = await this.getAdaptivePathProgress(enrollmentId);
+    
+    // Enhanced performance analysis with learning velocity and engagement
+    const enhancedPerformance = await this.analyzeEnhancedLearningPerformance(enrollmentId);
+    
+    // Analyze competency alignment and gaps
+    const competencyAlignment = await this.analyzeCompetencyAlignment(enrollmentId);
+    
+    // Generate step reordering recommendations
+    const stepOptimizations = await this.generateStepReorderingOptimizations(enrollmentId, enhancedPerformance);
+    
+    // Generate content adjustments based on performance patterns
+    const contentAdjustments = await this.generateContentAdjustments(enrollmentId, enhancedPerformance);
+    
+    // Real-time competency sync
+    const competencySync = await this.syncCompetenciesWithLearningProgress(enrollmentId);
+    
+    // Generate personalized recommendations
+    const personalizedRecommendations = await this.generatePersonalizedStepRecommendations(enrollmentId, enhancedPerformance);
+    
+    // Calculate next optimal steps based on current performance and preferences
+    const nextOptimalSteps = await this.calculateNextOptimalSteps(enrollmentId, enhancedPerformance);
+    
+    // Get adaptation history for this enrollment
+    const adaptationHistory = await this.getAdaptationHistory(enrollmentId);
+    
+    // Log optimization event for audit trail
+    await this.logOptimizationEvent(enrollmentId, 'real_time_optimization', {
+      triggeredByStepCompletion,
+      performanceScore: enhancedPerformance.averageScore,
+      optimizationsApplied: stepOptimizations.length + contentAdjustments.length,
+      competenciesSynced: competencySync.length
+    });
+    
+    console.log(`[REAL-TIME-OPT] Completed optimization with ${stepOptimizations.length} step adjustments and ${contentAdjustments.length} content modifications`);
+    
+    return {
+      enrollmentId,
+      pathType: adaptiveProgress.pathType,
+      optimizations: {
+        stepReordering: stepOptimizations,
+        contentAdjustments,
+        competencySync,
+        personalizedRecommendations
+      },
+      performance: enhancedPerformance,
+      nextOptimalSteps,
+      adaptationHistory
+    };
+  }
+
+  // Enhanced Learning Performance Analysis
+  private async analyzeEnhancedLearningPerformance(enrollmentId: string): Promise<{
+    averageScore: number;
+    learningVelocity: number;
+    retentionRate: number;
+    engagementLevel: number;
+    difficultyPreference: 'challenging' | 'moderate' | 'supportive';
+    performancePattern: 'accelerating' | 'steady' | 'struggling' | 'inconsistent';
+  }> {
+    const stepProgresses = await this.getLearningPathStepProgress(enrollmentId);
+    const completedSteps = stepProgresses.filter(step => step.status === 'completed');
+    
+    // Get enrollment date for velocity calculation
+    const [enrollment] = await db.select()
+      .from(learningPathEnrollments)
+      .where(eq(learningPathEnrollments.id, enrollmentId));
+    
+    if (!enrollment) throw new Error("Enrollment not found for performance analysis");
+    
+    const enrollmentDuration = (Date.now() - new Date(enrollment.enrolledAt).getTime()) / (1000 * 60 * 60 * 24); // Days
+    const learningVelocity = enrollmentDuration > 0 ? completedSteps.length / enrollmentDuration : 0;
+    
+    // Calculate average score
+    const scoredSteps = completedSteps.filter(step => step.score !== null && step.score !== undefined);
+    const averageScore = scoredSteps.length > 0 
+      ? Math.round(scoredSteps.reduce((sum, step) => sum + (step.score || 0), 0) / scoredSteps.length)
+      : 0;
+    
+    // Calculate retention rate (simplified - based on consistency of scores)
+    const recentScores = scoredSteps.slice(-5).map(s => s.score || 0);
+    const retentionRate = recentScores.length >= 2 
+      ? Math.max(0, 100 - (Math.abs(recentScores[recentScores.length - 1] - recentScores[0]) * 2))
+      : averageScore;
+    
+    // Calculate engagement level (based on completion patterns)
+    const completionGaps = completedSteps.map((step, index, arr) => {
+      if (index === 0) return 0;
+      const prevCompletion = new Date(arr[index - 1].completionDate || arr[index - 1].updatedAt);
+      const currentCompletion = new Date(step.completionDate || step.updatedAt);
+      return (currentCompletion.getTime() - prevCompletion.getTime()) / (1000 * 60 * 60 * 24); // Days between completions
+    });
+    
+    const averageGap = completionGaps.length > 0 
+      ? completionGaps.reduce((sum, gap) => sum + gap, 0) / completionGaps.length
+      : 7; // Default to 7 days
+    
+    const engagementLevel = Math.max(0, Math.min(100, 100 - (averageGap * 5))); // Higher engagement = shorter gaps
+    
+    // Determine difficulty preference based on performance patterns
+    let difficultyPreference: 'challenging' | 'moderate' | 'supportive' = 'moderate';
+    if (averageScore >= 85 && learningVelocity > 0.5) {
+      difficultyPreference = 'challenging';
+    } else if (averageScore < 70 || learningVelocity < 0.2) {
+      difficultyPreference = 'supportive';
+    }
+    
+    // Determine performance pattern
+    let performancePattern: 'accelerating' | 'steady' | 'struggling' | 'inconsistent' = 'steady';
+    if (recentScores.length >= 3) {
+      const trend = recentScores[recentScores.length - 1] - recentScores[0];
+      const variance = recentScores.reduce((sum, score) => sum + Math.pow(score - averageScore, 2), 0) / recentScores.length;
+      
+      if (variance > 400) performancePattern = 'inconsistent'; // High variance
+      else if (trend > 15) performancePattern = 'accelerating';
+      else if (averageScore < 60) performancePattern = 'struggling';
+    }
+    
+    return {
+      averageScore,
+      learningVelocity: Math.round(learningVelocity * 100) / 100, // Round to 2 decimal places
+      retentionRate: Math.round(retentionRate),
+      engagementLevel: Math.round(engagementLevel),
+      difficultyPreference,
+      performancePattern
+    };
+  }
+
+  // Generate Step Reordering Optimizations
+  private async generateStepReorderingOptimizations(enrollmentId: string, performance: any): Promise<Array<{stepId: string; newOrder: number; reason: string}>> {
+    const [enrollment] = await db.select()
+      .from(learningPathEnrollments)
+      .where(eq(learningPathEnrollments.id, enrollmentId));
+      
+    if (!enrollment) return [];
+    
+    const pathSteps = await db.select()
+      .from(learningPathSteps)
+      .where(and(eq(learningPathSteps.pathId, enrollment.pathId), isNull(learningPathSteps.deletedAt)))
+      .orderBy(asc(learningPathSteps.stepOrder));
+    
+    const optimizations: Array<{stepId: string; newOrder: number; reason: string}> = [];
+    
+    // For high performers, suggest skipping basic review steps
+    if (performance.averageScore >= 85 && performance.performancePattern === 'accelerating') {
+      const basicSteps = pathSteps.filter(step => step.stepType === 'document' && step.title?.toLowerCase().includes('review'));
+      basicSteps.forEach(step => {
+        if (pathSteps.length > 3) { // Only skip if path has enough content
+          optimizations.push({
+            stepId: step.id,
+            newOrder: 999, // Move to end (effectively skip for now)
+            reason: `High performance (${performance.averageScore}%) suggests basic review can be deferred`
+          });
+        }
+      });
+    }
+    
+    // For struggling learners, prioritize assessment steps earlier  
+    if (performance.averageScore < 65 && performance.performancePattern === 'struggling') {
+      const assessmentSteps = pathSteps.filter(step => step.stepType === 'assessment' || step.stepType === 'quiz');
+      assessmentSteps.forEach((step, index) => {
+        if (step.stepOrder > 2) { // If assessment is later in path
+          optimizations.push({
+            stepId: step.id,
+            newOrder: 2 + index, // Move assessments earlier
+            reason: `Early assessment recommended to identify specific learning gaps (current performance: ${performance.averageScore}%)`
+          });
+        }
+      });
+    }
+    
+    return optimizations;
+  }
+
+  // Generate Content Adjustments
+  private async generateContentAdjustments(enrollmentId: string, performance: any): Promise<Array<{stepId: string; adjustmentType: 'skip' | 'add_prerequisite' | 'increase_difficulty' | 'decrease_difficulty'; reason: string}>> {
+    const [enrollment] = await db.select()
+      .from(learningPathEnrollments)
+      .where(eq(learningPathEnrollments.id, enrollmentId));
+      
+    if (!enrollment) return [];
+    
+    const pathSteps = await db.select()
+      .from(learningPathSteps)
+      .where(and(eq(learningPathSteps.pathId, enrollment.pathId), isNull(learningPathSteps.deletedAt)));
+    
+    const adjustments: Array<{stepId: string; adjustmentType: 'skip' | 'add_prerequisite' | 'increase_difficulty' | 'decrease_difficulty'; reason: string}> = [];
+    
+    pathSteps.forEach(step => {
+      // Suggest difficulty adjustments based on performance patterns
+      if (performance.difficultyPreference === 'challenging' && step.stepType === 'quiz') {
+        adjustments.push({
+          stepId: step.id,
+          adjustmentType: 'increase_difficulty',
+          reason: `Learner shows high performance (${performance.averageScore}%) and prefers challenging content`
+        });
+      } else if (performance.difficultyPreference === 'supportive' && !step.isOptional) {
+        adjustments.push({
+          stepId: step.id,
+          adjustmentType: 'add_prerequisite',
+          reason: `Performance pattern (${performance.performancePattern}) suggests additional support needed`
+        });
+      }
+    });
+    
+    return adjustments;
+  }
+
+  // Sync Competencies with Learning Progress
+  private async syncCompetenciesWithLearningProgress(enrollmentId: string): Promise<Array<{competencyId: string; updatedLevel: number; triggeredBy: string}>> {
+    // This would integrate with the competency system to update levels based on learning path completion
+    // For now, return empty array - this would be implemented as part of competency integration
+    return [];
+  }
+
+  // Generate Personalized Step Recommendations  
+  private async generatePersonalizedStepRecommendations(enrollmentId: string, performance: any): Promise<Array<{stepId: string; customContent: string; priority: 'high' | 'medium' | 'low'}>> {
+    const recommendations: Array<{stepId: string; customContent: string; priority: 'high' | 'medium' | 'low'}> = [];
+    
+    // Generate recommendations based on performance patterns
+    if (performance.performancePattern === 'inconsistent') {
+      recommendations.push({
+        stepId: 'virtual-consistency-support',
+        customContent: 'Practice sessions to improve consistency. Consider breaking learning into smaller, more frequent sessions.',
+        priority: 'high'
+      });
+    }
+    
+    if (performance.retentionRate < 70) {
+      recommendations.push({
+        stepId: 'virtual-retention-boost',
+        customContent: 'Spaced repetition exercises to improve knowledge retention. Review previous topics before new learning.',
+        priority: 'medium'
+      });
+    }
+    
+    return recommendations;
+  }
+
+  // Calculate Next Optimal Steps
+  private async calculateNextOptimalSteps(enrollmentId: string, performance: any): Promise<Array<{stepId: string; priority: number; estimatedCompletionTime: number}>> {
+    const [enrollment] = await db.select()
+      .from(learningPathEnrollments)
+      .where(eq(learningPathEnrollments.id, enrollmentId));
+      
+    if (!enrollment) return [];
+    
+    const pathSteps = await db.select()
+      .from(learningPathSteps)
+      .where(and(eq(learningPathSteps.pathId, enrollment.pathId), isNull(learningPathSteps.deletedAt)))
+      .orderBy(asc(learningPathSteps.stepOrder));
+      
+    const stepProgress = await this.getLearningPathStepProgress(enrollmentId);
+    const completedStepIds = stepProgress.filter(p => p.status === 'completed').map(p => p.stepId);
+    
+    const nextSteps = pathSteps
+      .filter(step => !completedStepIds.includes(step.id))
+      .slice(0, 3) // Next 3 optimal steps
+      .map((step, index) => {
+        let priority = 100 - (index * 20); // Higher priority for earlier steps
+        let estimatedTime = step.estimatedDuration || 30; // Default 30 minutes
+        
+        // Adjust based on performance
+        if (performance.learningVelocity > 0.5) {
+          estimatedTime *= 0.8; // Faster learners need less time
+        } else if (performance.learningVelocity < 0.2) {
+          estimatedTime *= 1.5; // Slower learners need more time
+        }
+        
+        return {
+          stepId: step.id,
+          priority,
+          estimatedCompletionTime: Math.round(estimatedTime)
+        };
+      });
+    
+    return nextSteps;
+  }
+
+  // Helper methods for optimization infrastructure
+  private async analyzeCompetencyAlignment(enrollmentId: string): Promise<any> {
+    // Placeholder for competency alignment analysis
+    return { alignmentScore: 85, gaps: [] };
+  }
+
+  private async getAdaptationHistory(enrollmentId: string): Promise<Array<{timestamp: Date; changeType: string; reason: string; impact: string}>> {
+    // Placeholder for adaptation history - would typically fetch from audit logs
+    return [];
+  }
+
+  // Get optimization status for UI (actual implementation)
+  async getOptimizationStatus(enrollmentId: string): Promise<{
+    enrollmentId: string;
+    pathType: string;
+    currentProgress: {
+      completedSteps: number;
+      isCompleted: boolean;
+      progressPercentage: number;
+    };
+    performance: {
+      averageScore: number;
+      trend: 'improving' | 'declining' | 'stable';
+      consistencyScore: number;
+      recentScores: number[];
+    };
+    adaptations: {
+      skipBasics: boolean;
+      addRemedial: boolean;
+      originalRequirement: number;
+      adaptedRequirement: number;
+    };
+    lastOptimized: string;
+    optimizationEnabled: boolean;
+  }> {
+    console.log(`[OPT-STATUS] Getting optimization status for enrollment ${enrollmentId}`);
+    
+    // Get the adaptive path progress which has the data UI expects
+    const adaptiveProgress = await this.getAdaptivePathProgress(enrollmentId);
+    
+    return {
+      enrollmentId: adaptiveProgress.enrollmentId,
+      pathType: adaptiveProgress.pathType,
+      currentProgress: {
+        completedSteps: adaptiveProgress.completedSteps,
+        isCompleted: adaptiveProgress.isCompleted,
+        progressPercentage: adaptiveProgress.progressPercentage
+      },
+      performance: adaptiveProgress.performance, // This already has the right shape
+      adaptations: adaptiveProgress.adaptations,
+      lastOptimized: new Date().toISOString(), // Would come from audit trail in production
+      optimizationEnabled: adaptiveProgress.completionCriteria?.adaptationEnabled || true
+    };
+  }
+
+  private async logOptimizationEvent(enrollmentId: string, eventType: string, metadata: any): Promise<void> {
+    console.log(`[OPT-AUDIT] ${eventType} for enrollment ${enrollmentId}:`, metadata);
+    // In production, this would log to audit trail table
+  }
+
+  // This duplicate implementation has been moved to the proper location in the DatabaseStorage class
 
   async getAdaptivePathProgress(enrollmentId: string): Promise<{
     enrollmentId: string;
