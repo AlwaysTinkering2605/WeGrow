@@ -2834,6 +2834,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Non-Linear Learning Paths (Phase 2)
+  app.post('/api/learning-paths/non-linear', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { title, description, category, estimatedDuration, relativeDueDays, requiredCompletions, availableChoices } = req.body;
+      
+      // Basic validation
+      if (!title || typeof requiredCompletions !== 'number' || typeof availableChoices !== 'number') {
+        return res.status(400).json({ message: "Missing required fields: title, requiredCompletions, availableChoices" });
+      }
+      
+      if (requiredCompletions <= 0) {
+        return res.status(400).json({ message: "requiredCompletions must be greater than 0" });
+      }
+      
+      if (requiredCompletions > availableChoices) {
+        return res.status(400).json({ message: "requiredCompletions cannot exceed availableChoices" });
+      }
+      
+      const pathData = {
+        title,
+        description,
+        category,
+        estimatedDuration,
+        relativeDueDays,
+        requiredCompletions,
+        availableChoices,
+        createdBy: userId
+      };
+      
+      const newPath = await storage.createNonLinearLearningPath(pathData);
+      res.status(201).json(newPath);
+    } catch (error: any) {
+      console.error("Error creating non-linear learning path:", error);
+      return res.status(500).json({ message: "Failed to create non-linear learning path" });
+    }
+  });
+
+  app.put('/api/learning-paths/:id/criteria', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { requiredCompletions, availableChoices } = req.body;
+      
+      // Basic validation
+      if (typeof requiredCompletions !== 'number' || typeof availableChoices !== 'number') {
+        return res.status(400).json({ message: "Missing required fields: requiredCompletions, availableChoices" });
+      }
+      
+      if (requiredCompletions <= 0) {
+        return res.status(400).json({ message: "requiredCompletions must be greater than 0" });
+      }
+      
+      if (requiredCompletions > availableChoices) {
+        return res.status(400).json({ message: "requiredCompletions cannot exceed availableChoices" });
+      }
+      
+      const criteria = { requiredCompletions, availableChoices };
+      const updatedPath = await storage.updateNonLinearPathCriteria(id, criteria);
+      res.json(updatedPath);
+    } catch (error: any) {
+      console.error("Error updating non-linear path criteria:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(500).json({ message: "Failed to update non-linear path criteria" });
+    }
+  });
+
+  app.get('/api/learning-path-enrollments/:enrollmentId/non-linear-progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Check if user owns this enrollment or is admin
+      const enrollment = await storage.getLearningPathEnrollment(enrollmentId);
+      if (!enrollment) {
+        return res.status(404).json({ message: "Learning path enrollment not found" });
+      }
+      
+      const user = await storage.getUser(userId);
+      const isAdmin = user?.role === 'supervisor' || user?.role === 'leadership';
+      
+      if (!isAdmin && enrollment.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const progress = await storage.getNonLinearPathProgress(enrollmentId);
+      res.json(progress);
+    } catch (error: any) {
+      console.error("Error fetching non-linear path progress:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(500).json({ message: "Failed to fetch non-linear path progress" });
+    }
+  });
+
   // Learning Path Steps Management
   app.get('/api/learning-paths/:pathId/steps', isAuthenticated, async (req: any, res) => {
     try {

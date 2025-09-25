@@ -404,6 +404,34 @@ export interface IStorage {
   updateStepProgress(progress: InsertLearningPathStepProgress): Promise<LearningPathStepProgress>;
   completeStep(enrollmentId: string, stepId: string, score?: number, timeSpent?: number): Promise<LearningPathStepProgress>;
   skipStep(enrollmentId: string, stepId: string, reason: string): Promise<LearningPathStepProgress>;
+
+  // Non-Linear Learning Paths (Phase 2)
+  createNonLinearLearningPath(pathData: {
+    title: string;
+    description?: string;
+    category?: string;
+    estimatedDuration?: number;
+    relativeDueDays?: number;
+    requiredCompletions: number;
+    availableChoices: number;
+    createdBy: string;
+  }): Promise<LearningPath>;
+  updateNonLinearPathCriteria(pathId: string, criteria: {
+    requiredCompletions: number;
+    availableChoices: number;
+  }): Promise<LearningPath>;
+  getNonLinearPathProgress(enrollmentId: string): Promise<{
+    enrollmentId: string;
+    pathType: string;
+    completionCriteria: any;
+    completedSteps: number;
+    requiredCompletions: number;
+    availableChoices: number;
+    isCompleted: boolean;
+    progressPercentage: number;
+    availableSteps: LearningPathStep[];
+    completedStepDetails: Array<LearningPathStepProgress & { step: LearningPathStep }>;
+  }>;
   
   // Competency Library Management
   getCompetencyLibrary(): Promise<CompetencyLibraryItem[]>;
@@ -2941,6 +2969,154 @@ export class DatabaseStorage implements IStorage {
     return updatedPath;
   }
 
+  // Non-Linear Learning Path Methods
+  async createNonLinearLearningPath(pathData: {
+    title: string;
+    description?: string;
+    category?: string;
+    estimatedDuration?: number;
+    relativeDueDays?: number;
+    requiredCompletions: number;
+    availableChoices: number;
+    createdBy: string;
+  }): Promise<LearningPath> {
+    const completionCriteria = {
+      type: "choice",
+      requiredCompletions: pathData.requiredCompletions,
+      availableChoices: pathData.availableChoices,
+      description: `Complete ${pathData.requiredCompletions} out of ${pathData.availableChoices} available courses`
+    };
+
+    const [learningPath] = await db.insert(learningPaths).values({
+      title: pathData.title,
+      description: pathData.description,
+      pathType: "non_linear",
+      category: pathData.category,
+      estimatedDuration: pathData.estimatedDuration,
+      relativeDueDays: pathData.relativeDueDays,
+      completionCriteria,
+      createdBy: pathData.createdBy
+    }).returning();
+
+    return learningPath;
+  }
+
+  async updateNonLinearPathCriteria(pathId: string, criteria: {
+    requiredCompletions: number;
+    availableChoices: number;
+  }): Promise<LearningPath> {
+    const completionCriteria = {
+      type: "choice",
+      requiredCompletions: criteria.requiredCompletions,
+      availableChoices: criteria.availableChoices,
+      description: `Complete ${criteria.requiredCompletions} out of ${criteria.availableChoices} available courses`
+    };
+
+    const [updatedPath] = await db.update(learningPaths)
+      .set({ 
+        completionCriteria,
+        updatedAt: new Date() 
+      })
+      .where(and(eq(learningPaths.id, pathId), isNull(learningPaths.deletedAt)))
+      .returning();
+
+    if (!updatedPath) {
+      throw new Error("Learning path not found");
+    }
+
+    return updatedPath;
+  }
+
+  async getNonLinearPathProgress(enrollmentId: string): Promise<{
+    enrollmentId: string;
+    pathType: string;
+    completionCriteria: any;
+    completedSteps: number;
+    requiredCompletions: number;
+    availableChoices: number;
+    isCompleted: boolean;
+    progressPercentage: number;
+    availableSteps: LearningPathStep[];
+    completedStepDetails: Array<LearningPathStepProgress & { step: LearningPathStep }>;
+  }> {
+    // Get enrollment and path details
+    const [enrollment] = await db.select()
+      .from(learningPathEnrollments)
+      .where(eq(learningPathEnrollments.id, enrollmentId));
+
+    if (!enrollment) {
+      throw new Error("Learning path enrollment not found");
+    }
+
+    const [learningPath] = await db.select()
+      .from(learningPaths)
+      .where(and(eq(learningPaths.id, enrollment.pathId), isNull(learningPaths.deletedAt)));
+
+    if (!learningPath) {
+      throw new Error("Learning path not found");
+    }
+
+    // Get all steps for this path
+    const pathSteps = await db.select()
+      .from(learningPathSteps)
+      .where(and(eq(learningPathSteps.pathId, enrollment.pathId), isNull(learningPathSteps.deletedAt)))
+      .orderBy(asc(learningPathSteps.stepOrder));
+
+    // Get step progress
+    const stepProgresses = await this.getLearningPathStepProgress(enrollmentId);
+    
+    // Get completion criteria
+    const criteria = learningPath.completionCriteria as any || {};
+    const requiredCompletions = criteria.requiredCompletions || pathSteps.length;
+    const availableChoices = criteria.availableChoices || pathSteps.length;
+
+    // Calculate completed steps based on path type
+    let completedSteps: number;
+    if (learningPath.pathType === "non_linear" && criteria.type === "choice") {
+      // For choice-based paths, only count truly completed steps (not skipped)
+      completedSteps = stepProgresses.filter(step => step.status === "completed").length;
+    } else {
+      // For linear paths, count both completed and skipped
+      completedSteps = stepProgresses.filter(step => step.status === "completed" || step.status === "skipped").length;
+    }
+
+    // Calculate progress
+    const progressPercentage = Math.min(100, Math.round((completedSteps / requiredCompletions) * 100));
+    const isCompleted = completedSteps >= requiredCompletions;
+
+    // Get completed step details
+    const completedStepDetails = await db.select({
+      enrollmentId: learningPathStepProgress.enrollmentId,
+      stepId: learningPathStepProgress.stepId,
+      status: learningPathStepProgress.status,
+      score: learningPathStepProgress.score,
+      timeSpent: learningPathStepProgress.timeSpent,
+      completionDate: learningPathStepProgress.completionDate,
+      createdAt: learningPathStepProgress.createdAt,
+      updatedAt: learningPathStepProgress.updatedAt,
+      step: learningPathSteps
+    })
+    .from(learningPathStepProgress)
+    .innerJoin(learningPathSteps, eq(learningPathStepProgress.stepId, learningPathSteps.id))
+    .where(and(
+      eq(learningPathStepProgress.enrollmentId, enrollmentId),
+      or(eq(learningPathStepProgress.status, "completed"), eq(learningPathStepProgress.status, "skipped"))
+    ));
+
+    return {
+      enrollmentId,
+      pathType: learningPath.pathType,
+      completionCriteria: criteria,
+      completedSteps,
+      requiredCompletions,
+      availableChoices,
+      isCompleted,
+      progressPercentage,
+      availableSteps: pathSteps,
+      completedStepDetails
+    };
+  }
+
   async deleteLearningPath(pathId: string): Promise<void> {
     // Soft delete the path and all its steps
     await db.transaction(async (tx) => {
@@ -3497,27 +3673,85 @@ export class DatabaseStorage implements IStorage {
     const stepProgresses = await this.getLearningPathStepProgress(enrollmentId);
     
     if (stepProgresses.length === 0) return;
-    
-    // Calculate overall progress
+
+    // Get the learning path to check completion criteria
+    const [enrollment] = await db.select()
+      .from(learningPathEnrollments)
+      .where(eq(learningPathEnrollments.id, enrollmentId));
+
+    if (!enrollment) return;
+
+    const [learningPath] = await db.select()
+      .from(learningPaths)
+      .where(eq(learningPaths.id, enrollment.pathId));
+
+    if (!learningPath) return;
+
+    // Calculate overall progress based on path type and completion criteria
     const completedSteps = stepProgresses.filter(step => step.status === "completed" || step.status === "skipped").length;
     const totalSteps = stepProgresses.length;
-    const progressPercentage = Math.round((completedSteps / totalSteps) * 100);
     
-    // Determine if all steps are completed
-    const allStepsCompleted = completedSteps === totalSteps;
+    let progressPercentage: number;
+    let isCompleted: boolean;
+
+    // Handle different path types and completion criteria
+    if (learningPath.pathType === "non_linear" && learningPath.completionCriteria) {
+      const criteria = learningPath.completionCriteria as any;
+      
+      if (criteria.type === "choice") {
+        // Choice-based completion: complete X of Y courses (skipped steps don't count)
+        const actualCompletedSteps = stepProgresses.filter(step => step.status === "completed").length;
+        const requiredCompletions = criteria.requiredCompletions || totalSteps;
+        const availableChoices = criteria.availableChoices || totalSteps;
+        
+        // Validate criteria to prevent division by zero
+        if (requiredCompletions <= 0) {
+          throw new Error("Invalid completion criteria: requiredCompletions must be greater than 0");
+        }
+        
+        // Calculate progress based on choice criteria (only count completed, not skipped)
+        progressPercentage = Math.min(100, Math.round((actualCompletedSteps / requiredCompletions) * 100));
+        isCompleted = actualCompletedSteps >= requiredCompletions;
+      } else if (criteria.type === "minimum_score") {
+        // Score-based completion
+        const averageScore = this.calculateAverageScore(stepProgresses);
+        const requiredScore = criteria.minimumScore || 80;
+        
+        progressPercentage = Math.round((completedSteps / totalSteps) * 100);
+        isCompleted = completedSteps === totalSteps && averageScore >= requiredScore;
+      } else {
+        // Default: all steps must be completed
+        progressPercentage = Math.round((completedSteps / totalSteps) * 100);
+        isCompleted = completedSteps === totalSteps;
+      }
+    } else {
+      // Linear or default completion: all steps must be completed
+      progressPercentage = Math.round((completedSteps / totalSteps) * 100);
+      isCompleted = completedSteps === totalSteps;
+    }
     
     // Update enrollment
     const updates: Partial<InsertLearningPathEnrollment> = {
       progress: progressPercentage
     };
     
-    if (allStepsCompleted) {
+    if (isCompleted) {
       updates.enrollmentStatus = "completed";
+      updates.completionDate = new Date();
     }
     
     await db.update(learningPathEnrollments)
       .set(updates)
       .where(eq(learningPathEnrollments.id, enrollmentId));
+  }
+
+  // Helper method to calculate average score from step progresses
+  private calculateAverageScore(stepProgresses: LearningPathStepProgress[]): number {
+    const scoredSteps = stepProgresses.filter(step => step.score !== null && step.score !== undefined);
+    if (scoredSteps.length === 0) return 0;
+    
+    const totalScore = scoredSteps.reduce((sum, step) => sum + (step.score || 0), 0);
+    return Math.round(totalScore / scoredSteps.length);
   }
 
   // Competency Library Management (Vertical Slice 4)
