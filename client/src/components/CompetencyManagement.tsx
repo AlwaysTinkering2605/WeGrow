@@ -39,7 +39,9 @@ import {
   Upload,
   Download,
   RefreshCw,
-  Move
+  Move,
+  Tree,
+  TreeHorizontal
 } from "lucide-react";
 
 // Form schemas for competency management

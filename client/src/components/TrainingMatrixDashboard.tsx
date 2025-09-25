@@ -36,6 +36,7 @@ import {
   Star,
   ArrowUp,
   ArrowDown,
+  ArrowRight,
   Minus,
   ChevronRight,
   Eye
@@ -594,7 +595,7 @@ export default function TrainingMatrixDashboard() {
         </div>
       </div>
 
-      <Tabs value={activeView} onValueChange={(value: "matrix" | "gaps" | "teams") => setActiveView(value)}>
+      <Tabs value={activeView} onValueChange={(value) => setActiveView(value as "matrix" | "gaps" | "teams")}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="matrix" data-testid="tab-matrix">Live Matrix</TabsTrigger>
           <TabsTrigger value="gaps" data-testid="tab-gaps">Gap Analysis</TabsTrigger>

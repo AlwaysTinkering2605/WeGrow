@@ -1594,7 +1594,7 @@ export const conditionSchema = z.object({
 });
 
 // Condition group for nested logic (smart segmentation)
-export const conditionGroupSchema = z.object({
+export const conditionGroupSchema: z.ZodType<any> = z.object({
   id: z.string(),
   logicalOperator: z.enum(["AND", "OR"]),
   conditions: z.array(conditionSchema),
