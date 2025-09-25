@@ -3043,6 +3043,332 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ========================================
+  // ADAPTIVE LEARNING ENGINE - PHASE 2 MEDIUM PRIORITY
+  // ========================================
+
+  // Adaptive Learning Profile Management
+  async getAdaptiveLearningProfile(userId: string): Promise<any> {
+    const [profile] = await db.select()
+      .from(adaptiveLearningProfiles)
+      .where(eq(adaptiveLearningProfiles.userId, userId));
+    
+    if (!profile) {
+      // Create default profile if it doesn't exist
+      return await this.createAdaptiveLearningProfile(userId);
+    }
+    
+    return profile;
+  }
+
+  async createAdaptiveLearningProfile(userId: string): Promise<any> {
+    // Calculate initial performance metrics
+    const enrollments = await this.getUserLearningPathEnrollments(userId);
+    const performanceMetrics = await this.calculateUserPerformanceMetrics(userId);
+    
+    const [newProfile] = await db.insert(adaptiveLearningProfiles)
+      .values({
+        userId,
+        performanceMetrics,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+    
+    return newProfile;
+  }
+
+  async updateAdaptiveLearningProfile(userId: string, updates: any): Promise<any> {
+    const [updatedProfile] = await db.update(adaptiveLearningProfiles)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(adaptiveLearningProfiles.userId, userId))
+      .returning();
+    
+    return updatedProfile;
+  }
+
+  // Performance Metrics Calculation
+  private async calculateUserPerformanceMetrics(userId: string): Promise<any> {
+    const enrollments = await this.getUserLearningPathEnrollments(userId);
+    
+    if (enrollments.length === 0) {
+      return {
+        averageScore: 0,
+        completionRate: 0,
+        engagementLevel: 0,
+        consistencyScore: 0,
+        learningVelocity: 1.0,
+      };
+    }
+
+    // Calculate average score across all enrollments
+    const enrollmentScores = await Promise.all(
+      enrollments.map(async (enrollment) => {
+        const stepProgresses = await this.getLearningPathStepProgress(enrollment.id);
+        return this.calculateAverageScore(stepProgresses);
+      })
+    );
+    
+    const averageScore = enrollmentScores.length > 0 
+      ? Math.round(enrollmentScores.reduce((a, b) => a + b, 0) / enrollmentScores.length)
+      : 0;
+
+    // Calculate completion rate
+    const completedEnrollments = enrollments.filter(e => e.enrollmentStatus === 'completed').length;
+    const completionRate = Math.round((completedEnrollments / enrollments.length) * 100);
+
+    // Calculate engagement level (based on active enrollments and recent activity)
+    const activeEnrollments = enrollments.filter(e => e.enrollmentStatus === 'in_progress').length;
+    const engagementLevel = Math.min(100, Math.round((activeEnrollments / Math.max(enrollments.length, 1)) * 100));
+
+    // Calculate learning velocity (relative to expected completion time)
+    const learningVelocity = 1.0; // Simplified for now
+
+    // Calculate consistency score (based on regular activity)
+    const consistencyScore = 75; // Simplified for now
+
+    return {
+      averageScore,
+      completionRate,
+      engagementLevel,
+      consistencyScore,
+      learningVelocity,
+    };
+  }
+
+  // Generate Adaptive Recommendations
+  async generateAdaptiveRecommendations(userId: string): Promise<any[]> {
+    const profile = await this.getAdaptiveLearningProfile(userId);
+    const competencyGaps = await this.getCompetencyGapAnalysis(userId);
+    const enrollments = await this.getUserLearningPathEnrollments(userId);
+    
+    const recommendations: any[] = [];
+
+    // Recommendation 1: Address competency gaps
+    if (competencyGaps.criticalGaps?.length > 0) {
+      const gap = competencyGaps.criticalGaps[0];
+      recommendations.push({
+        id: `gap-${gap.competencyId}-${Date.now()}`,
+        type: 'learning_path',
+        title: `Close ${gap.competencyName} Skill Gap`,
+        description: `Targeted learning path to develop ${gap.competencyName} competency`,
+        reasoning: `You have a critical gap in ${gap.competencyName}. This learning path is designed to bring you up to required proficiency.`,
+        confidence: 95,
+        priority: 'high',
+        estimatedTime: 180,
+        adaptations: {
+          adjustedDifficulty: profile.performanceMetrics?.averageScore < 70 ? 'easier' : 'harder',
+          adjustedPace: profile.preferredPace,
+          prerequisiteReview: profile.performanceMetrics?.averageScore < 60,
+        },
+        metadata: { competencyId: gap.competencyId, gapSeverity: gap.severity }
+      });
+    }
+
+    // Recommendation 2: Continue active paths
+    const activeEnrollments = enrollments.filter(e => e.enrollmentStatus === 'in_progress');
+    if (activeEnrollments.length > 0) {
+      const enrollment = activeEnrollments[0];
+      recommendations.push({
+        id: `continue-${enrollment.id}`,
+        type: 'learning_path',
+        title: 'Continue Your Active Learning Path',
+        description: `You're ${enrollment.progress}% complete. Keep up the momentum!`,
+        reasoning: `You're making good progress on this path. Continuing with consistency will help you maintain learning momentum.`,
+        confidence: 88,
+        priority: 'medium',
+        estimatedTime: 60,
+        pathId: enrollment.pathId,
+        adaptations: {
+          adjustedPace: profile.preferredPace,
+        },
+        metadata: { enrollmentId: enrollment.id, currentProgress: enrollment.progress }
+      });
+    }
+
+    // Recommendation 3: Take a break if overloaded
+    if (activeEnrollments.length > 2 && profile.performanceMetrics?.averageScore < 70) {
+      recommendations.push({
+        id: `break-${Date.now()}`,
+        type: 'break',
+        title: 'Consider Taking a Learning Break',
+        description: 'Focus on completing current paths before starting new ones',
+        reasoning: 'You have multiple active learning paths and recent performance suggests you might benefit from focusing on fewer topics.',
+        confidence: 75,
+        priority: 'medium',
+        estimatedTime: 0,
+        adaptations: {},
+        metadata: { activePathCount: activeEnrollments.length }
+      });
+    }
+
+    // Recommendation 4: Practice weak areas
+    if (profile.performanceMetrics?.averageScore < 75) {
+      recommendations.push({
+        id: `practice-${Date.now()}`,
+        type: 'review',
+        title: 'Review and Practice Fundamentals',
+        description: 'Strengthen your foundation with targeted practice',
+        reasoning: 'Your recent performance indicates that reviewing fundamental concepts could help improve your learning outcomes.',
+        confidence: 82,
+        priority: 'medium',
+        estimatedTime: 45,
+        adaptations: {
+          adjustedDifficulty: 'easier',
+          prerequisiteReview: true,
+        },
+        metadata: { averageScore: profile.performanceMetrics?.averageScore }
+      });
+    }
+
+    return recommendations;
+  }
+
+  // Get Performance Insights
+  async getPerformanceInsights(userId: string): Promise<any[]> {
+    const profile = await this.getAdaptiveLearningProfile(userId);
+    const enrollments = await this.getUserLearningPathEnrollments(userId);
+    
+    const insights: any[] = [];
+
+    // Insight 1: Performance trend analysis
+    if (profile.performanceMetrics?.averageScore >= 85) {
+      insights.push({
+        category: 'strength',
+        title: 'Excellent Learning Performance',
+        description: `Your average score of ${profile.performanceMetrics.averageScore}% demonstrates strong comprehension`,
+        impact: 'high',
+        actionable: true,
+        suggestedActions: [
+          'Consider taking on more challenging learning paths',
+          'Mentor other learners in areas of strength',
+          'Explore advanced topics in your field of expertise'
+        ],
+        data: { averageScore: profile.performanceMetrics.averageScore }
+      });
+    } else if (profile.performanceMetrics?.averageScore < 60) {
+      insights.push({
+        category: 'concern',
+        title: 'Learning Performance Needs Attention',
+        description: `Your average score of ${profile.performanceMetrics.averageScore}% suggests areas for improvement`,
+        impact: 'high',
+        actionable: true,
+        suggestedActions: [
+          'Schedule regular study sessions',
+          'Request additional support from supervisors',
+          'Focus on completing current paths before starting new ones'
+        ],
+        data: { averageScore: profile.performanceMetrics.averageScore }
+      });
+    }
+
+    // Insight 2: Completion rate analysis
+    if (profile.performanceMetrics?.completionRate >= 90) {
+      insights.push({
+        category: 'strength',
+        title: 'Outstanding Completion Rate',
+        description: `You complete ${profile.performanceMetrics.completionRate}% of your learning paths`,
+        impact: 'medium',
+        actionable: false,
+        suggestedActions: [],
+        data: { completionRate: profile.performanceMetrics.completionRate }
+      });
+    } else if (profile.performanceMetrics?.completionRate < 50) {
+      insights.push({
+        category: 'improvement',
+        title: 'Improve Learning Path Completion',
+        description: `Your completion rate of ${profile.performanceMetrics.completionRate}% could be improved`,
+        impact: 'medium',
+        actionable: true,
+        suggestedActions: [
+          'Set smaller, achievable learning goals',
+          'Block dedicated time for learning activities',
+          'Choose shorter learning paths to build momentum'
+        ],
+        data: { completionRate: profile.performanceMetrics.completionRate }
+      });
+    }
+
+    // Insight 3: Engagement analysis
+    const activeCount = enrollments.filter(e => e.enrollmentStatus === 'in_progress').length;
+    if (activeCount === 0) {
+      insights.push({
+        category: 'trend',
+        title: 'No Active Learning Paths',
+        description: 'You currently have no active learning paths',
+        impact: 'medium',
+        actionable: true,
+        suggestedActions: [
+          'Explore recommended learning paths',
+          'Enroll in a path aligned with your development goals',
+          'Speak with your supervisor about learning priorities'
+        ],
+        data: { activeEnrollments: activeCount }
+      });
+    }
+
+    return insights;
+  }
+
+  // Get User's Adaptive Path Progress
+  async getUserAdaptivePathProgress(userId: string): Promise<any[]> {
+    const enrollments = await this.getUserLearningPathEnrollments(userId);
+    const adaptiveEnrollments = enrollments.filter(e => e.enrollmentStatus === 'in_progress');
+    
+    const progressData = await Promise.all(
+      adaptiveEnrollments.map(async (enrollment) => {
+        try {
+          return await this.getAdaptivePathProgress(enrollment.id);
+        } catch (error) {
+          // If path is not adaptive, return basic progress data
+          const stepProgresses = await this.getLearningPathStepProgress(enrollment.id);
+          return {
+            enrollmentId: enrollment.id,
+            pathType: 'linear',
+            completionCriteria: {},
+            performance: await this.analyzeLearnPerformance(enrollment.id),
+            adaptations: {
+              skipBasics: false,
+              addRemedial: false,
+              originalRequirement: stepProgresses.length,
+              adaptedRequirement: stepProgresses.length,
+            },
+            completedSteps: stepProgresses.filter(s => s.status === 'completed').length,
+            isCompleted: enrollment.enrollmentStatus === 'completed',
+            progressPercentage: enrollment.progress || 0,
+            availableSteps: [],
+            stepProgresses,
+          };
+        }
+      })
+    );
+    
+    return progressData;
+  }
+
+  // Accept and Apply Recommendation
+  async acceptAdaptiveRecommendation(recommendationId: string, userId: string): Promise<any> {
+    // For now, simply mark as accepted and perform basic action
+    // In a full implementation, this would apply the actual recommendation
+    
+    const recommendation = {
+      id: recommendationId,
+      status: 'accepted',
+      acceptedAt: new Date(),
+    };
+
+    // If it's a learning path recommendation, auto-enroll the user
+    if (recommendationId.includes('gap-') || recommendationId.includes('continue-')) {
+      // This would trigger actual enrollment logic
+      console.log(`Applied recommendation ${recommendationId} for user ${userId}`);
+    }
+
+    return recommendation;
+  }
+
+  // ========================================
   // LEARNING PATHS AND TRAINING MATRIX STUB IMPLEMENTATIONS
   // These methods are implemented incrementally in vertical slices
   // ========================================

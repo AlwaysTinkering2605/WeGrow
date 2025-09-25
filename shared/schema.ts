@@ -576,6 +576,45 @@ export const learningPathStepProgress = pgTable("learning_path_step_progress", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Adaptive Learning Profile - user learning preferences and metrics
+export const adaptiveLearningProfiles = pgTable("adaptive_learning_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  learningStyle: varchar("learning_style").default("visual"), // "visual", "auditory", "kinesthetic", "reading"
+  preferredPace: varchar("preferred_pace").default("medium"), // "fast", "medium", "slow"
+  difficultyPreference: varchar("difficulty_preference").default("moderate"), // "challenging", "moderate", "gentle"
+  availableTime: integer("available_time").default(300), // minutes per week
+  strongCompetencies: text("strong_competencies").array().default([]),
+  developmentAreas: text("development_areas").array().default([]),
+  careerGoals: text("career_goals").array().default([]),
+  performanceMetrics: jsonb("performance_metrics"), // JSON object with various metrics
+  preferences: jsonb("preferences"), // Additional learning preferences
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Adaptive Recommendations - AI-generated learning recommendations
+export const adaptiveRecommendations = pgTable("adaptive_recommendations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  type: varchar("type").notNull(), // "learning_path", "course", "resource", "break", "review"
+  title: varchar("title").notNull(),
+  description: text("description"),
+  reasoning: text("reasoning"), // Why this recommendation was made
+  confidence: integer("confidence").default(75), // Confidence percentage
+  priority: varchar("priority").default("medium"), // "high", "medium", "low"
+  estimatedTime: integer("estimated_time").default(60), // minutes
+  pathId: varchar("path_id"),
+  courseId: varchar("course_id"),
+  resourceId: varchar("resource_id"),
+  adaptations: jsonb("adaptations"), // Personalized adaptations
+  metadata: jsonb("metadata"), // Additional recommendation data
+  status: varchar("status").default("pending"), // "pending", "accepted", "declined", "expired"
+  createdAt: timestamp("created_at").defaultNow(),
+  acceptedAt: timestamp("accepted_at"),
+  expiresAt: timestamp("expires_at"),
+});
+
 // Enhanced Competency Library - extends existing competencies for training matrix
 export const competencyLibrary = pgTable("competency_library", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
