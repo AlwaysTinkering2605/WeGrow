@@ -3915,6 +3915,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================
+  // AUTO-ASSIGNMENT ENGINE API
+  // ========================
+
+  // Get auto-assignment logs for monitoring
+  app.get('/api/auto-assignments/logs', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { userId, limit = 50 } = req.query;
+      const logs = await storage.getAutomationRunLogs(userId, 'user', parseInt(limit));
+      
+      // Filter for auto-assignment logs
+      const autoAssignmentLogs = logs.filter(log => log.runType === 'auto_assignment');
+      
+      res.json(autoAssignmentLogs);
+    } catch (error: any) {
+      console.error("Error fetching auto-assignment logs:", error);
+      res.status(500).json({ message: "Failed to fetch auto-assignment logs" });
+    }
+  });
+
+  // Manual trigger for role-based auto-assignment (admin use)
+  app.post('/api/auto-assignments/trigger/role/:userId', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const currentUserId = req.user.claims.sub;
+      
+      // Get user details to get current role
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Manually trigger role-based auto-assignment
+      await storage.triggerRoleBasedAutoAssignment(userId, user.role, currentUserId);
+      
+      res.json({ 
+        message: "Role-based auto-assignment triggered successfully",
+        userId,
+        role: user.role,
+        triggeredBy: currentUserId
+      });
+    } catch (error: any) {
+      console.error("Error triggering role-based auto-assignment:", error);
+      res.status(500).json({ message: "Failed to trigger auto-assignment" });
+    }
+  });
+
+  // Get required competencies for a role (for preview/planning)
+  app.get('/api/auto-assignments/competencies/:role', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { role } = req.params;
+      const { teamId } = req.query;
+      
+      const competencies = await storage.getRequiredCompetenciesForRole(role, teamId);
+      res.json(competencies);
+    } catch (error: any) {
+      console.error("Error fetching role competencies:", error);
+      res.status(500).json({ message: "Failed to fetch role competencies" });
+    }
+  });
+
+  // Get auto-assignment statistics
+  app.get('/api/auto-assignments/stats', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const logs = await storage.getAutomationRunLogs();
+      const autoAssignmentLogs = logs.filter(log => log.runType === 'auto_assignment');
+      
+      const stats = {
+        totalAutoAssignments: autoAssignmentLogs.length,
+        successfulAssignments: autoAssignmentLogs.filter(log => log.status === 'completed').length,
+        failedAssignments: autoAssignmentLogs.filter(log => log.status === 'failed').length,
+        totalEnrollmentsCreated: autoAssignmentLogs.reduce((sum, log) => sum + (log.assignmentsCreated || 0), 0),
+        byAssignmentType: {
+          role_change: autoAssignmentLogs.filter(log => 
+            log.executionDetails && (log.executionDetails as any).assignmentType === 'role_change'
+          ).length,
+          competency_gap: autoAssignmentLogs.filter(log => 
+            log.executionDetails && (log.executionDetails as any).assignmentType === 'competency_gap'
+          ).length,
+          compliance_requirement: autoAssignmentLogs.filter(log => 
+            log.executionDetails && (log.executionDetails as any).assignmentType === 'compliance_requirement'
+          ).length
+        },
+        recent: autoAssignmentLogs
+          .filter(log => log.startedAt && new Date(log.startedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+          .length
+      };
+      
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Error fetching auto-assignment stats:", error);
+      res.status(500).json({ message: "Failed to fetch auto-assignment statistics" });
+    }
+  });
+
+  // ========================
   // AUTOMATION RULES API
   // ========================
 

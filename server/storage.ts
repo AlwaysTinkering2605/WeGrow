@@ -1225,6 +1225,16 @@ export class DatabaseStorage implements IStorage {
       .set({ role: newRole as any, updatedAt: new Date() })
       .where(eq(users.id, userId))
       .returning();
+    
+    // Trigger role-based auto-assignment after successful role update
+    try {
+      await this.triggerRoleBasedAutoAssignment(userId, newRole, updatedByUserId);
+      console.log(`[AUTO-ASSIGN] Triggered role-based auto-assignment for user ${userId} with new role: ${newRole}`);
+    } catch (autoAssignError) {
+      console.error(`[AUTO-ASSIGN] Failed to trigger auto-assignment for user ${userId}:`, autoAssignError);
+      // Don't fail the role update if auto-assignment fails
+    }
+    
     return user;
   }
 
@@ -6085,6 +6095,310 @@ export class DatabaseStorage implements IStorage {
       .where(eq(automationRunLogs.status, "failed"))
       .orderBy(desc(automationRunLogs.startedAt))
       .limit(limit);
+  }
+
+  // ========================
+  // AUTO-ASSIGNMENT ENGINE
+  // ========================
+
+  /**
+   * Triggers role-based auto-assignment when a user's role changes
+   */
+  async triggerRoleBasedAutoAssignment(userId: string, newRole: string, updatedByUserId: string): Promise<void> {
+    console.log(`[AUTO-ASSIGN] Starting role-based auto-assignment for user ${userId}, new role: ${newRole}`);
+    
+    try {
+      // Get user details including team
+      const user = await this.getUser(userId);
+      if (!user) {
+        throw new Error(`User not found: ${userId}`);
+      }
+
+      // Get required competencies for the new role (considering team-specific requirements)
+      const requiredCompetencies = await this.getRequiredCompetenciesForRole(newRole, user.teamId);
+      console.log(`[AUTO-ASSIGN] Found ${requiredCompetencies.length} required competencies for role ${newRole}`);
+
+      // Find learning paths for each required competency
+      const assignmentCandidates = await this.findLearningPathsForCompetencies(requiredCompetencies, userId);
+      console.log(`[AUTO-ASSIGN] Found ${assignmentCandidates.length} learning path candidates for auto-assignment`);
+
+      // Filter out existing enrollments to avoid duplicates
+      const filteredAssignments = await this.filterExistingEnrollments(userId, assignmentCandidates);
+      console.log(`[AUTO-ASSIGN] After filtering duplicates: ${filteredAssignments.length} new assignments needed`);
+
+      // Execute assignments with priority-based ordering
+      const assignments = await this.executeRoleBasedAssignments(userId, filteredAssignments, updatedByUserId, newRole);
+      
+      console.log(`[AUTO-ASSIGN] Successfully completed ${assignments.length} role-based assignments for user ${userId}`);
+      
+      // Log assignment for audit trail
+      await this.logAutoAssignmentActivity(userId, 'role_change', {
+        newRole,
+        assignmentsCreated: assignments.length,
+        competenciesAddressed: requiredCompetencies.length,
+        updatedBy: updatedByUserId
+      });
+
+    } catch (error) {
+      console.error(`[AUTO-ASSIGN] Error in role-based auto-assignment:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets required competencies for a specific role, considering team-specific requirements
+   */
+  async getRequiredCompetenciesForRole(role: string, teamId?: string | null): Promise<Array<{
+    competencyLibraryId: string;
+    priority: string;
+    requiredProficiencyLevel: string;
+    gracePeriodDays: number | null;
+    isMandatory: boolean;
+    competencyTitle: string;
+    linkedLearningPaths: string[];
+  }>> {
+    const mappings = await db
+      .select({
+        competencyLibraryId: roleCompetencyMappings.competencyLibraryId,
+        priority: roleCompetencyMappings.priority,
+        requiredProficiencyLevel: roleCompetencyMappings.requiredProficiencyLevel,
+        gracePeriodDays: roleCompetencyMappings.gracePeriodDays,
+        isMandatory: roleCompetencyMappings.isMandatory,
+        competencyTitle: competencyLibrary.competencyId,
+        linkedLearningPaths: competencyLibrary.linkedLearningPaths,
+      })
+      .from(roleCompetencyMappings)
+      .leftJoin(competencyLibrary, eq(roleCompetencyMappings.competencyLibraryId, competencyLibrary.id))
+      .where(
+        and(
+          eq(roleCompetencyMappings.role, role as any),
+          // Include both team-specific and general role requirements
+          teamId ? 
+            sql`(${roleCompetencyMappings.teamId} = ${teamId} OR ${roleCompetencyMappings.teamId} IS NULL)` :
+            isNull(roleCompetencyMappings.teamId)
+        )
+      )
+      .orderBy(
+        // Priority order: critical > high > medium > low
+        sql`CASE ${roleCompetencyMappings.priority} 
+              WHEN 'critical' THEN 1 
+              WHEN 'high' THEN 2 
+              WHEN 'medium' THEN 3 
+              WHEN 'low' THEN 4 
+              ELSE 5 END`
+      );
+
+    return mappings.map(mapping => ({
+      competencyLibraryId: mapping.competencyLibraryId,
+      priority: mapping.priority || 'medium',
+      requiredProficiencyLevel: mapping.requiredProficiencyLevel || 'basic',
+      gracePeriodDays: mapping.gracePeriodDays,
+      isMandatory: mapping.isMandatory ?? true,
+      competencyTitle: mapping.competencyTitle || 'Unknown Competency',
+      linkedLearningPaths: (mapping.linkedLearningPaths as string[]) || []
+    }));
+  }
+
+  /**
+   * Finds learning paths for required competencies
+   */
+  async findLearningPathsForCompetencies(competencies: Array<{
+    competencyLibraryId: string;
+    priority: string;
+    linkedLearningPaths: string[];
+    gracePeriodDays: number | null;
+    isMandatory: boolean;
+  }>, userId: string): Promise<Array<{
+    pathId: string;
+    competencyLibraryId: string;
+    priority: string;
+    gracePeriodDays: number | null;
+    isMandatory: boolean;
+    pathTitle: string;
+    estimatedHours: number | null;
+  }>> {
+    const candidates: Array<{
+      pathId: string;
+      competencyLibraryId: string;
+      priority: string;
+      gracePeriodDays: number | null;
+      isMandatory: boolean;
+      pathTitle: string;
+      estimatedHours: number | null;
+    }> = [];
+
+    for (const competency of competencies) {
+      if (competency.linkedLearningPaths && competency.linkedLearningPaths.length > 0) {
+        // Get learning path details for linked paths
+        const paths = await db
+          .select({
+            id: learningPaths.id,
+            title: learningPaths.title,
+            estimatedHours: learningPaths.estimatedHours,
+            isPublished: learningPaths.isPublished,
+          })
+          .from(learningPaths)
+          .where(
+            and(
+              sql`${learningPaths.id} = ANY(${competency.linkedLearningPaths})`,
+              eq(learningPaths.isPublished, true),
+              isNull(learningPaths.deletedAt)
+            )
+          );
+
+        // Add each valid path as a candidate
+        for (const path of paths) {
+          candidates.push({
+            pathId: path.id,
+            competencyLibraryId: competency.competencyLibraryId,
+            priority: competency.priority,
+            gracePeriodDays: competency.gracePeriodDays,
+            isMandatory: competency.isMandatory,
+            pathTitle: path.title,
+            estimatedHours: path.estimatedHours,
+          });
+        }
+      }
+    }
+
+    console.log(`[AUTO-ASSIGN] Found ${candidates.length} learning path candidates from competency mappings`);
+    return candidates;
+  }
+
+  /**
+   * Filters out learning paths the user is already enrolled in
+   */
+  async filterExistingEnrollments(userId: string, candidates: Array<{
+    pathId: string;
+    competencyLibraryId: string;
+    priority: string;
+    gracePeriodDays: number | null;
+    isMandatory: boolean;
+    pathTitle: string;
+    estimatedHours: number | null;
+  }>): Promise<Array<{
+    pathId: string;
+    competencyLibraryId: string;
+    priority: string;
+    gracePeriodDays: number | null;
+    isMandatory: boolean;
+    pathTitle: string;
+    estimatedHours: number | null;
+  }>> {
+    if (candidates.length === 0) return [];
+
+    // Get all user's current enrollments
+    const existingEnrollments = await db
+      .select({ pathId: learningPathEnrollments.pathId })
+      .from(learningPathEnrollments)
+      .where(
+        and(
+          eq(learningPathEnrollments.userId, userId),
+          // Include active and completed enrollments to avoid re-enrollment
+          sql`${learningPathEnrollments.enrollmentStatus} IN ('enrolled', 'in_progress', 'completed')`
+        )
+      );
+
+    const enrolledPathIds = new Set(existingEnrollments.map(e => e.pathId));
+    
+    const filtered = candidates.filter(candidate => !enrolledPathIds.has(candidate.pathId));
+    
+    console.log(`[AUTO-ASSIGN] Filtered out ${candidates.length - filtered.length} duplicate enrollments`);
+    return filtered;
+  }
+
+  /**
+   * Executes role-based assignments with proper metadata and due dates
+   */
+  async executeRoleBasedAssignments(
+    userId: string, 
+    assignments: Array<{
+      pathId: string;
+      competencyLibraryId: string;
+      priority: string;
+      gracePeriodDays: number | null;
+      isMandatory: boolean;
+      pathTitle: string;
+    }>, 
+    assignedByUserId: string,
+    newRole: string
+  ): Promise<Array<{ enrollmentId: string; pathId: string; pathTitle: string }>> {
+    const completedAssignments: Array<{ enrollmentId: string; pathId: string; pathTitle: string }> = [];
+
+    for (const assignment of assignments) {
+      try {
+        // Calculate due date based on grace period or default
+        const gracePeriodDays = assignment.gracePeriodDays || 30; // Default 30 days
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + gracePeriodDays);
+
+        // Create enrollment with auto-assignment metadata
+        const enrollmentData = {
+          userId,
+          pathId: assignment.pathId,
+          enrollmentStatus: 'enrolled' as const,
+          enrollmentSource: 'role_based_auto_assignment',
+          dueDate,
+          metadata: {
+            autoAssignment: true,
+            assignmentReason: 'role_change',
+            newRole,
+            competencyLibraryId: assignment.competencyLibraryId,
+            priority: assignment.priority,
+            isMandatory: assignment.isMandatory,
+            assignedBy: assignedByUserId,
+            assignedAt: new Date().toISOString(),
+            gracePeriodDays
+          }
+        };
+
+        const enrollment = await this.enrollUserInLearningPath(enrollmentData);
+        
+        completedAssignments.push({
+          enrollmentId: enrollment.id,
+          pathId: assignment.pathId,
+          pathTitle: assignment.pathTitle,
+        });
+
+        console.log(`[AUTO-ASSIGN] Successfully enrolled user ${userId} in learning path "${assignment.pathTitle}" (${assignment.pathId})`);
+
+      } catch (error) {
+        console.error(`[AUTO-ASSIGN] Failed to enroll user ${userId} in path ${assignment.pathId}:`, error);
+        // Continue with other assignments even if one fails
+      }
+    }
+
+    return completedAssignments;
+  }
+
+  /**
+   * Logs auto-assignment activity for audit trail and monitoring
+   */
+  async logAutoAssignmentActivity(
+    userId: string, 
+    assignmentType: 'role_change' | 'competency_gap' | 'compliance_requirement',
+    metadata: Record<string, any>
+  ): Promise<void> {
+    try {
+      // Store in automation run logs for audit trail
+      await db.insert(automationRunLogs).values({
+        runType: 'auto_assignment',
+        entityId: userId,
+        entityType: 'user',
+        status: 'completed',
+        completedAt: new Date(),
+        assignmentsCreated: metadata.assignmentsCreated || 0,
+        executionDetails: {
+          assignmentType,
+          ...metadata
+        }
+      });
+
+      console.log(`[AUTO-ASSIGN] Logged auto-assignment activity for user ${userId}, type: ${assignmentType}`);
+    } catch (error) {
+      console.error(`[AUTO-ASSIGN] Failed to log auto-assignment activity:`, error);
+      // Don't throw - this is just logging
+    }
   }
 }
 
