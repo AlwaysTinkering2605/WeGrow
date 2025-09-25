@@ -61,6 +61,18 @@ export const badgeTypeEnum = pgEnum("badge_type", ["completion", "streak", "perf
 export const achievementTypeEnum = pgEnum("achievement_type", ["course_completion", "learning_path_completion", "quiz_mastery", "streak", "engagement", "leadership"]);
 export const pointTransactionTypeEnum = pgEnum("point_transaction_type", ["earned", "bonus", "deducted", "reset"]);
 
+// Advanced Analytics enums
+export const analyticsMetricTypeEnum = pgEnum("analytics_metric_type", [
+  "completion_rate", "engagement_score", "performance_score", "learning_velocity",
+  "competency_progress", "assessment_score", "time_spent", "streak_count",
+  "retention_rate", "skill_mastery", "course_effectiveness", "path_optimization"
+]);
+export const analyticsAggregationEnum = pgEnum("analytics_aggregation", ["hourly", "daily", "weekly", "monthly", "quarterly", "yearly"]);
+export const analyticsDimensionEnum = pgEnum("analytics_dimension", [
+  "user", "team", "department", "role", "course", "learning_path", "competency",
+  "assessment", "badge", "training_record", "certification"
+]);
+
 // Teams table - formal team structure
 export const teams = pgTable("teams", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2305,6 +2317,182 @@ export type RecurringAssignment = typeof recurringAssignments.$inferSelect;
 export type InsertRecurringAssignment = z.infer<typeof insertRecurringAssignmentSchema>;
 export type AutomationRunLog = typeof automationRunLogs.$inferSelect;
 export type InsertAutomationRunLog = z.infer<typeof insertAutomationRunLogSchema>;
+
+// =====================================================================
+// ADVANCED ANALYTICS TABLES - Phase 3 Implementation
+// =====================================================================
+
+// Analytics Metrics - Time-series data for all performance metrics
+export const analyticsMetrics = pgTable("analytics_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  metricType: analyticsMetricTypeEnum("metric_type").notNull(),
+  dimension: analyticsDimensionEnum("dimension").notNull(),
+  dimensionId: varchar("dimension_id").notNull(), // ID of the entity being measured
+  aggregationLevel: analyticsAggregationEnum("aggregation_level").notNull(),
+  value: integer("value").notNull(), // Metric value (scaled by 100 for percentages)
+  additionalData: jsonb("additional_data"), // Extra context/breakdown data
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Analytics Dashboards - Configurable dashboard definitions
+export const analyticsDashboards = pgTable("analytics_dashboards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  userId: varchar("user_id"), // User who created the dashboard
+  isPublic: boolean("is_public").default(false),
+  configuration: jsonb("configuration").notNull(), // Dashboard layout and widgets
+  filters: jsonb("filters"), // Default filters
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Analytics Reports - Generated reports and insights
+export const analyticsReports = pgTable("analytics_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  reportType: varchar("report_type").notNull(), // e.g., "performance", "compliance", "engagement"
+  generatedBy: varchar("generated_by").notNull(), // User ID
+  filters: jsonb("filters"), // Filters used to generate the report
+  data: jsonb("data").notNull(), // Report data and visualizations
+  insights: jsonb("insights"), // AI-generated insights and recommendations
+  isScheduled: boolean("is_scheduled").default(false),
+  schedule: jsonb("schedule"), // Cron-like schedule configuration
+  generatedAt: timestamp("generated_at").defaultNow(),
+  validUntil: timestamp("valid_until"), // Report expiry
+});
+
+// Performance Snapshots - Point-in-time performance captures
+export const performanceSnapshots = pgTable("performance_snapshots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  snapshotDate: timestamp("snapshot_date").notNull(),
+  overallScore: integer("overall_score"), // 0-100 overall performance score
+  competencyScores: jsonb("competency_scores"), // Breakdown by competency
+  learningVelocity: integer("learning_velocity"), // Learning pace metric
+  engagementLevel: integer("engagement_level"), // 0-100 engagement score
+  streakCount: integer("streak_count").default(0),
+  completionRate: integer("completion_rate"), // 0-100 percentage
+  assessmentAverage: integer("assessment_average"), // 0-100 average score
+  skillMastery: jsonb("skill_mastery"), // Skills and mastery levels
+  predictiveInsights: jsonb("predictive_insights"), // ML-generated predictions
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Learning Insights - AI-powered learning insights and recommendations
+export const learningInsights = pgTable("learning_insights", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),
+  teamId: varchar("team_id"),
+  departmentId: varchar("department_id"),
+  insightType: varchar("insight_type").notNull(), // e.g., "recommendation", "warning", "achievement"
+  title: varchar("title").notNull(),
+  description: text("description").notNull(),
+  priority: varchar("priority").notNull(), // high, medium, low
+  confidence: integer("confidence"), // 0-100 confidence score
+  dataPoints: jsonb("data_points"), // Supporting data for the insight
+  actionItems: jsonb("action_items"), // Recommended actions
+  isRead: boolean("is_read").default(false),
+  isActionTaken: boolean("is_action_taken").default(false),
+  validUntil: timestamp("valid_until"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Analytics Indexes for performance
+export const analyticsMetricsIndexes = [
+  index("idx_analytics_metrics_type_dimension").on(analyticsMetrics.metricType, analyticsMetrics.dimension),
+  index("idx_analytics_metrics_dimension_id").on(analyticsMetrics.dimensionId),
+  index("idx_analytics_metrics_period").on(analyticsMetrics.periodStart, analyticsMetrics.periodEnd),
+  index("idx_performance_snapshots_user_date").on(performanceSnapshots.userId, performanceSnapshots.snapshotDate),
+  index("idx_learning_insights_user").on(learningInsights.userId),
+  index("idx_learning_insights_team").on(learningInsights.teamId),
+  index("idx_learning_insights_type").on(learningInsights.insightType),
+];
+
+// Analytics Relations
+export const analyticsMetricsRelations = relations(analyticsMetrics, ({ one }) => ({
+  // Relations will be added based on dimension type
+}));
+
+export const analyticsDashboardsRelations = relations(analyticsDashboards, ({ one }) => ({
+  creator: one(users, {
+    fields: [analyticsDashboards.userId],
+    references: [users.id],
+  }),
+}));
+
+export const analyticsReportsRelations = relations(analyticsReports, ({ one }) => ({
+  generator: one(users, {
+    fields: [analyticsReports.generatedBy],
+    references: [users.id],
+  }),
+}));
+
+export const performanceSnapshotsRelations = relations(performanceSnapshots, ({ one }) => ({
+  user: one(users, {
+    fields: [performanceSnapshots.userId],
+    references: [users.id],
+  }),
+}));
+
+export const learningInsightsRelations = relations(learningInsights, ({ one, many }) => ({
+  user: one(users, {
+    fields: [learningInsights.userId],
+    references: [users.id],
+  }),
+  team: one(teams, {
+    fields: [learningInsights.teamId],
+    references: [teams.id],
+  }),
+}));
+
+// =====================================================================
+// ANALYTICS ZOD SCHEMAS
+// =====================================================================
+
+export const insertAnalyticsMetricSchema = createInsertSchema(analyticsMetrics).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertAnalyticsDashboardSchema = createInsertSchema(analyticsDashboards).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertAnalyticsReportSchema = createInsertSchema(analyticsReports).omit({
+  id: true,
+  generatedAt: true
+});
+
+export const insertPerformanceSnapshotSchema = createInsertSchema(performanceSnapshots).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertLearningInsightSchema = createInsertSchema(learningInsights).omit({
+  id: true,
+  createdAt: true
+});
+
+// =====================================================================
+// ANALYTICS TYPES
+// =====================================================================
+
+export type AnalyticsMetric = typeof analyticsMetrics.$inferSelect;
+export type InsertAnalyticsMetric = z.infer<typeof insertAnalyticsMetricSchema>;
+export type AnalyticsDashboard = typeof analyticsDashboards.$inferSelect;
+export type InsertAnalyticsDashboard = z.infer<typeof insertAnalyticsDashboardSchema>;
+export type AnalyticsReport = typeof analyticsReports.$inferSelect;
+export type InsertAnalyticsReport = z.infer<typeof insertAnalyticsReportSchema>;
+export type PerformanceSnapshot = typeof performanceSnapshots.$inferSelect;
+export type InsertPerformanceSnapshot = z.infer<typeof insertPerformanceSnapshotSchema>;
+export type LearningInsight = typeof learningInsights.$inferSelect;
+export type InsertLearningInsight = z.infer<typeof insertLearningInsightSchema>;
 
 // Re-export types for storage interface to avoid z import
 export type InsertTeam = z.infer<typeof insertTeamSchema>;
