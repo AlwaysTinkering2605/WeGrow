@@ -46,6 +46,18 @@ interface PathStep {
   score?: number;
 }
 
+interface StepProgress {
+  id: string;
+  stepId: string;
+  enrollmentId: string;
+  userId: string;
+  status: 'not_started' | 'in_progress' | 'completed';
+  progress: number;
+  isCompleted?: boolean;
+  completedAt?: string;
+  score?: number;
+}
+
 interface LearningPath {
   id: string;
   title: string;
@@ -85,26 +97,26 @@ export default function PathProgressVisualization({
   const [hoveredStep, setHoveredStep] = useState<string | null>(null);
 
   // Fetch learning path with steps
-  const { data: pathData, isLoading } = useQuery({
+  const { data: pathData, isLoading } = useQuery<LearningPath>({
     queryKey: [`/api/learning-paths/${pathId}/with-steps`],
     enabled: !!pathId,
   });
 
   // Fetch user enrollment if enrollmentId provided
-  const { data: enrollment } = useQuery({
+  const { data: enrollment } = useQuery<PathEnrollment>({
     queryKey: [`/api/learning-path-enrollments/${enrollmentId}`],
     enabled: !!enrollmentId,
   });
 
   // Fetch step progress for this enrollment
-  const { data: stepProgress = [] } = useQuery({
+  const { data: stepProgress = [] } = useQuery<StepProgress[]>({
     queryKey: [`/api/learning-path-enrollments/${enrollmentId}/progress`],
     enabled: !!enrollmentId,
   });
 
   // Process steps with progress data - fix circular reference bug
   const processedSteps = pathData?.steps?.reduce((acc: PathStep[], step: PathStep, index: number) => {
-    const progress = stepProgress.find((p: any) => p.stepId === step.id);
+    const progress = stepProgress.find((p: StepProgress) => p.stepId === step.id);
     const isCompleted = progress?.status === 'completed' || progress?.isCompleted;
     const isInProgress = progress?.status === 'in_progress';
     
@@ -129,7 +141,7 @@ export default function PathProgressVisualization({
   }, []) || [];
 
   // Calculate overall progress
-  const completedSteps = processedSteps.filter(step => step.isCompleted).length;
+  const completedSteps = processedSteps.filter((step: PathStep) => step.isCompleted).length;
   const totalSteps = processedSteps.length;
   const overallProgress = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
 
@@ -212,7 +224,7 @@ export default function PathProgressVisualization({
     }
 
     // Draw steps
-    processedSteps.forEach((step, index) => {
+    processedSteps.forEach((step: PathStep, index: number) => {
       const x = padding + (index * stepSpacing);
       const y = pathY;
 
@@ -374,7 +386,7 @@ export default function PathProgressVisualization({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {processedSteps.map((step, index) => (
+            {processedSteps.map((step: PathStep, index: number) => (
               <Card 
                 key={step.id}
                 className={`transition-all cursor-pointer ${
