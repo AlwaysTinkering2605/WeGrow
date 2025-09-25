@@ -101,8 +101,40 @@ const lessonSchema = insertLessonSchema.omit({ orderIndex: true }).extend({
   // Override to make these coercible from form inputs
   order: z.coerce.number().min(1),
   estimatedDuration: z.coerce.number().min(60).max(18000), // 1 minute to 5 hours in seconds
-  // Content type validation (matches backend enum)
-  contentType: z.enum(["video", "rich_text", "pdf_document"]).default("video"),
+  // Content type validation (Phase 2: Extended content types)
+  contentType: z.enum([
+    "video", 
+    "rich_text", 
+    "pdf_document", 
+    "scorm_package",
+    "external_video", 
+    "external_link", 
+    "document_file",
+    "instructor_led"
+  ]).default("video"),
+  
+  // Phase 2: New content type fields
+  scormPackageUrl: z.string().optional(),
+  scormManifestUrl: z.string().optional(),
+  externalVideoUrl: z.string().optional(),
+  externalVideoType: z.enum(["youtube", "direct", "vimeo_public"]).optional(),
+  externalLinkUrl: z.string().optional(),
+  externalLinkDescription: z.string().optional(),
+  documentFileUrl: z.string().optional(),
+  documentFileType: z.enum(["doc", "docx", "ppt", "pptx", "xls", "xlsx", "txt"]).optional(),
+  instructorDetails: z.object({
+    name: z.string(),
+    email: z.string().email(),
+    location: z.string(),
+    duration: z.number(),
+    maxParticipants: z.number().optional()
+  }).optional(),
+  sessionSchedule: z.object({
+    dates: z.array(z.string()),
+    times: z.array(z.string()),
+    location: z.string(),
+    isRecurring: z.boolean()
+  }).optional(),
 }).omit({
   moduleId: true, // Will be provided by the courseId context
 }).refine((data) => {
@@ -116,9 +148,24 @@ const lessonSchema = insertLessonSchema.omit({ orderIndex: true }).extend({
   if (data.contentType === "pdf_document") {
     return data.pdfContentUrl && data.pdfContentUrl.length > 0;
   }
+  if (data.contentType === "scorm_package") {
+    return data.scormPackageUrl && data.scormPackageUrl.length > 0;
+  }
+  if (data.contentType === "external_video") {
+    return data.externalVideoUrl && data.externalVideoUrl.length > 0 && data.externalVideoType;
+  }
+  if (data.contentType === "external_link") {
+    return data.externalLinkUrl && data.externalLinkUrl.length > 0;
+  }
+  if (data.contentType === "document_file") {
+    return data.documentFileUrl && data.documentFileUrl.length > 0 && data.documentFileType;
+  }
+  if (data.contentType === "instructor_led") {
+    return data.instructorDetails && data.sessionSchedule;
+  }
   return true;
 }, {
-  message: "Please provide content for the selected content type",
+  message: "Please provide all required content for the selected content type",
   path: ["richTextContent"], // This will be dynamically set based on content type
 });
 
@@ -1120,6 +1167,17 @@ export default function Learning() {
       vimeoVideoId: "",
       richTextContent: "",
       pdfContentUrl: "",
+      // Phase 2: New content type fields
+      scormPackageUrl: "",
+      scormManifestUrl: "",
+      externalVideoUrl: "",
+      externalVideoType: undefined,
+      externalLinkUrl: "",
+      externalLinkDescription: "",
+      documentFileUrl: "",
+      documentFileType: undefined,
+      instructorDetails: undefined,
+      sessionSchedule: undefined,
       order: 1,
       estimatedDuration: 1800, // 30 minutes in seconds
       isRequired: true,
@@ -1137,6 +1195,17 @@ export default function Learning() {
       vimeoVideoId: "",
       richTextContent: "",
       pdfContentUrl: "",
+      // Phase 2: New content type fields
+      scormPackageUrl: "",
+      scormManifestUrl: "",
+      externalVideoUrl: "",
+      externalVideoType: undefined,
+      externalLinkUrl: "",
+      externalLinkDescription: "",
+      documentFileUrl: "",
+      documentFileType: undefined,
+      instructorDetails: undefined,
+      sessionSchedule: undefined,
       order: 1,
       estimatedDuration: 1800, // 30 minutes in seconds
       isRequired: true,
@@ -2780,7 +2849,7 @@ export default function Learning() {
                             <div className="flex gap-2">
                               <Button
                                 variant="outline"
-                                onClick={() => window.open(currentLesson.pdfContentUrl, '_blank')}
+                                onClick={() => window.open(currentLesson.pdfContentUrl, '_blank', 'noopener,noreferrer')}
                                 data-testid="button-view-pdf"
                               >
                                 <FileText className="w-4 h-4 mr-2" />
@@ -2813,6 +2882,301 @@ export default function Learning() {
                             title="PDF Viewer"
                             data-testid="iframe-pdf-viewer"
                           />
+                        </div>
+                      </div>
+                    ) : currentLesson?.contentType === 'scorm_package' && currentLesson?.scormPackageUrl ? (
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg min-h-96">
+                        <div className="p-6 border-b">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <BookOpen className="w-6 h-6 text-blue-600 mr-2" />
+                              <div>
+                                <h3 className="font-semibold">SCORM Package</h3>
+                                <p className="text-sm text-muted-foreground">Interactive e-learning content</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={() => window.open(currentLesson.scormPackageUrl, '_blank', 'noopener,noreferrer')}
+                                data-testid="button-launch-scorm"
+                              >
+                                <Play className="w-4 h-4 mr-2" />
+                                Launch SCORM
+                              </Button>
+                              <Button
+                                onClick={() => {
+                                  const enrollmentId = courseDetails?.enrollment?.id;
+                                  if (enrollmentId && currentLesson?.id) {
+                                    completeLessonManuallyMutation.mutate({
+                                      enrollmentId,
+                                      lessonId: currentLesson.id
+                                    });
+                                  }
+                                }}
+                                variant="outline"
+                                size="sm"
+                                data-testid="button-complete-scorm"
+                              >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Mark Complete
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-6">
+                          <div className="bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-800/30 dark:to-indigo-800/30 rounded-lg p-6">
+                            <h4 className="font-medium mb-2">About SCORM Content</h4>
+                            <p className="text-sm text-muted-foreground">
+                              This lesson contains interactive SCORM content. Click "Launch SCORM" to open the content in a new window. 
+                              Complete the activities and mark the lesson as complete when finished.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : currentLesson?.contentType === 'external_video' && currentLesson?.externalVideoUrl ? (
+                      <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg min-h-96">
+                        <div className="p-6 border-b">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <Video className="w-6 h-6 text-purple-600 mr-2" />
+                              <div>
+                                <h3 className="font-semibold">External Video</h3>
+                                <p className="text-sm text-muted-foreground">
+                                  {currentLesson.externalVideoType === 'youtube' && 'YouTube Video'}
+                                  {currentLesson.externalVideoType === 'direct' && 'Direct Video Link'}
+                                  {currentLesson.externalVideoType === 'vimeo_public' && 'Public Vimeo Video'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={() => window.open(currentLesson.externalVideoUrl, '_blank', 'noopener,noreferrer')}
+                                data-testid="button-watch-external-video"
+                              >
+                                <Play className="w-4 h-4 mr-2" />
+                                Watch Video
+                              </Button>
+                              <Button
+                                onClick={() => {
+                                  const enrollmentId = courseDetails?.enrollment?.id;
+                                  if (enrollmentId && currentLesson?.id) {
+                                    completeLessonManuallyMutation.mutate({
+                                      enrollmentId,
+                                      lessonId: currentLesson.id
+                                    });
+                                  }
+                                }}
+                                variant="outline"
+                                size="sm"
+                                data-testid="button-complete-external-video"
+                              >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Mark Complete
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-6">
+                          {currentLesson.externalVideoType === 'youtube' && (
+                            <iframe
+                              src={currentLesson.externalVideoUrl.replace('watch?v=', 'embed/')}
+                              className="w-full h-96 rounded-lg"
+                              title="YouTube Video"
+                              allowFullScreen
+                              data-testid="iframe-youtube-video"
+                            />
+                          )}
+                          {(currentLesson.externalVideoType === 'direct' || currentLesson.externalVideoType === 'vimeo_public') && (
+                            <video
+                              src={currentLesson.externalVideoUrl}
+                              className="w-full h-96 rounded-lg"
+                              controls
+                              data-testid="video-external-player"
+                            >
+                              Your browser does not support the video tag.
+                            </video>
+                          )}
+                        </div>
+                      </div>
+                    ) : currentLesson?.contentType === 'external_link' && currentLesson?.externalLinkUrl ? (
+                      <div className="bg-green-50 dark:bg-green-900/20 rounded-lg min-h-96">
+                        <div className="p-6 border-b">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <Link className="w-6 h-6 text-green-600 mr-2" />
+                              <div>
+                                <h3 className="font-semibold">External Resource</h3>
+                                <p className="text-sm text-muted-foreground">External link to learning material</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={() => window.open(currentLesson.externalLinkUrl, '_blank', 'noopener,noreferrer')}
+                                data-testid="button-visit-external-link"
+                              >
+                                <ArrowRight className="w-4 h-4 mr-2" />
+                                Visit Resource
+                              </Button>
+                              <Button
+                                onClick={() => {
+                                  const enrollmentId = courseDetails?.enrollment?.id;
+                                  if (enrollmentId && currentLesson?.id) {
+                                    completeLessonManuallyMutation.mutate({
+                                      enrollmentId,
+                                      lessonId: currentLesson.id
+                                    });
+                                  }
+                                }}
+                                variant="outline"
+                                size="sm"
+                                data-testid="button-complete-external-link"
+                              >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Mark Complete
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-6">
+                          <div className="bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-800/30 dark:to-emerald-800/30 rounded-lg p-6">
+                            <h4 className="font-medium mb-2">Resource Link</h4>
+                            <p className="text-sm text-muted-foreground mb-4">
+                              {currentLesson.externalLinkDescription || 'Click the link above to access external learning resources.'}
+                            </p>
+                            <div className="bg-white dark:bg-gray-800 rounded p-3 border text-sm">
+                              <strong>URL:</strong> <span className="text-blue-600 break-all">{currentLesson.externalLinkUrl}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : currentLesson?.contentType === 'document_file' && currentLesson?.documentFileUrl ? (
+                      <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg min-h-96">
+                        <div className="p-6 border-b">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <FileText className="w-6 h-6 text-orange-600 mr-2" />
+                              <div>
+                                <h3 className="font-semibold">Document File</h3>
+                                <p className="text-sm text-muted-foreground">
+                                  {currentLesson.documentFileType?.toUpperCase()} Document
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => window.open(currentLesson.documentFileUrl, '_blank', 'noopener,noreferrer')}
+                                data-testid="button-download-document"
+                              >
+                                <Download className="w-4 h-4 mr-2" />
+                                Download
+                              </Button>
+                              <Button
+                                onClick={() => {
+                                  const enrollmentId = courseDetails?.enrollment?.id;
+                                  if (enrollmentId && currentLesson?.id) {
+                                    completeLessonManuallyMutation.mutate({
+                                      enrollmentId,
+                                      lessonId: currentLesson.id
+                                    });
+                                  }
+                                }}
+                                size="sm"
+                                data-testid="button-complete-document"
+                              >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Mark Complete
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-6">
+                          <div className="bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-800/30 dark:to-amber-800/30 rounded-lg p-6">
+                            <h4 className="font-medium mb-2">Document Information</h4>
+                            <p className="text-sm text-muted-foreground mb-4">
+                              This lesson contains a {currentLesson.documentFileType?.toUpperCase()} document file. 
+                              Download the file to access the learning material.
+                            </p>
+                            <div className="bg-white dark:bg-gray-800 rounded p-3 border text-sm space-y-2">
+                              <div><strong>File Type:</strong> {currentLesson.documentFileType?.toUpperCase()}</div>
+                              <div><strong>URL:</strong> <span className="text-blue-600 break-all">{currentLesson.documentFileUrl}</span></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : currentLesson?.contentType === 'instructor_led' && currentLesson?.instructorDetails ? (
+                      <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg min-h-96">
+                        <div className="p-6 border-b">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <Users className="w-6 h-6 text-indigo-600 mr-2" />
+                              <div>
+                                <h3 className="font-semibold">Instructor-Led Training</h3>
+                                <p className="text-sm text-muted-foreground">In-person or virtual training session</p>
+                              </div>
+                            </div>
+                            <Button
+                              onClick={() => {
+                                const enrollmentId = courseDetails?.enrollment?.id;
+                                if (enrollmentId && currentLesson?.id) {
+                                  completeLessonManuallyMutation.mutate({
+                                    enrollmentId,
+                                    lessonId: currentLesson.id
+                                  });
+                                }
+                              }}
+                              size="sm"
+                              data-testid="button-complete-instructor-led"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Mark Complete
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="p-6 space-y-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border">
+                              <h4 className="font-medium mb-3 flex items-center">
+                                <GraduationCap className="w-5 h-5 mr-2 text-indigo-600" />
+                                Instructor Details
+                              </h4>
+                              <div className="space-y-2 text-sm">
+                                <div><strong>Name:</strong> {currentLesson.instructorDetails.name}</div>
+                                <div><strong>Email:</strong> {currentLesson.instructorDetails.email}</div>
+                                <div><strong>Location:</strong> {currentLesson.instructorDetails.location}</div>
+                                {currentLesson.instructorDetails.maxParticipants && (
+                                  <div><strong>Max Participants:</strong> {currentLesson.instructorDetails.maxParticipants}</div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {currentLesson.sessionSchedule && (
+                              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border">
+                                <h4 className="font-medium mb-3 flex items-center">
+                                  <Calendar className="w-5 h-5 mr-2 text-indigo-600" />
+                                  Session Schedule
+                                </h4>
+                                <div className="space-y-2 text-sm">
+                                  <div><strong>Location:</strong> {currentLesson.sessionSchedule.location}</div>
+                                  <div><strong>Recurring:</strong> {currentLesson.sessionSchedule.isRecurring ? 'Yes' : 'No'}</div>
+                                  {currentLesson.sessionSchedule.dates && (
+                                    <div><strong>Dates:</strong> {currentLesson.sessionSchedule.dates.join(', ')}</div>
+                                  )}
+                                  {currentLesson.sessionSchedule.times && (
+                                    <div><strong>Times:</strong> {currentLesson.sessionSchedule.times.join(', ')}</div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-800/30 dark:to-purple-800/30 rounded-lg p-6">
+                            <h4 className="font-medium mb-2">Training Information</h4>
+                            <p className="text-sm text-muted-foreground">
+                              This is an instructor-led training session. Please contact the instructor to schedule or confirm your attendance. 
+                              Mark this lesson as complete after attending the training session.
+                            </p>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -4723,6 +5087,11 @@ export default function Learning() {
                                       <SelectItem value="video">🎥 Video Content (Vimeo)</SelectItem>
                                       <SelectItem value="rich_text">📝 Rich Text Content</SelectItem>
                                       <SelectItem value="pdf_document">📄 PDF Document</SelectItem>
+                                      <SelectItem value="scorm_package">📦 SCORM Package</SelectItem>
+                                      <SelectItem value="external_video">🎬 External Video (YouTube/Direct)</SelectItem>
+                                      <SelectItem value="external_link">🔗 External Link</SelectItem>
+                                      <SelectItem value="document_file">📋 Document File (Word/PPT/Excel)</SelectItem>
+                                      <SelectItem value="instructor_led">👨‍🏫 Instructor-Led Training</SelectItem>
                                     </SelectContent>
                                   </Select>
                                   <FormMessage />
@@ -4815,6 +5184,285 @@ export default function Learning() {
                                   </FormItem>
                                 )}
                               />
+                            )}
+
+                            {/* Phase 2: SCORM Package Fields */}
+                            {createLessonForm.watch("contentType") === "scorm_package" && (
+                              <div className="space-y-4">
+                                <FormField
+                                  control={createLessonForm.control}
+                                  name="scormPackageUrl"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>SCORM Package URL</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="https://example.com/scorm-package.zip" {...field} data-testid="input-lesson-scorm" />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={createLessonForm.control}
+                                  name="scormManifestUrl"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>SCORM Manifest URL (Optional)</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="https://example.com/imsmanifest.xml" {...field} data-testid="input-lesson-scorm-manifest" />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                            )}
+
+                            {/* Phase 2: External Video Fields */}
+                            {createLessonForm.watch("contentType") === "external_video" && (
+                              <div className="space-y-4">
+                                <FormField
+                                  control={createLessonForm.control}
+                                  name="externalVideoType"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Video Type</FormLabel>
+                                      <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger data-testid="select-external-video-type">
+                                            <SelectValue placeholder="Select video type" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          <SelectItem value="youtube">📺 YouTube</SelectItem>
+                                          <SelectItem value="direct">🎬 Direct Video Link</SelectItem>
+                                          <SelectItem value="vimeo_public">🎥 Public Vimeo</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={createLessonForm.control}
+                                  name="externalVideoUrl"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Video URL</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="https://youtube.com/watch?v=... or direct video URL" {...field} data-testid="input-lesson-external-video" />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                            )}
+
+                            {/* Phase 2: External Link Fields */}
+                            {createLessonForm.watch("contentType") === "external_link" && (
+                              <div className="space-y-4">
+                                <FormField
+                                  control={createLessonForm.control}
+                                  name="externalLinkUrl"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>External Link URL</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="https://example.com/resource" {...field} data-testid="input-lesson-external-link" />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={createLessonForm.control}
+                                  name="externalLinkDescription"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Link Description</FormLabel>
+                                      <FormControl>
+                                        <Textarea placeholder="Describe what learners will find at this link..." {...field} data-testid="input-lesson-link-description" />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                            )}
+
+                            {/* Phase 2: Document File Fields */}
+                            {createLessonForm.watch("contentType") === "document_file" && (
+                              <div className="space-y-4">
+                                <FormField
+                                  control={createLessonForm.control}
+                                  name="documentFileType"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Document Type</FormLabel>
+                                      <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger data-testid="select-document-type">
+                                            <SelectValue placeholder="Select document type" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          <SelectItem value="doc">📄 Word Document (.doc)</SelectItem>
+                                          <SelectItem value="docx">📄 Word Document (.docx)</SelectItem>
+                                          <SelectItem value="ppt">📊 PowerPoint (.ppt)</SelectItem>
+                                          <SelectItem value="pptx">📊 PowerPoint (.pptx)</SelectItem>
+                                          <SelectItem value="xls">📈 Excel (.xls)</SelectItem>
+                                          <SelectItem value="xlsx">📈 Excel (.xlsx)</SelectItem>
+                                          <SelectItem value="txt">📝 Text File (.txt)</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={createLessonForm.control}
+                                  name="documentFileUrl"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Document File URL</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="https://example.com/document.docx" {...field} data-testid="input-lesson-document" />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                            )}
+
+                            {/* Phase 2: Instructor-Led Training Fields */}
+                            {createLessonForm.watch("contentType") === "instructor_led" && (
+                              <div className="space-y-4">
+                                <div className="border rounded-lg p-4 space-y-4">
+                                  <h4 className="font-medium">Instructor Details</h4>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <FormField
+                                      control={createLessonForm.control}
+                                      name="instructorDetails.name"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Instructor Name</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="Jane Smith" {...field} data-testid="input-instructor-name" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={createLessonForm.control}
+                                      name="instructorDetails.email"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Instructor Email</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="jane@company.com" {...field} data-testid="input-instructor-email" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <FormField
+                                      control={createLessonForm.control}
+                                      name="instructorDetails.location"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Location</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="Training Room A" {...field} data-testid="input-instructor-location" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={createLessonForm.control}
+                                      name="instructorDetails.maxParticipants"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Max Participants</FormLabel>
+                                          <FormControl>
+                                            <Input type="number" placeholder="20" {...field} data-testid="input-instructor-max-participants" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="border rounded-lg p-4 space-y-4">
+                                  <h4 className="font-medium">Session Schedule</h4>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <FormField
+                                      control={createLessonForm.control}
+                                      name="sessionSchedule.location"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Session Location</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="Conference Room B" {...field} data-testid="input-session-location" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={createLessonForm.control}
+                                      name="sessionSchedule.isRecurring"
+                                      render={({ field }) => (
+                                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                          <div className="space-y-0.5">
+                                            <FormLabel className="text-base">Recurring Session</FormLabel>
+                                            <FormDescription>Multiple session dates</FormDescription>
+                                          </div>
+                                          <FormControl>
+                                            <input 
+                                              type="checkbox" 
+                                              checked={field.value} 
+                                              onChange={field.onChange}
+                                              data-testid="checkbox-session-recurring"
+                                            />
+                                          </FormControl>
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+                                  <FormField
+                                    control={createLessonForm.control}
+                                    name="sessionSchedule.dates"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Session Dates (comma-separated)</FormLabel>
+                                        <FormControl>
+                                          <Input placeholder="2024-01-15, 2024-01-22, 2024-01-29" {...field} data-testid="input-session-dates" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createLessonForm.control}
+                                    name="sessionSchedule.times"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Session Times (comma-separated)</FormLabel>
+                                        <FormControl>
+                                          <Input placeholder="09:00-12:00, 14:00-17:00" {...field} data-testid="input-session-times" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              </div>
                             )}
                             <div className="grid grid-cols-2 gap-4">
                               <FormField

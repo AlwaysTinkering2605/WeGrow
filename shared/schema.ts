@@ -38,7 +38,16 @@ export const companyValueEnum = pgEnum("company_value", ["excellence", "teamwork
 
 // LMS-specific enums
 export const lessonTypeEnum = pgEnum("lesson_type", ["video", "quiz", "document", "link"]);
-export const contentTypeEnum = pgEnum("content_type", ["rich_text", "video", "pdf_document"]);
+export const contentTypeEnum = pgEnum("content_type", [
+  "rich_text", 
+  "video", 
+  "pdf_document", 
+  "scorm_package",
+  "external_video", 
+  "external_link", 
+  "document_file",
+  "instructor_led"
+]);
 export const courseTypeEnum = pgEnum("course_type", ["internal", "external"]);
 export const trainingFormatEnum = pgEnum("training_format", ["online", "in_person", "hybrid"]);
 export const enrollmentStatusEnum = pgEnum("enrollment_status", ["enrolled", "in_progress", "completed", "expired"]);
@@ -311,10 +320,22 @@ export const lessons = pgTable("lessons", {
   orderIndex: integer("order_index").notNull(),
   
   // Enhanced content type fields
-  contentType: contentTypeEnum("content_type").default("video"), // rich_text, video, pdf_document
+  contentType: contentTypeEnum("content_type").default("video"), // All content types supported
   richTextContent: text("rich_text_content"), // HTML content for rich text lessons
-  vimeoVideoId: varchar("vimeo_video_id"), // For video lessons
+  vimeoVideoId: varchar("vimeo_video_id"), // For Vimeo video lessons
   pdfContentUrl: varchar("pdf_content_url"), // URL to uploaded PDF document
+  
+  // Phase 2: Extended content type fields
+  scormPackageUrl: varchar("scorm_package_url"), // URL to SCORM package
+  scormManifestUrl: varchar("scorm_manifest_url"), // SCORM manifest file URL
+  externalVideoUrl: varchar("external_video_url"), // YouTube, direct video links
+  externalVideoType: varchar("external_video_type"), // "youtube", "direct", "vimeo_public"
+  externalLinkUrl: varchar("external_link_url"), // External links to resources
+  externalLinkDescription: text("external_link_description"), // Description for links
+  documentFileUrl: varchar("document_file_url"), // Word docs, PowerPoint, etc.
+  documentFileType: varchar("document_file_type"), // "doc", "docx", "ppt", "pptx", "xls", "xlsx"
+  instructorDetails: jsonb("instructor_details"), // { name, email, location, duration, maxParticipants }
+  sessionSchedule: jsonb("session_schedule"), // { dates, times, location, isRecurring }
   
   estimatedDuration: integer("estimated_duration"), // seconds
   resourceUrl: varchar("resource_url"), // For documents/links (legacy)
