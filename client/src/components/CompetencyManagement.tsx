@@ -120,6 +120,602 @@ interface EvidenceRecord {
   competency?: Competency;
 }
 
+// Enhanced Competency Management Dashboard
+function CompetencyManagementDashboard() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [skillTypeFilter, setSkillTypeFilter] = useState<string>("");
+  const [activeTab, setActiveTab] = useState("library");
+  const { user } = useAuth();
+
+  // Fetch competencies with enhanced filtering
+  const { data: competencies, isLoading } = useQuery({
+    queryKey: ["/api/competency-library", { search: searchTerm, category: categoryFilter, skillType: skillTypeFilter }]
+  }) as { data: Competency[] | undefined; isLoading: boolean };
+
+  // Fetch competency usage statistics
+  const { data: competencyStats } = useQuery({
+    queryKey: ["/api/competency-library/stats"]
+  }) as { data: any; isLoading: boolean };
+
+  const filteredCompetencies = competencies?.filter(comp => {
+    const matchesSearch = !searchTerm || 
+      comp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      comp.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = !categoryFilter || comp.category === categoryFilter;
+    const matchesSkillType = !skillTypeFilter || comp.skillType === skillTypeFilter;
+    return matchesSearch && matchesCategory && matchesSkillType;
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Competency Library Management</h2>
+          <p className="text-muted-foreground">
+            Manage organizational competencies and role mappings for ISO 9001:2015 compliance
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" data-testid="button-import-competencies">
+            <Upload className="w-4 h-4 mr-2" />
+            Import
+          </Button>
+          <Button variant="outline" data-testid="button-export-competencies">
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </Button>
+        </div>
+      </div>
+
+      {/* Enhanced Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Layers className="w-8 h-8 text-blue-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Total Competencies</p>
+                <p className="text-2xl font-bold" data-testid="stat-total-competencies">
+                  {competencies?.length || 0}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Shield className="w-8 h-8 text-green-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Safety Critical</p>
+                <p className="text-2xl font-bold" data-testid="stat-safety-competencies">
+                  {competencies?.filter(c => c.skillType === "safety").length || 0}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <CheckCircle className="w-8 h-8 text-purple-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Compliance</p>
+                <p className="text-2xl font-bold" data-testid="stat-compliance-competencies">
+                  {competencies?.filter(c => c.skillType === "compliance").length || 0}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Users className="w-8 h-8 text-orange-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Active Users</p>
+                <p className="text-2xl font-bold" data-testid="stat-active-users">
+                  {competencyStats?.activeUsersCount || 0}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Enhanced Filters */}
+      <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Search competencies..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-64"
+            data-testid="input-search-competencies"
+          />
+        </div>
+
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-48" data-testid="select-category-filter">
+            <SelectValue placeholder="Filter by category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Categories</SelectItem>
+            <SelectItem value="Cleaning Operations">Cleaning Operations</SelectItem>
+            <SelectItem value="Safety & Health">Safety & Health</SelectItem>
+            <SelectItem value="Customer Service">Customer Service</SelectItem>
+            <SelectItem value="Leadership">Leadership</SelectItem>
+            <SelectItem value="Technical Skills">Technical Skills</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={skillTypeFilter} onValueChange={setSkillTypeFilter}>
+          <SelectTrigger className="w-48" data-testid="select-skill-type-filter">
+            <SelectValue placeholder="Filter by skill type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Types</SelectItem>
+            <SelectItem value="technical">Technical</SelectItem>
+            <SelectItem value="safety">Safety</SelectItem>
+            <SelectItem value="compliance">Compliance</SelectItem>
+            <SelectItem value="behavioral">Behavioral</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Button
+          variant="outline"
+          onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/competency-library"] })}
+          data-testid="button-refresh-competencies"
+        >
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="library" data-testid="tab-competency-library">Competency Library</TabsTrigger>
+          <TabsTrigger value="mappings" data-testid="tab-role-mappings">Role Mappings</TabsTrigger>
+          <TabsTrigger value="evidence" data-testid="tab-evidence">Evidence Records</TabsTrigger>
+          <TabsTrigger value="analytics" data-testid="tab-competency-analytics">Analytics</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="library" className="space-y-6">
+          <CompetencyLibraryView competencies={filteredCompetencies} isLoading={isLoading} />
+        </TabsContent>
+
+        <TabsContent value="mappings" className="space-y-6">
+          <RoleMappingManager />
+        </TabsContent>
+
+        <TabsContent value="evidence" className="space-y-6">
+          <EvidenceRecordManager />
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-6">
+          <CompetencyAnalytics />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// Enhanced Competency Library View
+function CompetencyLibraryView({ competencies, isLoading }: {
+  competencies?: Competency[];
+  isLoading: boolean;
+}) {
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingCompetency, setEditingCompetency] = useState<Competency | null>(null);
+  const { toast } = useToast();
+
+  const form = useForm<CompetencyFormType>({
+    resolver: zodResolver(competencySchema),
+    defaultValues: {
+      skillType: "technical",
+      level: 1,
+      isActive: true,
+      requiredForRoles: [],
+      trainingResources: [],
+    }
+  });
+
+  // Create competency mutation
+  const createCompetencyMutation = useMutation({
+    mutationFn: (data: CompetencyFormType) => apiRequest("/api/competency-library", {
+      method: "POST",
+      body: JSON.stringify(data)
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/competency-library"] });
+      toast({ title: "Success", description: "Competency created successfully" });
+      setIsCreateDialogOpen(false);
+      form.reset();
+    }
+  });
+
+  // Update competency mutation
+  const updateCompetencyMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CompetencyFormType> }) => 
+      apiRequest(`/api/competency-library/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data)
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/competency-library"] });
+      toast({ title: "Success", description: "Competency updated successfully" });
+      setEditingCompetency(null);
+      form.reset();
+    }
+  });
+
+  const handleCreate = (data: CompetencyFormType) => {
+    createCompetencyMutation.mutate(data);
+  };
+
+  const handleEdit = (competency: Competency) => {
+    setEditingCompetency(competency);
+    form.reset({
+      title: competency.title,
+      description: competency.description,
+      category: competency.category,
+      level: competency.level,
+      parentId: competency.parentId,
+      skillType: competency.skillType,
+      assessmentCriteria: competency.assessmentCriteria,
+      isActive: competency.isActive,
+    });
+    setIsCreateDialogOpen(true);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <TreePine className="w-5 h-5" />
+            Competency Library
+          </CardTitle>
+          <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create-competency">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Competency
+          </Button>
+        </div>
+        <CardDescription>
+          Define and manage organizational competencies with hierarchical relationships
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-20 w-full" />
+            ))}
+          </div>
+        ) : competencies && competencies.length > 0 ? (
+          <div className="space-y-3">
+            {competencies.map((competency) => (
+              <Card key={competency.id} className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h4 className="font-medium">{competency.title}</h4>
+                      <Badge variant={competency.isActive ? "default" : "secondary"}>
+                        {competency.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                      <Badge variant="outline">Level {competency.level}</Badge>
+                      <Badge 
+                        variant={competency.skillType === "safety" ? "destructive" : 
+                                competency.skillType === "compliance" ? "secondary" :
+                                competency.skillType === "behavioral" ? "outline" : "default"}
+                      >
+                        {competency.skillType}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">{competency.description}</p>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span>📂 {competency.category}</span>
+                      {competency.assessmentCriteria && (
+                        <span>📋 Has Assessment Criteria</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(competency)}
+                      data-testid={`edit-competency-${competency.id}`}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      data-testid={`delete-competency-${competency.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <TreePine className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="font-medium mb-2">No competencies found</h3>
+            <p className="text-sm text-muted-foreground">
+              Create your first competency to start building your library
+            </p>
+          </div>
+        )}
+
+        {/* Create/Edit Competency Dialog */}
+        <Dialog open={isCreateDialogOpen || !!editingCompetency} onOpenChange={(open) => {
+          if (!open) {
+            setIsCreateDialogOpen(false);
+            setEditingCompetency(null);
+            form.reset();
+          }
+        }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                {editingCompetency ? "Edit Competency" : "Create New Competency"}
+              </DialogTitle>
+              <DialogDescription>
+                Define competency requirements and assessment criteria
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(editingCompetency ? 
+                (data) => updateCompetencyMutation.mutate({ id: editingCompetency.id, data }) : 
+                handleCreate
+              )} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Title</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-competency-title" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-competency-category" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} data-testid="textarea-competency-description" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="skillType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Skill Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-skill-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="technical">Technical</SelectItem>
+                            <SelectItem value="safety">Safety</SelectItem>
+                            <SelectItem value="compliance">Compliance</SelectItem>
+                            <SelectItem value="behavioral">Behavioral</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="level"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Competency Level</FormLabel>
+                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={String(field.value)}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-competency-level">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="1">Level 1 - Awareness</SelectItem>
+                            <SelectItem value="2">Level 2 - Basic</SelectItem>
+                            <SelectItem value="3">Level 3 - Competent</SelectItem>
+                            <SelectItem value="4">Level 4 - Proficient</SelectItem>
+                            <SelectItem value="5">Level 5 - Expert</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="assessmentCriteria"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assessment Criteria</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} rows={3} data-testid="textarea-assessment-criteria" />
+                      </FormControl>
+                      <FormDescription>
+                        Define how this competency should be assessed and verified
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex items-center justify-between pt-4">
+                  <FormField
+                    control={form.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2">
+                        <FormControl>
+                          <input
+                            type="checkbox"
+                            checked={field.value}
+                            onChange={field.onChange}
+                            data-testid="checkbox-is-active"
+                          />
+                        </FormControl>
+                        <FormLabel className="text-sm">Active competency</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsCreateDialogOpen(false);
+                        setEditingCompetency(null);
+                        form.reset();
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createCompetencyMutation.isPending || updateCompetencyMutation.isPending}
+                      data-testid="button-save-competency"
+                    >
+                      {editingCompetency ? "Update Competency" : "Create Competency"}
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Role Mapping Manager Component (placeholder implementation)
+function RoleMappingManager() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Users className="w-5 h-5" />
+          Role Competency Mappings
+        </CardTitle>
+        <CardDescription>
+          Define which competencies are required for each role
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="text-center py-8">
+          <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="font-medium mb-2">Role Mapping Interface</h3>
+          <p className="text-sm text-muted-foreground">
+            Configure role-specific competency requirements
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Evidence Record Manager Component (placeholder implementation)
+function EvidenceRecordManager() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="w-5 h-5" />
+          Evidence Records
+        </CardTitle>
+        <CardDescription>
+          Manage competency evidence and verification records
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="text-center py-8">
+          <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="font-medium mb-2">Evidence Management</h3>
+          <p className="text-sm text-muted-foreground">
+            Track and verify competency evidence
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Competency Analytics Component (placeholder implementation)
+function CompetencyAnalytics() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <BarChart3 className="w-5 h-5" />
+          Competency Analytics
+        </CardTitle>
+        <CardDescription>
+          Analyze competency trends and organizational gaps
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="text-center py-8">
+          <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="font-medium mb-2">Analytics Dashboard</h3>
+          <p className="text-sm text-muted-foreground">
+            Competency trends and gap analysis
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // Hierarchical Competency Tree Component
 function CompetencyTree({ competencies, onEdit, onDelete, onReorder }: {
   competencies: Competency[];
