@@ -56,6 +56,7 @@ function Router() {
       <Route path="/analytics" component={Home} />
       <Route path="/reports" component={Home} />
       <Route path="/settings" component={Home} />
+      <Route path="/webhooks" component={Home} />
       <Route component={NotFound} />
     </Switch>
   );

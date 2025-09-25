@@ -19,6 +19,7 @@ import {
   Zap,
   Route,
   Brain,
+  Webhook,
 } from "lucide-react";
 import { NotificationBadge } from "./NotificationCenter";
 import Dashboard from "./Dashboard";
@@ -40,8 +41,9 @@ import TrainingMatrixDashboard from "./TrainingMatrixDashboard";
 import LearningPathsManagement from "./LearningPathsManagement";
 import AutomationEngine from "./AutomationEngine";
 import AdvancedAnalyticsDashboard from "./AdvancedAnalyticsDashboard";
+import WebhookConfiguration from "../pages/WebhookConfiguration";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine";
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks";
 
 export default function Layout() {
   const [location] = useLocation();
@@ -68,6 +70,7 @@ export default function Layout() {
     if (location === "/settings") return "settings";
     if (location === "/competency-management") return "competency-management";
     if (location === "/training-matrix") return "training-matrix";
+    if (location === "/webhooks") return "webhooks";
     return "dashboard";
   };
 
@@ -103,6 +106,7 @@ export default function Layout() {
     { id: "automation-engine", label: "Automation Engine", icon: Zap, component: AutomationEngine },
     { id: "competency-management", label: "Competency Management", icon: Layers, component: CompetencyManagement },
     { id: "training-matrix", label: "Training Matrix", icon: BarChart3, component: TrainingMatrixDashboard },
+    { id: "webhooks", label: "Webhook Configuration", icon: Webhook, component: WebhookConfiguration },
     { id: "reports", label: "Reports", icon: BarChart3, component: Reports },
     { id: "settings", label: "Company Settings", icon: Settings, component: CompanySettings },
   ];
