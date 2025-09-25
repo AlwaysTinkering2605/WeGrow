@@ -47,6 +47,12 @@ import {
   insertRelativeDueDateConfigSchema,
   insertRecurringAssignmentSchema,
   insertAutomationRunLogSchema,
+  // Advanced Analytics schemas
+  insertAnalyticsMetricSchema,
+  insertAnalyticsDashboardSchema,
+  insertAnalyticsReportSchema,
+  insertPerformanceSnapshotSchema,
+  insertLearningInsightSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -4719,6 +4725,188 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error fetching failed automation logs:", error);
       res.status(500).json({ message: "Failed to fetch failed automation logs" });
+    }
+  });
+
+  // =====================================================================
+  // ADVANCED ANALYTICS API ENDPOINTS - Phase 3 Implementation
+  // =====================================================================
+
+  // Analytics Metrics
+  app.get('/api/analytics/metrics', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const filters = {
+        metricType: req.query.metricType as string,
+        dimension: req.query.dimension as string,
+        dimensionId: req.query.dimensionId as string,
+        aggregationLevel: req.query.aggregationLevel as string,
+        startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+        endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+        limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+      };
+
+      const metrics = await storage.getAnalyticsMetrics(filters);
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching analytics metrics:", error);
+      res.status(500).json({ message: "Failed to fetch analytics metrics" });
+    }
+  });
+
+  // Performance Snapshots
+  app.get('/api/analytics/performance/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      const targetUserId = req.params.userId;
+      
+      // Check permissions: users can view their own data, supervisors/leadership can view all
+      if (currentUser?.id !== targetUserId && currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied." });
+      }
+
+      const date = req.query.date ? new Date(req.query.date as string) : undefined;
+      const snapshot = await storage.getUserPerformanceSnapshot(targetUserId, date);
+      res.json(snapshot || null);
+    } catch (error) {
+      console.error("Error fetching performance snapshot:", error);
+      res.status(500).json({ message: "Failed to fetch performance snapshot" });
+    }
+  });
+
+  app.get('/api/analytics/performance/:userId/history', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      const targetUserId = req.params.userId;
+      
+      if (currentUser?.id !== targetUserId && currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied." });
+      }
+
+      const days = req.query.days ? parseInt(req.query.days as string) : 30;
+      const history = await storage.getUserPerformanceHistory(targetUserId, days);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching performance history:", error);
+      res.status(500).json({ message: "Failed to fetch performance history" });
+    }
+  });
+
+  // Learning Insights
+  app.get('/api/analytics/insights/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      const targetUserId = req.params.userId;
+      
+      if (currentUser?.id !== targetUserId && currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied." });
+      }
+
+      const unreadOnly = req.query.unreadOnly === 'true';
+      const insights = await storage.getUserLearningInsights(targetUserId, unreadOnly);
+      res.json(insights);
+    } catch (error) {
+      console.error("Error fetching learning insights:", error);
+      res.status(500).json({ message: "Failed to fetch learning insights" });
+    }
+  });
+
+  app.patch('/api/analytics/insights/:insightId/read', isAuthenticated, async (req: any, res) => {
+    try {
+      const insightId = req.params.insightId;
+      await storage.markInsightAsRead(insightId);
+      res.json({ message: "Insight marked as read" });
+    } catch (error) {
+      console.error("Error marking insight as read:", error);
+      res.status(500).json({ message: "Failed to mark insight as read" });
+    }
+  });
+
+  // Engagement Metrics (Aggregated analytics)
+  app.get('/api/analytics/engagement', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const filters = {
+        userId: req.query.userId as string,
+        teamId: req.query.teamId as string,
+        startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+        endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+      };
+
+      const metrics = await storage.getEngagementMetrics(filters);
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching engagement metrics:", error);
+      res.status(500).json({ message: "Failed to fetch engagement metrics" });
+    }
+  });
+
+  app.get('/api/analytics/performance-metrics', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const filters = {
+        userId: req.query.userId as string,
+        teamId: req.query.teamId as string,
+        startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+        endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+      };
+
+      const metrics = await storage.getPerformanceMetrics(filters);
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching performance metrics:", error);
+      res.status(500).json({ message: "Failed to fetch performance metrics" });
+    }
+  });
+
+  // Analytics Dashboard Overview (for leadership)
+  app.get('/api/analytics/overview', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      // Aggregate multiple analytics sources for a comprehensive overview
+      const [engagementMetrics, performanceMetrics] = await Promise.all([
+        storage.getEngagementMetrics({}),
+        storage.getPerformanceMetrics({})
+      ]);
+
+      const overview = {
+        engagement: {
+          averageScore: engagementMetrics.reduce((acc, m) => acc + m.engagementScore, 0) / Math.max(engagementMetrics.length, 1),
+          averageCompletion: engagementMetrics.reduce((acc, m) => acc + m.completionRate, 0) / Math.max(engagementMetrics.length, 1),
+          totalPeriods: engagementMetrics.length
+        },
+        performance: {
+          averageScore: performanceMetrics.reduce((acc, m) => acc + m.averageScore, 0) / Math.max(performanceMetrics.length, 1),
+          averageProgress: performanceMetrics.reduce((acc, m) => acc + m.progressRate, 0) / Math.max(performanceMetrics.length, 1),
+          totalPeriods: performanceMetrics.length
+        },
+        insights: {
+          totalGenerated: 0, // Would be calculated from actual insights
+          unreadCount: 0, // Would be calculated from actual insights
+          criticalCount: 0 // Would be calculated from actual insights
+        }
+      };
+
+      res.json(overview);
+    } catch (error) {
+      console.error("Error fetching analytics overview:", error);
+      res.status(500).json({ message: "Failed to fetch analytics overview" });
     }
   });
 

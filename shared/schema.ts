@@ -2334,7 +2334,11 @@ export const analyticsMetrics = pgTable("analytics_metrics", {
   periodStart: timestamp("period_start").notNull(),
   periodEnd: timestamp("period_end").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_analytics_metrics_type_dimension").on(table.metricType, table.dimension),
+  index("idx_analytics_metrics_dimension_id").on(table.dimensionId),
+  index("idx_analytics_metrics_period").on(table.periodStart, table.periodEnd),
+]);
 
 // Analytics Dashboards - Configurable dashboard definitions
 export const analyticsDashboards = pgTable("analytics_dashboards", {
@@ -2380,7 +2384,9 @@ export const performanceSnapshots = pgTable("performance_snapshots", {
   skillMastery: jsonb("skill_mastery"), // Skills and mastery levels
   predictiveInsights: jsonb("predictive_insights"), // ML-generated predictions
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_performance_snapshots_user_date").on(table.userId, table.snapshotDate),
+]);
 
 // Learning Insights - AI-powered learning insights and recommendations
 export const learningInsights = pgTable("learning_insights", {
@@ -2399,18 +2405,14 @@ export const learningInsights = pgTable("learning_insights", {
   isActionTaken: boolean("is_action_taken").default(false),
   validUntil: timestamp("valid_until"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_learning_insights_user").on(table.userId),
+  index("idx_learning_insights_team").on(table.teamId),
+  index("idx_learning_insights_type").on(table.insightType),
+]);
 
-// Analytics Indexes for performance
-export const analyticsMetricsIndexes = [
-  index("idx_analytics_metrics_type_dimension").on(analyticsMetrics.metricType, analyticsMetrics.dimension),
-  index("idx_analytics_metrics_dimension_id").on(analyticsMetrics.dimensionId),
-  index("idx_analytics_metrics_period").on(analyticsMetrics.periodStart, analyticsMetrics.periodEnd),
-  index("idx_performance_snapshots_user_date").on(performanceSnapshots.userId, performanceSnapshots.snapshotDate),
-  index("idx_learning_insights_user").on(learningInsights.userId),
-  index("idx_learning_insights_team").on(learningInsights.teamId),
-  index("idx_learning_insights_type").on(learningInsights.insightType),
-];
+// Analytics tables will have indexes defined inline
+// Individual indexes are defined within table declarations for proper syntax
 
 // Analytics Relations
 export const analyticsMetricsRelations = relations(analyticsMetrics, ({ one }) => ({
