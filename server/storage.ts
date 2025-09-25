@@ -84,11 +84,11 @@ import {
   type Badge,
   type UserBadge,
   type TrainingRequirement,
-  // Phase 2: Gamification types
-  type UserPoints,
-  type PointTransaction,
-  type Achievement,
-  type UserAchievement,
+  // Phase 2: Gamification types (using table names)
+  userPoints,
+  pointTransactions, 
+  achievements,
+  userAchievements,
   type PdpCourseLink,
   // Learning path types
   type LearningPath,
@@ -158,6 +158,8 @@ import {
   type InsertLearningInsight,
   insertTeamSchema,
   updateUserProfileSchema,
+  // Missing insert schemas
+  insertAchievementSchema,
   // Enhanced Competency Management types
   type AuditTrailFilter,
   type ComplianceReportConfig,
@@ -577,7 +579,7 @@ export interface IStorage {
   // Achievement System
   getAllAchievements(): Promise<Achievement[]>;
   getAchievement(achievementId: string): Promise<Achievement | undefined>;
-  createAchievement(achievement: InsertAchievement): Promise<Achievement>;
+  createAchievement(achievement: typeof achievements.$inferInsert): Promise<typeof achievements.$inferSelect>;
   getUserAchievements(userId: string): Promise<Array<{userAchievement: UserAchievement; achievement: Achievement}>>;
   progressAchievement(userId: string, achievementId: string, progress: number): Promise<UserAchievement>;
   checkAchievementCompletion(userId: string, achievementId: string): Promise<UserAchievement | undefined>;
@@ -711,7 +713,7 @@ export class DatabaseStorage implements IStorage {
       const pgError = error as any; // Type assertion for PostgreSQL error
       console.log("[DEBUG] upsertUser - Error occurred:", pgError.message || String(error));
       if (pgError.code === '23505') { // PostgreSQL unique violation
-        console.warn('Unique constraint violation in upsertUser, attempting to find existing user:', error.message);
+        console.warn('Unique constraint violation in upsertUser, attempting to find existing user:', pgError.message);
         
         // Try to find the existing user and update it
         if (userData.email) {
@@ -1314,12 +1316,11 @@ export class DatabaseStorage implements IStorage {
 
   // Enhanced User Profile Management
   async updateUserProfile(userId: string, updates: UserProfileUpdate, updatedByUserId: string): Promise<User> {
-    // Remove role from updates - should be handled separately
-    const { role, ...profileUpdates } = updates;
+    // ProfileUpdates doesn't include role - that's handled separately
     
     const [user] = await db
       .update(users)
-      .set({ ...profileUpdates, updatedAt: new Date() })
+      .set({ ...updates, updatedAt: new Date() })
       .where(eq(users.id, userId))
       .returning();
     return user;
@@ -1603,61 +1604,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLessons(moduleId: string): Promise<Lesson[]> {
-    return await db.select({
-      id: lessons.id,
-      title: lessons.title,
-      description: lessons.description,
-      contentType: lessons.contentType,
-      orderIndex: lessons.orderIndex,
-      estimatedDuration: lessons.estimatedDuration,
-      isRequired: lessons.isRequired,
-      moduleId: lessons.moduleId,
-      vimeoVideoId: lessons.vimeoVideoId,
-      richTextContent: lessons.richTextContent,
-      pdfContentUrl: lessons.pdfContentUrl,
-      resourceUrl: lessons.resourceUrl,
-      type: lessons.type,
-      createdAt: lessons.createdAt,
-    }).from(lessons).where(eq(lessons.moduleId, moduleId)).orderBy(lessons.orderIndex);
+    return await db.select().from(lessons).where(eq(lessons.moduleId, moduleId)).orderBy(lessons.orderIndex);
   }
 
   async getLesson(lessonId: string): Promise<Lesson | undefined> {
-    const [lesson] = await db.select({
-      id: lessons.id,
-      title: lessons.title,
-      description: lessons.description,
-      contentType: lessons.contentType,
-      orderIndex: lessons.orderIndex,
-      estimatedDuration: lessons.estimatedDuration,
-      isRequired: lessons.isRequired,
-      moduleId: lessons.moduleId,
-      vimeoVideoId: lessons.vimeoVideoId,
-      richTextContent: lessons.richTextContent,
-      pdfContentUrl: lessons.pdfContentUrl,
-      resourceUrl: lessons.resourceUrl,
-      type: lessons.type,
-      createdAt: lessons.createdAt,
-    }).from(lessons).where(eq(lessons.id, lessonId));
+    const [lesson] = await db.select().from(lessons).where(eq(lessons.id, lessonId));
     return lesson;
   }
 
   async getDefaultLesson(moduleId: string): Promise<Lesson | undefined> {
-    const [lesson] = await db.select({
-      id: lessons.id,
-      title: lessons.title,
-      description: lessons.description,
-      contentType: lessons.contentType,
-      orderIndex: lessons.orderIndex,
-      estimatedDuration: lessons.estimatedDuration,
-      isRequired: lessons.isRequired,
-      moduleId: lessons.moduleId,
-      vimeoVideoId: lessons.vimeoVideoId,
-      richTextContent: lessons.richTextContent,
-      pdfContentUrl: lessons.pdfContentUrl,
-      resourceUrl: lessons.resourceUrl,
-      type: lessons.type,
-      createdAt: lessons.createdAt,
-    }).from(lessons)
+    const [lesson] = await db.select().from(lessons)
       .where(eq(lessons.moduleId, moduleId))
       .orderBy(lessons.orderIndex)
       .limit(1);
@@ -2270,7 +2226,7 @@ export class DatabaseStorage implements IStorage {
                 .where(
                   and(
                     eq(learningPathEnrollments.userId, userId),
-                    sql`${learningPathEnrollments.learningPathId} = ANY(${competency.linkedLearningPaths})`
+                    sql`${learningPathEnrollments.pathId} = ANY(${competency.linkedLearningPaths})`
                   )
                 );
 
@@ -2317,7 +2273,7 @@ export class DatabaseStorage implements IStorage {
               competencyLibraryId: competency.id,
               previousStatus: currentRecord?.currentStatus || "not_started",
               newStatus,
-              changeReason: `Learning progress sync - ${stepType}`,
+              statusChangeReason: `Learning progress sync - ${stepType}`,
               evidenceType: "learning_path_progress",
               evidenceData: {
                 learningPathId,
@@ -2328,11 +2284,11 @@ export class DatabaseStorage implements IStorage {
               changedBy: userId
             });
 
-            statusUpdates.push(`${competency.title}: ${currentRecord?.currentStatus || "not_started"} → ${newStatus}`);
+            statusUpdates.push(`${competency.competencyName || competency.id}: ${currentRecord?.currentStatus || "not_started"} → ${newStatus}`);
             syncedCompetencies++;
 
             // Log audit trail for ISO compliance
-            console.log(`[AUDIT] Training Matrix sync - User ${userId}, Competency ${competency.id} (${competency.title}): ${currentRecord?.currentStatus || "not_started"} → ${newStatus} via ${stepType}`);
+            console.log(`[AUDIT] Training Matrix sync - User ${userId}, Competency ${competency.id} (${competency.competencyName || 'Unknown'}): ${currentRecord?.currentStatus || "not_started"} → ${newStatus} via ${stepType}`);
           }
         } catch (error: any) {
           errors.push(`Failed to sync competency ${competency.id}: ${error.message}`);
@@ -4249,7 +4205,7 @@ export class DatabaseStorage implements IStorage {
       try {
         const syncResult = await this.syncTrainingMatrixOnLearningProgress(
           completedEnrollment.userId,
-          completedEnrollment.learningPathId,
+          completedEnrollment.pathId,
           'path_completion',
           { completed: true }
         );
@@ -4378,7 +4334,7 @@ export class DatabaseStorage implements IStorage {
       if (enrollment) {
         const syncResult = await this.syncTrainingMatrixOnLearningProgress(
           enrollment.userId,
-          enrollment.learningPathId,
+          enrollment.pathId,
           'lesson', // Step completion treated as lesson progress
           { score, completed: true }
         );
@@ -5983,7 +5939,7 @@ export class DatabaseStorage implements IStorage {
     return achievement;
   }
 
-  async createAchievement(achievement: InsertAchievement): Promise<Achievement> {
+  async createAchievement(achievement: typeof achievements.$inferInsert): Promise<typeof achievements.$inferSelect> {
     const [newAchievement] = await db.insert(achievements).values(achievement).returning();
     return newAchievement;
   }
