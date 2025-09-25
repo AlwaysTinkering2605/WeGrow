@@ -410,7 +410,7 @@ export default function PathProgressVisualization({
                         step.status === 'locked' ? 'bg-gray-100' :
                         'bg-gray-100'
                       }`}>
-                        {getStepIcon(step.stepType, step.status)}
+                        {getStepIcon(step.stepType, step.status || 'not_started')}
                       </div>
                     </div>
                     

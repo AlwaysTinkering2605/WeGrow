@@ -1420,22 +1420,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You don't have permission to access this profile" });
       }
       
-      // For now, return mock data until storage is fully fixed
+      // Get real user data for adaptive learning profile
+      const [userCompetencies, learningPathEnrollments] = await Promise.all([
+        storage.getUserCompetencies(userId),
+        storage.getLearningPathEnrollments(userId)
+      ]);
+      
+      // Calculate performance metrics from real data
+      const completedEnrollments = learningPathEnrollments.filter(e => e.enrollmentStatus === 'completed');
+      const inProgressEnrollments = learningPathEnrollments.filter(e => e.enrollmentStatus === 'in_progress');
+      const totalEnrollments = learningPathEnrollments.length;
+      
+      // Calculate completion rate
+      const completionRate = totalEnrollments > 0 ? (completedEnrollments.length / totalEnrollments) * 100 : 0;
+      
+      // Calculate average progress for in-progress enrollments
+      const averageProgress = inProgressEnrollments.length > 0 
+        ? inProgressEnrollments.reduce((sum, e) => sum + (e.progress || 0), 0) / inProgressEnrollments.length
+        : 0;
+      
+      // Analyze competencies for strengths and development areas
+      const strongCompetencies: string[] = [];
+      const developmentAreas: string[] = [];
+      
+      userCompetencies.forEach((uc: any) => {
+        if (uc.competency && uc.currentLevel && uc.targetLevel) {
+          if (uc.currentLevel >= uc.targetLevel) {
+            strongCompetencies.push(uc.competency.name);
+          } else if (uc.currentLevel < uc.targetLevel * 0.7) {
+            developmentAreas.push(uc.competency.name);
+          }
+        }
+      });
+      
+      // Calculate learning velocity (enrollments in last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const recentEnrollments = learningPathEnrollments.filter(e => 
+        new Date(e.enrolledAt) >= thirtyDaysAgo
+      ).length;
+      
+      const learningVelocity = recentEnrollments / 30; // enrollments per day
+      
+      // Calculate engagement level based on active enrollments
+      const activeEnrollmentRatio = inProgressEnrollments.length / Math.max(totalEnrollments, 1);
+      const engagementLevel = Math.min(100, activeEnrollmentRatio * 100 + (averageProgress * 0.5));
+      
+      // Calculate consistency score based on regular activity
+      const consistencyScore = Math.min(100, 
+        (completedEnrollments.length * 20) + // 20 points per completion
+        (averageProgress * 0.8) + // progress contribution
+        (recentEnrollments * 10) // recent activity bonus
+      );
+      
       const profile = {
         userId: userId,
-        learningStyle: 'visual',
-        preferredPace: 'medium',
-        difficultyPreference: 'moderate',
-        availableTime: 300,
-        strongCompetencies: ['communication', 'teamwork'],
-        developmentAreas: ['technical_skills', 'leadership'],
-        careerGoals: ['team_lead', 'project_management'],
+        learningStyle: 'visual', // Default - can be enhanced later with user preferences
+        preferredPace: 'medium', // Default - can be enhanced later
+        difficultyPreference: 'moderate', // Default - can be enhanced later
+        availableTime: 300, // Default 5 hours per week
+        strongCompetencies: strongCompetencies.slice(0, 5), // Top 5 strong competencies
+        developmentAreas: developmentAreas.slice(0, 5), // Top 5 development areas
+        careerGoals: ['professional_development'], // Default - can be enhanced later
         performanceMetrics: {
-          averageScore: 78,
-          completionRate: 85,
-          engagementLevel: 92,
-          consistencyScore: 73,
-          learningVelocity: 1.2,
+          averageScore: Math.round(averageProgress),
+          completionRate: Math.round(completionRate),
+          engagementLevel: Math.round(engagementLevel),
+          consistencyScore: Math.round(consistencyScore),
+          learningVelocity: Math.round(learningVelocity * 100) / 100,
         },
       };
       
@@ -1482,57 +1535,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You don't have permission to access these recommendations" });
       }
       
-      // Generate intelligent recommendations based on user performance
-      const recommendations = [
-        {
-          id: `rec-${Date.now()}-1`,
-          type: 'learning_path',
-          title: 'Improve Communication Skills',
-          description: 'Enhance your communication effectiveness through structured learning',
-          reasoning: 'Based on recent feedback and assessment scores, developing communication skills will help you become more effective in team collaboration.',
-          confidence: 88,
-          priority: 'high',
-          estimatedTime: 120,
+      // Generate intelligent recommendations based on real user performance data
+      const [
+        userCompetencies, 
+        learningPathEnrollments, 
+        gapAnalysis, 
+        availableLearningPaths
+      ] = await Promise.all([
+        storage.getUserCompetencies(userId),
+        storage.getLearningPathEnrollments(userId),
+        storage.getCompetencyGapAnalysis(userId),
+        storage.getAllLearningPaths()
+      ]);
+      
+      const recommendations = [];
+      const timestamp = Date.now();
+      
+      // 1. Competency gap-based recommendations
+      if (gapAnalysis.gapDetails && gapAnalysis.gapDetails.length > 0) {
+        gapAnalysis.gapDetails.slice(0, 3).forEach((gap: any, index: number) => {
+          const gapSeverity = gap.gap || 0;
+          const priority = gapSeverity > 2 ? 'high' : gapSeverity > 1 ? 'medium' : 'low';
+          const confidence = Math.min(95, 70 + (gapSeverity * 10));
+          
+          recommendations.push({
+            id: `rec-gap-${timestamp}-${index}`,
+            type: 'learning_path',
+            title: `Develop ${gap.competency.name}`,
+            description: `Targeted learning to improve your ${gap.competency.name.toLowerCase()} competency`,
+            reasoning: `You currently have level ${gap.currentLevel || 0} but need level ${gap.requiredLevel || 0} for your role. Bridging this ${gapSeverity.toFixed(1)}-point gap is critical for your development.`,
+            confidence,
+            priority,
+            estimatedTime: Math.round(gapSeverity * 30 + 60), // More time for bigger gaps
+            pathId: gap.recommendedPaths?.[0], // Use first recommended path if available
+            adaptations: {
+              adjustedDifficulty: gapSeverity > 2 ? 'moderate' : 'easier',
+              adjustedPace: priority === 'high' ? 'medium' : 'slow',
+              prerequisiteReview: gap.currentLevel === 0,
+            },
+            metadata: { 
+              source: 'competency_gap_analysis',
+              competencyId: gap.competency.id,
+              gapSeverity: gapSeverity
+            }
+          });
+        });
+      }
+      
+      // 2. Incomplete enrollment recommendations
+      const stuckEnrollments = learningPathEnrollments.filter(e => 
+        e.enrollmentStatus === 'in_progress' && 
+        (e.progress || 0) < 20 &&
+        new Date(e.enrolledAt) < new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Stuck for > 1 week
+      );
+      
+      stuckEnrollments.slice(0, 2).forEach((enrollment, index) => {
+        recommendations.push({
+          id: `rec-stuck-${timestamp}-${index}`,
+          type: 'review',
+          title: `Resume Learning Path: ${enrollment.pathTitle || 'Learning Path'}`,
+          description: 'Get back on track with your learning journey',
+          reasoning: `You started this learning path ${Math.ceil((Date.now() - new Date(enrollment.enrolledAt).getTime()) / (24 * 60 * 60 * 1000))} days ago but progress has stalled at ${Math.round(enrollment.progress || 0)}%. A refresher might help you regain momentum.`,
+          confidence: 85,
+          priority: 'medium',
+          estimatedTime: 30,
+          pathId: enrollment.pathId,
+          adaptations: {
+            adjustedDifficulty: 'easier',
+            adjustedPace: 'slow',
+            prerequisiteReview: true,
+          },
+          metadata: { 
+            source: 'stalled_enrollment',
+            enrollmentId: enrollment.id
+          }
+        });
+      });
+      
+      // 3. Performance-based recommendations
+      const competenciesNeedingReinforcement = userCompetencies.filter((uc: any) => 
+        uc.currentLevel > 0 && 
+        uc.currentLevel < (uc.targetLevel || 3) * 0.8 &&
+        uc.competency
+      );
+      
+      competenciesNeedingReinforcement.slice(0, 2).forEach((comp: any, index) => {
+        const improvementNeeded = (comp.targetLevel || 3) - comp.currentLevel;
+        recommendations.push({
+          id: `rec-reinforce-${timestamp}-${index}`,
+          type: 'course',
+          title: `Strengthen ${comp.competency.name}`,
+          description: `Targeted practice to reinforce your ${comp.competency.name.toLowerCase()} skills`,
+          reasoning: `Your current level (${comp.currentLevel}) is approaching your target (${comp.targetLevel || 3}), but some reinforcement will ensure you maintain this competency.`,
+          confidence: 75,
+          priority: 'low',
+          estimatedTime: Math.round(improvementNeeded * 20 + 30),
           adaptations: {
             adjustedDifficulty: 'moderate',
             adjustedPace: 'medium',
             prerequisiteReview: false,
           },
-          metadata: { source: 'competency_gap_analysis' }
-        },
-        {
-          id: `rec-${Date.now()}-2`,
-          type: 'review',
-          title: 'Practice Safety Protocols',
-          description: 'Review and practice essential safety procedures',
-          reasoning: 'Your recent quiz scores in safety topics suggest additional practice would be beneficial.',
-          confidence: 92,
-          priority: 'high',
-          estimatedTime: 45,
-          adaptations: {
-            adjustedDifficulty: 'easier',
-            prerequisiteReview: true,
-          },
-          metadata: { source: 'performance_analysis' }
-        },
-        {
-          id: `rec-${Date.now()}-3`,
-          type: 'course',
-          title: 'Advanced Cleaning Techniques',
-          description: 'Learn specialized cleaning methods for challenging situations',
-          reasoning: 'Your strong performance in basic cleaning suggests you\'re ready for advanced techniques.',
-          confidence: 75,
-          priority: 'medium',
-          estimatedTime: 180,
-          adaptations: {
-            adjustedDifficulty: 'harder',
-            adjustedPace: 'fast',
-          },
-          metadata: { source: 'progression_algorithm' }
-        }
-      ];
+          metadata: { 
+            source: 'competency_reinforcement',
+            competencyId: comp.competencyId
+          }
+        });
+      });
       
-      res.json(recommendations);
+      // 4. If no specific gaps, suggest general development
+      if (recommendations.length === 0) {
+        recommendations.push({
+          id: `rec-general-${timestamp}`,
+          type: 'learning_path',
+          title: 'Continue Your Learning Journey',
+          description: 'Explore new areas to enhance your professional development',
+          reasoning: 'Your competencies are well-developed! This is a great time to explore new learning opportunities and expand your skill set.',
+          confidence: 60,
+          priority: 'low',
+          estimatedTime: 90,
+          adaptations: {
+            adjustedDifficulty: 'moderate',
+            adjustedPace: 'medium',
+            prerequisiteReview: false,
+          },
+          metadata: { source: 'general_development' }
+        });
+      }
+      
+      // Sort recommendations by priority and confidence
+      recommendations.sort((a, b) => {
+        const priorityOrder = { high: 3, medium: 2, low: 1 };
+        if (priorityOrder[a.priority as keyof typeof priorityOrder] !== priorityOrder[b.priority as keyof typeof priorityOrder]) {
+          return priorityOrder[b.priority as keyof typeof priorityOrder] - priorityOrder[a.priority as keyof typeof priorityOrder];
+        }
+        return b.confidence - a.confidence;
+      });
+      
+      res.json(recommendations.slice(0, 5)); // Return top 5 recommendations
     } catch (error) {
       console.error("Error fetching adaptive recommendations:", error);
       res.status(500).json({ message: "Failed to fetch adaptive recommendations" });
