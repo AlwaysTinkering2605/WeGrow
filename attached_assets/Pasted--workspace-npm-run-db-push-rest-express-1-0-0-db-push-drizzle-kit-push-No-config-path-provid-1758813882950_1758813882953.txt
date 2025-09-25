@@ -1,0 +1,78 @@
+~/workspace$ npm run db:push
+
+> rest-express@1.0.0 db:push
+> drizzle-kit push
+
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/home/runner/workspace/drizzle.config.ts'
+Using 'pg' driver for database querying
+[✓] Pulling schema from database...
++ achievements table will be created
++ adaptive_learning_profiles table will be created
++ adaptive_recommendations table will be created
++ analytics_dashboards table will be created
++ analytics_metrics table will be created
++ analytics_reports table will be created
++ competency_evidence_records table will be created
++ competency_status_history table will be created
++ learning_insights table will be created
++ performance_snapshots table will be created
++ point_transactions table will be created
++ recurring_assignments table will be created
++ relative_due_date_configs table will be created
++ user_achievements table will be created
++ user_points table will be created
+--- all table conflicts resolved ---
+
+
++ description column will be created
+
++ metadata column will be created
+--- all columns conflicts in user_badges table resolved ---
+
+
++ image_url column will be created
+
++ badge_type column will be created
+
++ points_required column will be created
+
++ updated_at column will be created
+--- all columns conflicts in badges table resolved ---
+
+ Warning  Found data-loss statements:
+· You're about to change criteria column type from text to jsonb with 1 items
+· You're about to add not-null badge_type column without default value, which contains 1 items
+· You're about to delete icon_url column in badges table with 1 items
+· You're about to delete icon_key column in badges table with 1 items
+· You're about to delete color column in badges table with 1 items
+
+THIS ACTION WILL CAUSE DATA LOSS AND CANNOT BE REVERTED
+
+Do you still want to push changes?
+error: column "criteria" cannot be cast automatically to type jsonb
+    at /home/runner/workspace/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Object.query (/home/runner/workspace/node_modules/drizzle-kit/bin.cjs:66575:26)
+    at async pgPush (/home/runner/workspace/node_modules/drizzle-kit/bin.cjs:70117:13)
+    at async Object.handler (/home/runner/workspace/node_modules/drizzle-kit/bin.cjs:79124:9)
+    at async run (/home/runner/workspace/node_modules/drizzle-kit/bin.cjs:78381:7) {
+  length: 183,
+  severity: 'ERROR',
+  code: '42804',
+  detail: undefined,
+  hint: 'You might need to specify "USING criteria::jsonb".',
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'tablecmds.c',
+  line: '12561',
+  routine: 'ATPrepAlterColumnType'
+}
+~/workspace$ ^C

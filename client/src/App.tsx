@@ -53,6 +53,7 @@ function Router() {
       <Route path="/training-matrix" component={Home} />
       <Route path="/learning-paths" component={Home} />
       <Route path="/automation-engine" component={Home} />
+      <Route path="/analytics" component={Home} />
       <Route path="/reports" component={Home} />
       <Route path="/settings" component={Home} />
       <Route component={NotFound} />

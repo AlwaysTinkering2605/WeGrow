@@ -2338,6 +2338,8 @@ export const analyticsMetrics = pgTable("analytics_metrics", {
   index("idx_analytics_metrics_type_dimension").on(table.metricType, table.dimension),
   index("idx_analytics_metrics_dimension_id").on(table.dimensionId),
   index("idx_analytics_metrics_period").on(table.periodStart, table.periodEnd),
+  index("idx_analytics_metrics_composite_query").on(table.metricType, table.dimension, table.aggregationLevel, table.periodStart),
+  index("idx_analytics_metrics_dimension_period").on(table.dimensionId, table.periodStart),
 ]);
 
 // Analytics Dashboards - Configurable dashboard definitions
@@ -2351,7 +2353,11 @@ export const analyticsDashboards = pgTable("analytics_dashboards", {
   filters: jsonb("filters"), // Default filters
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_analytics_dashboards_user").on(table.userId),
+  index("idx_analytics_dashboards_public").on(table.isPublic),
+  index("idx_analytics_dashboards_created").on(table.createdAt),
+]);
 
 // Analytics Reports - Generated reports and insights
 export const analyticsReports = pgTable("analytics_reports", {
@@ -2367,7 +2373,12 @@ export const analyticsReports = pgTable("analytics_reports", {
   schedule: jsonb("schedule"), // Cron-like schedule configuration
   generatedAt: timestamp("generated_at").defaultNow(),
   validUntil: timestamp("valid_until"), // Report expiry
-});
+}, (table) => [
+  index("idx_analytics_reports_generated_by").on(table.generatedBy),
+  index("idx_analytics_reports_type").on(table.reportType),
+  index("idx_analytics_reports_generated_at").on(table.generatedAt),
+  index("idx_analytics_reports_scheduled").on(table.isScheduled),
+]);
 
 // Performance Snapshots - Point-in-time performance captures
 export const performanceSnapshots = pgTable("performance_snapshots", {
@@ -2386,6 +2397,7 @@ export const performanceSnapshots = pgTable("performance_snapshots", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("idx_performance_snapshots_user_date").on(table.userId, table.snapshotDate),
+  index("idx_performance_snapshots_date").on(table.snapshotDate),
 ]);
 
 // Learning Insights - AI-powered learning insights and recommendations
@@ -2409,6 +2421,8 @@ export const learningInsights = pgTable("learning_insights", {
   index("idx_learning_insights_user").on(table.userId),
   index("idx_learning_insights_team").on(table.teamId),
   index("idx_learning_insights_type").on(table.insightType),
+  index("idx_learning_insights_user_created").on(table.userId, table.createdAt),
+  index("idx_learning_insights_team_created").on(table.teamId, table.createdAt),
 ]);
 
 // Analytics tables will have indexes defined inline
