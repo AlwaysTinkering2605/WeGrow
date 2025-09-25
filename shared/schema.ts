@@ -2562,3 +2562,100 @@ export type AnalyticsPerformanceHistoryQuery = z.infer<typeof analyticsPerforman
 export type AnalyticsInsightsQuery = z.infer<typeof analyticsInsightsQuerySchema>;
 export type AnalyticsEngagementQuery = z.infer<typeof analyticsEngagementQuerySchema>;
 export type AnalyticsPerformanceMetricsQuery = z.infer<typeof analyticsPerformanceMetricsQuerySchema>;
+
+// Department/Team Analytics Types
+export type DepartmentAnalytics = {
+  department: string;
+  teamCount: number;
+  memberCount: number;
+  completionRate: number;
+  activeEnrollments: number;
+  averageProgress: number;
+  totalCompetencies: number;
+  achievedCompetencies: number;
+  overdueTraining: number;
+  topPerformingTeams: Array<{
+    teamId: string;
+    teamName: string;
+    completionRate: number;
+    memberCount: number;
+  }>;
+  recentActivity: Array<{
+    activityType: string;
+    count: number;
+    period: string;
+  }>;
+};
+
+export type TeamAnalytics = {
+  teamId: string;
+  teamName: string;
+  department: string;
+  memberCount: number;
+  completionRate: number;
+  averageProgress: number;
+  activeEnrollments: number;
+  totalCompetencies: number;
+  achievedCompetencies: number;
+  overdueTraining: number;
+  learningVelocity: number;
+  engagementScore: number;
+  members: Array<{
+    userId: string;
+    name: string;
+    role: string;
+    completionRate: number;
+    activeEnrollments: number;
+    lastActivity: Date | null;
+  }>;
+  recentCompletions: Array<{
+    userId: string;
+    userName: string;
+    itemType: string;
+    itemTitle: string;
+    completedAt: Date;
+  }>;
+};
+
+export type DepartmentHierarchyAnalytics = {
+  department: string;
+  teamStructure: Array<{
+    teamId: string;
+    teamName: string;
+    parentTeamId: string | null;
+    level: number;
+    memberCount: number;
+    completionRate: number;
+    children: Array<{
+      teamId: string;
+      teamName: string;
+      memberCount: number;
+      completionRate: number;
+    }>;
+  }>;
+  departmentMetrics: {
+    totalMembers: number;
+    averageCompletionRate: number;
+    totalActiveEnrollments: number;
+    complianceRate: number;
+  };
+};
+
+export type TeamLearningTrends = {
+  teamId: string;
+  teamName: string;
+  trends: Array<{
+    date: string;
+    enrollments: number;
+    completions: number;
+    averageProgress: number;
+    activeUsers: number;
+  }>;
+  insights: Array<{
+    type: 'improvement' | 'concern' | 'strength';
+    title: string;
+    description: string;
+    metric: number;
+    trend: 'up' | 'down' | 'stable';
+  }>;
+};

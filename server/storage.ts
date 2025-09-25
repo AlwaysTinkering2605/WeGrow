@@ -185,7 +185,7 @@ import {
   type AutomationTriggerData,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, ne, sql, inArray, isNull, max } from "drizzle-orm";
+import { eq, and, desc, asc, ne, sql, inArray, isNull, isNotNull, max, gte, lte } from "drizzle-orm";
 
 export interface IStorage {
   // User operations - required for Replit Auth
@@ -556,6 +556,13 @@ export interface IStorage {
   getUserCompetencyProfile(userId: string, filters?: CompetencyProfileFilter): Promise<UserCompetencyProfile>;
   getComplianceMetrics(filters?: ComplianceMetricsFilter): Promise<ComplianceMetrics>;
   getTeamCompetencyOverview(): Promise<TeamCompetencyOverview[]>;
+  
+  // Department/Team Analytics
+  getDepartmentAnalytics(): Promise<DepartmentAnalytics[]>;
+  getTeamAnalytics(teamId?: string): Promise<TeamAnalytics[]>;
+  getDepartmentHierarchyAnalytics(): Promise<DepartmentHierarchyAnalytics[]>;
+  getTeamLearningTrends(teamId: string, days?: number): Promise<TeamLearningTrends>;
+  
   getAuditTrail(filters?: EnhancedAuditTrailFilter): Promise<AuditTrailRecord[]>;
   exportAuditTrail(format: 'csv' | 'json', filters?: EnhancedAuditTrailFilter): Promise<string>;
   generateComplianceReport(config: ComplianceReportConfig): Promise<ComplianceReport>;
@@ -5538,6 +5545,640 @@ export class DatabaseStorage implements IStorage {
       ...team,
       completionRate: team.totalCompetencies > 0 ? (team.achievedCompetencies / team.totalCompetencies) * 100 : 0
     }));
+  }
+  
+  // Department Analytics Implementation
+  async getDepartmentAnalytics(): Promise<Array<{
+    department: string;
+    teamCount: number;
+    memberCount: number;
+    completionRate: number;
+    activeEnrollments: number;
+    averageProgress: number;
+    totalCompetencies: number;
+    achievedCompetencies: number;
+    overdueTraining: number;
+    topPerformingTeams: Array<{
+      teamId: string;
+      teamName: string;
+      completionRate: number;
+      memberCount: number;
+    }>;
+    recentActivity: Array<{
+      activityType: string;
+      count: number;
+      period: string;
+    }>;
+  }>> {
+    // Get department-level aggregated data
+    const departmentData = await db
+      .select({
+        department: teams.department,
+        teamId: teams.id,
+        teamName: teams.name,
+        memberCount: sql<number>`COUNT(DISTINCT ${users.id})`,
+        totalCompetencies: sql<number>`COUNT(${trainingMatrixRecords.id})`,
+        achievedCompetencies: sql<number>`COUNT(CASE WHEN ${trainingMatrixRecords.status} = 'achieved' THEN 1 END)`,
+        overdueCompetencies: sql<number>`COUNT(CASE WHEN ${trainingMatrixRecords.status} = 'overdue' THEN 1 END)`,
+        activeEnrollments: sql<number>`COUNT(CASE WHEN ${enrollments.status} = 'in_progress' THEN 1 END)`,
+        averageProgress: sql<number>`AVG(${enrollments.progress})`
+      })
+      .from(teams)
+      .leftJoin(users, eq(teams.id, users.teamId))
+      .leftJoin(trainingMatrixRecords, eq(users.id, trainingMatrixRecords.userId))
+      .leftJoin(enrollments, eq(users.id, enrollments.userId))
+      .where(and(eq(teams.isActive, true), isNotNull(teams.department)))
+      .groupBy(teams.department, teams.id, teams.name);
+
+    // Get recent activity data
+    const recentActivity = await db
+      .select({
+        department: teams.department,
+        activityType: sql<string>`'completion'`,
+        count: sql<number>`COUNT(*)`,
+        period: sql<string>`'last_30_days'`
+      })
+      .from(enrollments)
+      .leftJoin(users, eq(enrollments.userId, users.id))
+      .leftJoin(teams, eq(users.teamId, teams.id))
+      .where(and(
+        eq(enrollments.status, 'completed'),
+        gte(enrollments.completedAt, sql`NOW() - INTERVAL '30 days'`),
+        isNotNull(teams.department)
+      ))
+      .groupBy(teams.department);
+
+    // Group by department and calculate metrics
+    const departmentMap = new Map<string, any>();
+    
+    departmentData.forEach(row => {
+      if (!row.department) return;
+      
+      if (!departmentMap.has(row.department)) {
+        departmentMap.set(row.department, {
+          department: row.department,
+          teamCount: 0,
+          memberCount: 0,
+          completionRate: 0,
+          activeEnrollments: 0,
+          averageProgress: 0,
+          totalCompetencies: 0,
+          achievedCompetencies: 0,
+          overdueTraining: 0,
+          topPerformingTeams: [],
+          recentActivity: []
+        });
+      }
+      
+      const dept = departmentMap.get(row.department)!;
+      dept.teamCount += 1;
+      dept.memberCount += row.memberCount || 0;
+      dept.totalCompetencies += row.totalCompetencies || 0;
+      dept.achievedCompetencies += row.achievedCompetencies || 0;
+      dept.overdueTraining += row.overdueCompetencies || 0;
+      dept.activeEnrollments += row.activeEnrollments || 0;
+      
+      // Add team performance data
+      const teamCompletionRate = row.totalCompetencies > 0 
+        ? (row.achievedCompetencies / row.totalCompetencies) * 100 
+        : 0;
+        
+      dept.topPerformingTeams.push({
+        teamId: row.teamId,
+        teamName: row.teamName,
+        completionRate: teamCompletionRate,
+        memberCount: row.memberCount || 0
+      });
+    });
+    
+    // Add recent activity data
+    recentActivity.forEach(activity => {
+      if (activity.department && departmentMap.has(activity.department)) {
+        const dept = departmentMap.get(activity.department)!;
+        dept.recentActivity.push({
+          activityType: activity.activityType,
+          count: activity.count,
+          period: activity.period
+        });
+      }
+    });
+    
+    // Calculate final metrics and sort teams
+    return Array.from(departmentMap.values()).map(dept => ({
+      ...dept,
+      completionRate: dept.totalCompetencies > 0 ? (dept.achievedCompetencies / dept.totalCompetencies) * 100 : 0,
+      averageProgress: dept.activeEnrollments > 0 ? (dept.averageProgress || 0) : 0,
+      topPerformingTeams: dept.topPerformingTeams
+        .sort((a: any, b: any) => b.completionRate - a.completionRate)
+        .slice(0, 5) // Top 5 teams per department
+    }));
+  }
+  
+  async getTeamAnalytics(teamId?: string): Promise<Array<{
+    teamId: string;
+    teamName: string;
+    department: string;
+    memberCount: number;
+    completionRate: number;
+    averageProgress: number;
+    activeEnrollments: number;
+    totalCompetencies: number;
+    achievedCompetencies: number;
+    overdueTraining: number;
+    learningVelocity: number;
+    engagementScore: number;
+    members: Array<{
+      userId: string;
+      name: string;
+      role: string;
+      completionRate: number;
+      activeEnrollments: number;
+      lastActivity: Date | null;
+    }>;
+    recentCompletions: Array<{
+      userId: string;
+      userName: string;
+      itemType: string;
+      itemTitle: string;
+      completedAt: Date;
+    }>;
+  }>> {
+    // Build query conditions
+    const whereConditions = [eq(teams.isActive, true)];
+    if (teamId) {
+      whereConditions.push(eq(teams.id, teamId));
+    }
+    
+    // Get team data with member analytics
+    const teamData = await db
+      .select({
+        teamId: teams.id,
+        teamName: teams.name,
+        department: teams.department,
+        userId: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        role: users.role,
+        memberCompetencies: sql<number>`COUNT(${trainingMatrixRecords.id})`,
+        memberAchieved: sql<number>`COUNT(CASE WHEN ${trainingMatrixRecords.status} = 'achieved' THEN 1 END)`,
+        memberOverdue: sql<number>`COUNT(CASE WHEN ${trainingMatrixRecords.status} = 'overdue' THEN 1 END)`,
+        memberActiveEnrollments: sql<number>`COUNT(CASE WHEN ${enrollments.status} = 'in_progress' THEN 1 END)`,
+        memberProgress: sql<number>`AVG(${enrollments.progress})`,
+        lastActivityDate: sql<Date>`MAX(${enrollments.lastAccessedAt})`
+      })
+      .from(teams)
+      .leftJoin(users, eq(teams.id, users.teamId))
+      .leftJoin(trainingMatrixRecords, eq(users.id, trainingMatrixRecords.userId))
+      .leftJoin(enrollments, eq(users.id, enrollments.userId))
+      .where(and(...whereConditions))
+      .groupBy(teams.id, teams.name, teams.department, users.id, users.firstName, users.lastName, users.role)
+      .having(sql`${users.id} IS NOT NULL`);
+
+    // Get recent completions
+    const recentCompletions = await db
+      .select({
+        teamId: teams.id,
+        userId: users.id,
+        userName: sql<string>`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
+        itemType: sql<string>`'learning_path'`,
+        itemTitle: learningPaths.title,
+        completedAt: learningPathEnrollments.completedAt
+      })
+      .from(learningPathEnrollments)
+      .leftJoin(users, eq(learningPathEnrollments.userId, users.id))
+      .leftJoin(teams, eq(users.teamId, teams.id))
+      .leftJoin(learningPaths, eq(learningPathEnrollments.pathId, learningPaths.id))
+      .where(and(
+        teamId ? eq(teams.id, teamId) : sql`1=1`,
+        eq(learningPathEnrollments.enrollmentStatus, 'completed'),
+        gte(learningPathEnrollments.completedAt, sql`NOW() - INTERVAL '30 days'`),
+        isNotNull(learningPathEnrollments.completedAt)
+      ))
+      .orderBy(desc(learningPathEnrollments.completedAt))
+      .limit(20);
+      
+    // Calculate learning velocity (completions in last 30 days vs previous 30 days)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+    
+    const velocityData = await db
+      .select({
+        teamId: teams.id,
+        recentCompletions: sql<number>`COUNT(CASE WHEN ${learningPathEnrollments.completedAt} >= ${thirtyDaysAgo.toISOString()} THEN 1 END)`,
+        previousCompletions: sql<number>`COUNT(CASE WHEN ${learningPathEnrollments.completedAt} >= ${sixtyDaysAgo.toISOString()} AND ${learningPathEnrollments.completedAt} < ${thirtyDaysAgo.toISOString()} THEN 1 END)`
+      })
+      .from(teams)
+      .leftJoin(users, eq(teams.id, users.teamId))
+      .leftJoin(learningPathEnrollments, and(
+        eq(users.id, learningPathEnrollments.userId),
+        eq(learningPathEnrollments.enrollmentStatus, 'completed')
+      ))
+      .where(teamId ? eq(teams.id, teamId) : eq(teams.isActive, true))
+      .groupBy(teams.id);
+
+    // Group data by team
+    const teamMap = new Map<string, any>();
+    
+    teamData.forEach(row => {
+      if (!teamMap.has(row.teamId)) {
+        teamMap.set(row.teamId, {
+          teamId: row.teamId,
+          teamName: row.teamName,
+          department: row.department || 'Unassigned',
+          memberCount: 0,
+          completionRate: 0,
+          averageProgress: 0,
+          activeEnrollments: 0,
+          totalCompetencies: 0,
+          achievedCompetencies: 0,
+          overdueTraining: 0,
+          learningVelocity: 0,
+          engagementScore: 0,
+          members: [],
+          recentCompletions: []
+        });
+      }
+      
+      if (row.userId) {
+        const team = teamMap.get(row.teamId)!;
+        team.memberCount += 1;
+        team.totalCompetencies += row.memberCompetencies || 0;
+        team.achievedCompetencies += row.memberAchieved || 0;
+        team.overdueTraining += row.memberOverdue || 0;
+        team.activeEnrollments += row.memberActiveEnrollments || 0;
+        
+        const memberCompletionRate = row.memberCompetencies > 0 
+          ? (row.memberAchieved / row.memberCompetencies) * 100 
+          : 0;
+          
+        team.members.push({
+          userId: row.userId,
+          name: `${row.firstName || ''} ${row.lastName || ''}`.trim(),
+          role: row.role,
+          completionRate: memberCompletionRate,
+          activeEnrollments: row.memberActiveEnrollments || 0,
+          lastActivity: row.lastActivityDate
+        });
+      }
+    });
+    
+    // Add velocity data
+    velocityData.forEach(velocity => {
+      if (teamMap.has(velocity.teamId)) {
+        const team = teamMap.get(velocity.teamId)!;
+        const recentCount = velocity.recentCompletions || 0;
+        const previousCount = velocity.previousCompletions || 0;
+        
+        // Learning velocity as percentage change
+        team.learningVelocity = previousCount > 0 
+          ? ((recentCount - previousCount) / previousCount) * 100 
+          : recentCount > 0 ? 100 : 0;
+      }
+    });
+    
+    // Add recent completions and calculate final metrics
+    const completionsMap = new Map<string, any[]>();
+    recentCompletions.forEach(completion => {
+      if (!completionsMap.has(completion.teamId)) {
+        completionsMap.set(completion.teamId, []);
+      }
+      completionsMap.get(completion.teamId)!.push({
+        userId: completion.userId,
+        userName: completion.userName,
+        itemType: completion.itemType,
+        itemTitle: completion.itemTitle,
+        completedAt: completion.completedAt
+      });
+    });
+    
+    return Array.from(teamMap.values()).map(team => {
+      // Calculate completion rate
+      team.completionRate = team.totalCompetencies > 0 
+        ? (team.achievedCompetencies / team.totalCompetencies) * 100 
+        : 0;
+      
+      // Calculate average progress from member data
+      const activeMembers = team.members.filter((m: any) => m.activeEnrollments > 0);
+      team.averageProgress = activeMembers.length > 0 
+        ? activeMembers.reduce((sum: number, m: any) => sum + (m.completionRate || 0), 0) / activeMembers.length
+        : 0;
+      
+      // Calculate engagement score (combination of completion rate and activity)
+      const activityScore = Math.min(100, team.learningVelocity + 50); // Normalize velocity to 0-100
+      team.engagementScore = (team.completionRate * 0.7) + (activityScore * 0.3);
+      
+      // Add recent completions
+      team.recentCompletions = completionsMap.get(team.teamId) || [];
+      
+      return team;
+    });
+  }
+  
+  async getDepartmentHierarchyAnalytics(): Promise<Array<{
+    department: string;
+    teamStructure: Array<{
+      teamId: string;
+      teamName: string;
+      parentTeamId: string | null;
+      level: number;
+      memberCount: number;
+      completionRate: number;
+      children: Array<{
+        teamId: string;
+        teamName: string;
+        memberCount: number;
+        completionRate: number;
+      }>;
+    }>;
+    departmentMetrics: {
+      totalMembers: number;
+      averageCompletionRate: number;
+      totalActiveEnrollments: number;
+      complianceRate: number;
+    };
+  }>> {
+    // Get all teams with their hierarchical structure
+    const hierarchyData = await db
+      .select({
+        department: teams.department,
+        teamId: teams.id,
+        teamName: teams.name,
+        parentTeamId: teams.parentTeamId,
+        memberCount: sql<number>`COUNT(DISTINCT ${users.id})`,
+        totalCompetencies: sql<number>`COUNT(${trainingMatrixRecords.id})`,
+        achievedCompetencies: sql<number>`COUNT(CASE WHEN ${trainingMatrixRecords.status} = 'achieved' THEN 1 END)`,
+        activeEnrollments: sql<number>`COUNT(CASE WHEN ${enrollments.status} = 'in_progress' THEN 1 END)`,
+        overdueCompetencies: sql<number>`COUNT(CASE WHEN ${trainingMatrixRecords.status} = 'overdue' THEN 1 END)`
+      })
+      .from(teams)
+      .leftJoin(users, eq(teams.id, users.teamId))
+      .leftJoin(trainingMatrixRecords, eq(users.id, trainingMatrixRecords.userId))
+      .leftJoin(enrollments, eq(users.id, enrollments.userId))
+      .where(and(eq(teams.isActive, true), isNotNull(teams.department)))
+      .groupBy(teams.department, teams.id, teams.name, teams.parentTeamId);
+
+    // Group by department and build hierarchy
+    const departmentMap = new Map<string, any>();
+    
+    hierarchyData.forEach(row => {
+      if (!departmentMap.has(row.department)) {
+        departmentMap.set(row.department, {
+          department: row.department,
+          teamStructure: [],
+          departmentMetrics: {
+            totalMembers: 0,
+            averageCompletionRate: 0,
+            totalActiveEnrollments: 0,
+            complianceRate: 0
+          }
+        });
+      }
+      
+      const dept = departmentMap.get(row.department)!;
+      const completionRate = row.totalCompetencies > 0 
+        ? (row.achievedCompetencies / row.totalCompetencies) * 100 
+        : 0;
+      
+      // Add team data
+      dept.teamStructure.push({
+        teamId: row.teamId,
+        teamName: row.teamName,
+        parentTeamId: row.parentTeamId,
+        level: 0, // Will be calculated below
+        memberCount: row.memberCount || 0,
+        completionRate,
+        children: []
+      });
+      
+      // Accumulate department metrics
+      dept.departmentMetrics.totalMembers += row.memberCount || 0;
+      dept.departmentMetrics.totalActiveEnrollments += row.activeEnrollments || 0;
+    });
+    
+    // Build hierarchical structure and calculate levels
+    return Array.from(departmentMap.values()).map(dept => {
+      const teams = dept.teamStructure;
+      const teamMap = new Map(teams.map((t: any) => [t.teamId, t]));
+      
+      // Calculate levels and build children relationships
+      teams.forEach((team: any) => {
+        if (team.parentTeamId) {
+          const parent = teamMap.get(team.parentTeamId);
+          if (parent) {
+            parent.children.push({
+              teamId: team.teamId,
+              teamName: team.teamName,
+              memberCount: team.memberCount,
+              completionRate: team.completionRate
+            });
+            team.level = (parent.level || 0) + 1;
+          }
+        }
+      });
+      
+      // Calculate department averages
+      const totalTeams = teams.length;
+      if (totalTeams > 0) {
+        dept.departmentMetrics.averageCompletionRate = 
+          teams.reduce((sum: number, t: any) => sum + t.completionRate, 0) / totalTeams;
+        
+        // Compliance rate (teams with >80% completion rate)
+        const compliantTeams = teams.filter((t: any) => t.completionRate >= 80).length;
+        dept.departmentMetrics.complianceRate = (compliantTeams / totalTeams) * 100;
+      }
+      
+      // Sort teams by hierarchy level
+      dept.teamStructure.sort((a: any, b: any) => a.level - b.level);
+      
+      return dept;
+    });
+  }
+  
+  async getTeamLearningTrends(teamId: string, days: number = 30): Promise<{
+    teamId: string;
+    teamName: string;
+    trends: Array<{
+      date: string;
+      enrollments: number;
+      completions: number;
+      averageProgress: number;
+      activeUsers: number;
+    }>;
+    insights: Array<{
+      type: 'improvement' | 'concern' | 'strength';
+      title: string;
+      description: string;
+      metric: number;
+      trend: 'up' | 'down' | 'stable';
+    }>;
+  }> {
+    // Get team basic info
+    const team = await db
+      .select({
+        teamId: teams.id,
+        teamName: teams.name
+      })
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .limit(1);
+      
+    if (team.length === 0) {
+      throw new Error('Team not found');
+    }
+    
+    // Generate daily trends for the specified period
+    const endDate = new Date();
+    const startDate = new Date(endDate.getTime() - days * 24 * 60 * 60 * 1000);
+    
+    // Get daily activity data
+    const dailyTrends = [];
+    const trendsMap = new Map<string, any>();
+    
+    // Initialize all days with zero values
+    for (let i = 0; i < days; i++) {
+      const date = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
+      const dateKey = date.toISOString().split('T')[0];
+      trendsMap.set(dateKey, {
+        date: dateKey,
+        enrollments: 0,
+        completions: 0,
+        averageProgress: 0,
+        activeUsers: 0
+      });
+    }
+    
+    // Get enrollment data
+    const enrollmentTrends = await db
+      .select({
+        date: sql<string>`DATE(${enrollments.enrolledAt})`,
+        enrollments: sql<number>`COUNT(*)`,
+        activeUsers: sql<number>`COUNT(DISTINCT ${enrollments.userId})`
+      })
+      .from(enrollments)
+      .leftJoin(users, eq(enrollments.userId, users.id))
+      .where(and(
+        eq(users.teamId, teamId),
+        gte(enrollments.enrolledAt, startDate.toISOString()),
+        lte(enrollments.enrolledAt, endDate.toISOString())
+      ))
+      .groupBy(sql`DATE(${enrollments.enrolledAt})`);
+    
+    // Get completion data
+    const completionTrends = await db
+      .select({
+        date: sql<string>`DATE(${enrollments.completedAt})`,
+        completions: sql<number>`COUNT(*)`,
+        averageProgress: sql<number>`AVG(${enrollments.progress})`
+      })
+      .from(enrollments)
+      .leftJoin(users, eq(enrollments.userId, users.id))
+      .where(and(
+        eq(users.teamId, teamId),
+        eq(enrollments.status, 'completed'),
+        gte(enrollments.completedAt, startDate.toISOString()),
+        lte(enrollments.completedAt, endDate.toISOString()),
+        isNotNull(enrollments.completedAt)
+      ))
+      .groupBy(sql`DATE(${enrollments.completedAt})`);
+    
+    // Populate trends data
+    enrollmentTrends.forEach(trend => {
+      if (trendsMap.has(trend.date)) {
+        const dayData = trendsMap.get(trend.date)!;
+        dayData.enrollments = trend.enrollments;
+        dayData.activeUsers = Math.max(dayData.activeUsers, trend.activeUsers);
+      }
+    });
+    
+    completionTrends.forEach(trend => {
+      if (trendsMap.has(trend.date)) {
+        const dayData = trendsMap.get(trend.date)!;
+        dayData.completions = trend.completions;
+        dayData.averageProgress = trend.averageProgress || 0;
+      }
+    });
+    
+    // Convert to array and sort by date
+    const trends = Array.from(trendsMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+    
+    // Generate insights based on trends
+    const insights = [];
+    const totalEnrollments = trends.reduce((sum, t) => sum + t.enrollments, 0);
+    const totalCompletions = trends.reduce((sum, t) => sum + t.completions, 0);
+    const completionRate = totalEnrollments > 0 ? (totalCompletions / totalEnrollments) * 100 : 0;
+    
+    // Analyze enrollment trend
+    const firstHalf = trends.slice(0, Math.floor(trends.length / 2));
+    const secondHalf = trends.slice(Math.floor(trends.length / 2));
+    
+    const firstHalfEnrollments = firstHalf.reduce((sum, t) => sum + t.enrollments, 0);
+    const secondHalfEnrollments = secondHalf.reduce((sum, t) => sum + t.enrollments, 0);
+    
+    if (secondHalfEnrollments > firstHalfEnrollments * 1.2) {
+      insights.push({
+        type: 'strength',
+        title: 'Accelerating Learning Adoption',
+        description: `Team enrollment activity has increased by ${Math.round(((secondHalfEnrollments - firstHalfEnrollments) / firstHalfEnrollments) * 100)}% in the recent period`,
+        metric: secondHalfEnrollments,
+        trend: 'up' as const
+      });
+    } else if (secondHalfEnrollments < firstHalfEnrollments * 0.8) {
+      insights.push({
+        type: 'concern',
+        title: 'Declining Learning Activity',
+        description: `Team enrollment activity has decreased by ${Math.round(((firstHalfEnrollments - secondHalfEnrollments) / firstHalfEnrollments) * 100)}% in the recent period`,
+        metric: secondHalfEnrollments,
+        trend: 'down' as const
+      });
+    }
+    
+    // Analyze completion rate
+    if (completionRate >= 80) {
+      insights.push({
+        type: 'strength',
+        title: 'High Completion Rate',
+        description: `Excellent ${Math.round(completionRate)}% completion rate demonstrates strong engagement`,
+        metric: completionRate,
+        trend: 'stable' as const
+      });
+    } else if (completionRate < 50) {
+      insights.push({
+        type: 'concern',
+        title: 'Low Completion Rate',
+        description: `${Math.round(completionRate)}% completion rate suggests learners may need additional support`,
+        metric: completionRate,
+        trend: 'stable' as const
+      });
+    }
+    
+    // Analyze consistency
+    const dailyActiveUsers = trends.filter(t => t.activeUsers > 0).length;
+    const consistencyRate = (dailyActiveUsers / trends.length) * 100;
+    
+    if (consistencyRate >= 70) {
+      insights.push({
+        type: 'strength',
+        title: 'Consistent Daily Engagement',
+        description: `Team members are actively learning on ${Math.round(consistencyRate)}% of days`,
+        metric: consistencyRate,
+        trend: 'stable' as const
+      });
+    } else if (consistencyRate < 40) {
+      insights.push({
+        type: 'improvement',
+        title: 'Irregular Learning Patterns',
+        description: `Learning activity occurs on only ${Math.round(consistencyRate)}% of days - consider structured schedules`,
+        metric: consistencyRate,
+        trend: 'stable' as const
+      });
+    }
+    
+    return {
+      teamId: team[0].teamId,
+      teamName: team[0].teamName,
+      trends,
+      insights
+    };
   }
 
   async getAuditTrail(filters?: EnhancedAuditTrailFilter): Promise<AuditTrailRecord[]> {

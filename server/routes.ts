@@ -643,6 +643,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Department/Team Analytics Endpoints
+  
+  // Get department-level analytics (Leadership only)
+  app.get('/api/analytics/departments', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      
+      // Only leadership can view department-level analytics
+      if (currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const analytics = await storage.getDepartmentAnalytics();
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching department analytics:", error);
+      res.status(500).json({ message: "Failed to fetch department analytics" });
+    }
+  });
+
+  // Get team analytics (Supervisor+ with team access control)
+  app.get('/api/analytics/teams', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      const { teamId } = req.query;
+
+      // Role-based access control
+      if (currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      // Supervisors can only view their own team's analytics, leadership can view all
+      let filteredTeamId;
+      if (currentUser.role === 'supervisor' && teamId) {
+        // Verify supervisor has access to requested team
+        if (currentUser.teamId !== teamId) {
+          return res.status(403).json({ message: "Access denied. You can only view your own team's analytics." });
+        }
+        filteredTeamId = teamId as string;
+      } else if (currentUser.role === 'supervisor') {
+        // Default to supervisor's own team
+        filteredTeamId = currentUser.teamId;
+      } else {
+        // Leadership can view any team or all teams
+        filteredTeamId = teamId as string;
+      }
+
+      const analytics = await storage.getTeamAnalytics(filteredTeamId);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching team analytics:", error);
+      res.status(500).json({ message: "Failed to fetch team analytics" });
+    }
+  });
+
+  // Get specific team analytics by ID (Supervisor+ with team access control)
+  app.get('/api/analytics/teams/:teamId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Role-based access control
+      if (currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      // Supervisors can only view their own team's analytics
+      if (currentUser.role === 'supervisor' && currentUser.teamId !== teamId) {
+        return res.status(403).json({ message: "Access denied. You can only view your own team's analytics." });
+      }
+
+      const analytics = await storage.getTeamAnalytics(teamId);
+      if (analytics.length === 0) {
+        return res.status(404).json({ message: "Team not found or no analytics available" });
+      }
+
+      res.json(analytics[0]); // Return single team analytics
+    } catch (error) {
+      console.error("Error fetching team analytics:", error);
+      res.status(500).json({ message: "Failed to fetch team analytics" });
+    }
+  });
+
+  // Get department hierarchy analytics (Leadership only)
+  app.get('/api/analytics/departments/hierarchy', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await storage.getUser(req.user.claims.sub);
+      
+      // Only leadership can view department hierarchy analytics
+      if (currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const analytics = await storage.getDepartmentHierarchyAnalytics();
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching department hierarchy analytics:", error);
+      res.status(500).json({ message: "Failed to fetch department hierarchy analytics" });
+    }
+  });
+
+  // Get team learning trends (Supervisor+ with team access control)
+  app.get('/api/analytics/teams/:teamId/trends', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const { days } = req.query;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Role-based access control
+      if (currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      // Supervisors can only view their own team's trends
+      if (currentUser.role === 'supervisor' && currentUser.teamId !== teamId) {
+        return res.status(403).json({ message: "Access denied. You can only view your own team's trends." });
+      }
+
+      const daysParam = days ? parseInt(days as string, 10) : 30;
+      if (daysParam < 1 || daysParam > 365) {
+        return res.status(400).json({ message: "Days parameter must be between 1 and 365" });
+      }
+
+      const trends = await storage.getTeamLearningTrends(teamId, daysParam);
+      res.json(trends);
+    } catch (error) {
+      console.error("Error fetching team learning trends:", error);
+      res.status(500).json({ message: "Failed to fetch team learning trends" });
+    }
+  });
+
   // Object Storage endpoints for photo upload
   app.post('/api/objects/upload', isAuthenticated, async (req: any, res) => {
     try {
