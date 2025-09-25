@@ -2455,6 +2455,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const enrollment = await storage.enrollUser(enrollmentData);
       console.log("[DEBUG] Enrollment created successfully:", enrollment);
       
+      // Trigger enrollment notification
+      try {
+        // Fetch course title from database via enrollment's courseVersionId
+        const enrollmentDetail = await storage.getEnrollment(enrollment.id);
+        if (enrollmentDetail?.courseTitle) {
+          // Use the title from the enrollment (joins should provide this)
+          await storage.notifyEnrollment(userId, enrollmentDetail.courseTitle, enrollment.id);
+        } else {
+          // Fallback: fetch course data directly
+          await storage.notifyEnrollment(userId, "Course", enrollment.id);
+        }
+      } catch (notifyError) {
+        console.error("Failed to send enrollment notification:", notifyError);
+      }
+      
       res.json(enrollment);
     } catch (error: any) {
       console.error("[ERROR] Enrollment failed:", error);
@@ -2572,6 +2587,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           completionDate: new Date().toISOString()
         }
       });
+      
+      // Trigger completion and certificate notifications
+      try {
+        // Fetch course title from the enrollment (which includes course details)
+        const enrollmentDetail = await storage.getEnrollment(enrollmentId);
+        const courseTitle = enrollmentDetail?.courseTitle || "Course";
+        
+        await storage.notifyCourseCompletion(userId, courseTitle, enrollmentId);
+        await storage.notifyCertificateIssued(userId, courseTitle, certificate.id);
+      } catch (notifyError) {
+        console.error("Failed to send completion notifications:", notifyError);
+      }
       
       res.json({ enrollment, trainingRecord, certificate });
     } catch (error: any) {
@@ -2721,7 +2748,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Get all badges and check eligibility for each
           const badges = await storage.getBadges();
           for (const badge of badges) {
-            await storage.awardBadgeIfEligible(userId, badge.id, enrollmentId);
+            const awardedBadge = await storage.awardBadgeIfEligible(userId, badge.id, enrollmentId);
+            
+            // Trigger badge notification if awarded
+            if (awardedBadge) {
+              try {
+                await storage.notifyBadgeAwarded(userId, badge.name, badge.id);
+              } catch (notifyError) {
+                console.error("Failed to send badge notification:", notifyError);
+              }
+            }
           }
         } catch (error) {
           console.error("Error checking badge eligibility:", error);
@@ -2844,6 +2880,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If quiz passed, update lesson progress
       if (attempt.passed && attempt.enrollmentId) {
         await storage.updateLessonProgressFromQuiz(attempt.enrollmentId, attempt.quizId, userId);
+      }
+      
+      // Trigger quiz result notification
+      try {
+        // Fetch real lesson title from database
+        const quiz = await storage.getQuizById(attempt.quizId);
+        const lesson = quiz ? await storage.getLesson(quiz.lessonId) : null;
+        const lessonTitle = lesson?.title || "Lesson";
+        const score = attempt.score || 0;
+        
+        if (attempt.passed) {
+          await storage.notifyQuizPassed(userId, lessonTitle, score, attempt.quizId);
+        } else {
+          await storage.notifyQuizFailed(userId, lessonTitle, score, attempt.quizId);
+        }
+      } catch (notifyError) {
+        console.error("Failed to send quiz result notification:", notifyError);
       }
       
       res.json(attempt);

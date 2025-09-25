@@ -260,6 +260,26 @@ export interface IStorage {
   createRecognition(recognition: InsertRecognition): Promise<Recognition>;
   getUserRecognitionStats(userId: string): Promise<{ sent: number; received: number }>;
 
+  // Notification Triggers
+  triggerLMSNotification(userId: string, type: string, title: string, message: string, options?: {
+    priority?: "low" | "medium" | "high" | "urgent";
+    actionUrl?: string;
+    actionLabel?: string;
+    relatedEntityId?: string;
+    relatedEntityType?: string;
+    metadata?: any;
+    expiresAt?: Date;
+  }): Promise<void>;
+  triggerWebhookNotification(userId: string, type: string, data: any): Promise<void>;
+  notifyEnrollment(userId: string, courseTitle: string, enrollmentId: string): Promise<void>;
+  notifyCourseCompletion(userId: string, courseTitle: string, enrollmentId: string): Promise<void>;
+  notifyQuizPassed(userId: string, lessonTitle: string, score: number, quizId: string): Promise<void>;
+  notifyQuizFailed(userId: string, lessonTitle: string, score: number, quizId: string): Promise<void>;
+  notifyCertificateIssued(userId: string, courseTitle: string, certificateId: string): Promise<void>;
+  notifyBadgeAwarded(userId: string, badgeName: string, badgeId: string): Promise<void>;
+  notifyTrainingDue(userId: string, courseTitle: string, dueDate: Date, enrollmentId: string): Promise<void>;
+  notifyTrainingOverdue(userId: string, courseTitle: string, daysPastDue: number, enrollmentId: string): Promise<void>;
+
   // Team Management
   getTeamMembers(userId: string): Promise<User[]>;
   getTeamGoals(userId: string): Promise<Goal[]>;
@@ -1301,6 +1321,242 @@ export class DatabaseStorage implements IStorage {
       sent: sentCount?.count || 0,
       received: receivedCount?.count || 0,
     };
+  }
+
+  // Notification Trigger System for LMS Events
+  async triggerLMSNotification(
+    userId: string,
+    type: string,
+    title: string,
+    message: string,
+    options: {
+      priority?: "low" | "medium" | "high" | "urgent";
+      actionUrl?: string;
+      actionLabel?: string;
+      relatedEntityId?: string;
+      relatedEntityType?: string;
+      metadata?: any;
+      expiresAt?: Date;
+    } = {}
+  ): Promise<void> {
+    try {
+      // Check if user has in-app notifications enabled for this type
+      const [userPreference] = await db
+        .select()
+        .from(notificationPreferences)
+        .where(and(
+          eq(notificationPreferences.userId, userId),
+          eq(notificationPreferences.notificationType, type as any)
+        ));
+
+      const inAppEnabled = userPreference?.inAppEnabled !== false; // Default to true if no preference
+      const webhookEnabled = userPreference?.webhookEnabled === true; // Default to false
+
+      if (inAppEnabled) {
+        // Create in-app notification
+        await db.insert(notifications).values({
+          userId,
+          type: type as any,
+          priority: options.priority || "medium",
+          title,
+          message,
+          actionUrl: options.actionUrl,
+          actionLabel: options.actionLabel,
+          relatedEntityId: options.relatedEntityId,
+          relatedEntityType: options.relatedEntityType,
+          metadata: options.metadata,
+          isRead: false,
+          isArchived: false,
+          expiresAt: options.expiresAt
+        });
+      }
+
+      if (webhookEnabled) {
+        // Trigger webhook notifications (n8n integration)
+        await this.triggerWebhookNotification(userId, type, {
+          title,
+          message,
+          ...options
+        });
+      }
+    } catch (error) {
+      console.error(`Failed to trigger LMS notification for user ${userId}:`, error);
+      // Don't throw - notification failures shouldn't break LMS operations
+    }
+  }
+
+  async triggerWebhookNotification(userId: string, type: string, data: any): Promise<void> {
+    try {
+      // Get webhook configurations for this notification type
+      const webhookConfigs = await db
+        .select()
+        .from(n8nWebhookConfigs)
+        .where(and(
+          eq(n8nWebhookConfigs.userId, userId),
+          eq(n8nWebhookConfigs.eventType, type as any),
+          eq(n8nWebhookConfigs.isActive, true)
+        ));
+
+      for (const config of webhookConfigs) {
+        try {
+          const payload = {
+            event: type,
+            user_id: userId,
+            timestamp: new Date().toISOString(),
+            data
+          };
+
+          // Log webhook attempt
+          await db.insert(webhookExecutionLogs).values({
+            webhookConfigId: config.id,
+            eventType: type as any,
+            payload,
+            status: "pending",
+            attemptCount: 1
+          });
+
+          // In a real implementation, this would make HTTP request to n8n webhook
+          console.log(`Webhook notification triggered for ${type}:`, payload);
+          
+        } catch (webhookError) {
+          console.error(`Webhook notification failed for config ${config.id}:`, webhookError);
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to trigger webhook notifications:`, error);
+    }
+  }
+
+  // Specific LMS event notification triggers
+  async notifyEnrollment(userId: string, courseTitle: string, enrollmentId: string): Promise<void> {
+    await this.triggerLMSNotification(
+      userId,
+      "enrollment_reminder",
+      "New Course Enrollment",
+      `You've been enrolled in ${courseTitle}. Start learning today!`,
+      {
+        priority: "medium",
+        actionUrl: `/learning/courses/${enrollmentId}`,
+        actionLabel: "Start Course",
+        relatedEntityId: enrollmentId,
+        relatedEntityType: "enrollment"
+      }
+    );
+  }
+
+  async notifyCourseCompletion(userId: string, courseTitle: string, enrollmentId: string): Promise<void> {
+    await this.triggerLMSNotification(
+      userId,
+      "course_completion",
+      "Course Completed! 🎉",
+      `Congratulations! You've successfully completed ${courseTitle}.`,
+      {
+        priority: "high",
+        actionUrl: `/learning/certificates`,
+        actionLabel: "View Certificate",
+        relatedEntityId: enrollmentId,
+        relatedEntityType: "enrollment"
+      }
+    );
+  }
+
+  async notifyQuizPassed(userId: string, lessonTitle: string, score: number, quizId: string): Promise<void> {
+    await this.triggerLMSNotification(
+      userId,
+      "quiz_passed",
+      "Quiz Passed! ✅",
+      `Great job! You passed the quiz for "${lessonTitle}" with a score of ${score}%.`,
+      {
+        priority: "medium",
+        relatedEntityId: quizId,
+        relatedEntityType: "quiz",
+        metadata: { score }
+      }
+    );
+  }
+
+  async notifyQuizFailed(userId: string, lessonTitle: string, score: number, quizId: string): Promise<void> {
+    await this.triggerLMSNotification(
+      userId,
+      "quiz_failed",
+      "Quiz Needs Retry",
+      `You scored ${score}% on the quiz for "${lessonTitle}". Review the material and try again.`,
+      {
+        priority: "medium",
+        actionUrl: `/learning/lessons/${lessonTitle}/quiz`,
+        actionLabel: "Retry Quiz",
+        relatedEntityId: quizId,
+        relatedEntityType: "quiz",
+        metadata: { score }
+      }
+    );
+  }
+
+  async notifyCertificateIssued(userId: string, courseTitle: string, certificateId: string): Promise<void> {
+    await this.triggerLMSNotification(
+      userId,
+      "certification_issued",
+      "Certificate Issued! 🏆",
+      `Your certificate for ${courseTitle} has been issued and is ready for download.`,
+      {
+        priority: "high",
+        actionUrl: `/learning/certificates/${certificateId}`,
+        actionLabel: "Download Certificate",
+        relatedEntityId: certificateId,
+        relatedEntityType: "certificate"
+      }
+    );
+  }
+
+  async notifyBadgeAwarded(userId: string, badgeName: string, badgeId: string): Promise<void> {
+    await this.triggerLMSNotification(
+      userId,
+      "badge_awarded",
+      "Badge Earned! 🏅",
+      `Congratulations! You've earned the "${badgeName}" badge.`,
+      {
+        priority: "high",
+        actionUrl: `/profile#badges`,
+        actionLabel: "View Badge",
+        relatedEntityId: badgeId,
+        relatedEntityType: "badge"
+      }
+    );
+  }
+
+  async notifyTrainingDue(userId: string, courseTitle: string, dueDate: Date, enrollmentId: string): Promise<void> {
+    const daysUntilDue = Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    await this.triggerLMSNotification(
+      userId,
+      "training_due",
+      "Training Due Soon ⏰",
+      `${courseTitle} is due in ${daysUntilDue} day${daysUntilDue !== 1 ? 's' : ''}. Complete it to stay on track.`,
+      {
+        priority: daysUntilDue <= 3 ? "high" : "medium",
+        actionUrl: `/learning/courses/${enrollmentId}`,
+        actionLabel: "Continue Course",
+        relatedEntityId: enrollmentId,
+        relatedEntityType: "enrollment",
+        metadata: { dueDate: dueDate.toISOString(), daysUntilDue }
+      }
+    );
+  }
+
+  async notifyTrainingOverdue(userId: string, courseTitle: string, daysPastDue: number, enrollmentId: string): Promise<void> {
+    await this.triggerLMSNotification(
+      userId,
+      "training_overdue",
+      "Training Overdue! ⚠️",
+      `${courseTitle} is ${daysPastDue} day${daysPastDue !== 1 ? 's' : ''} overdue. Please complete it as soon as possible.`,
+      {
+        priority: "urgent",
+        actionUrl: `/learning/courses/${enrollmentId}`,
+        actionLabel: "Complete Now",
+        relatedEntityId: enrollmentId,
+        relatedEntityType: "enrollment",
+        metadata: { daysPastDue }
+      }
+    );
   }
 
   // Team Management
