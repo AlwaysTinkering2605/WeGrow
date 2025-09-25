@@ -73,6 +73,20 @@ export const analyticsDimensionEnum = pgEnum("analytics_dimension", [
   "assessment", "badge", "training_record", "certification"
 ]);
 
+// Notification System enums
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "course_completion", "learning_path_completion", "quiz_passed", "quiz_failed",
+  "certification_issued", "certificate_expiring", "training_due", "training_overdue",
+  "competency_achieved", "badge_awarded", "enrollment_reminder", "meeting_reminder",
+  "goal_deadline", "development_plan_update", "recognition_received", "system_alert"
+]);
+export const notificationPriorityEnum = pgEnum("notification_priority", ["low", "medium", "high", "urgent"]);
+export const notificationChannelEnum = pgEnum("notification_channel", ["in_app", "n8n_webhook", "system"]);
+export const webhookEventTypeEnum = pgEnum("webhook_event_type", [
+  "training_completed", "deadline_approaching", "compliance_alert", "user_milestone", 
+  "course_enrollment", "system_notification", "custom_event"
+]);
+
 // Teams table - formal team structure
 export const teams = pgTable("teams", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2659,3 +2673,137 @@ export type TeamLearningTrends = {
     trend: 'up' | 'down' | 'stable';
   }>;
 };
+
+// Notification System Tables
+
+// Notifications table - in-app notifications
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  type: notificationTypeEnum("type").notNull(),
+  priority: notificationPriorityEnum("priority").default("medium"),
+  title: varchar("title").notNull(),
+  message: text("message").notNull(),
+  actionUrl: varchar("action_url"), // Deep link to relevant page
+  actionLabel: varchar("action_label"), // Label for action button
+  relatedEntityId: varchar("related_entity_id"), // ID of course, goal, etc.
+  relatedEntityType: varchar("related_entity_type"), // "course", "goal", "meeting", etc.
+  metadata: jsonb("metadata"), // Additional data for the notification
+  isRead: boolean("is_read").default(false),
+  readAt: timestamp("read_at"),
+  isArchived: boolean("is_archived").default(false),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at"), // Optional expiry date for notifications
+});
+
+// N8N Webhook Configuration table - stores webhook URLs for different event types
+export const n8nWebhookConfigs = pgTable("n8n_webhook_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(), // Human-readable name for the webhook
+  eventType: webhookEventTypeEnum("event_type").notNull(),
+  webhookUrl: varchar("webhook_url").notNull(),
+  isActive: boolean("is_active").default(true),
+  description: text("description"), // What this webhook does
+  triggerConditions: jsonb("trigger_conditions"), // Conditions that trigger this webhook
+  headers: jsonb("headers"), // Custom headers to send with webhook
+  retryCount: integer("retry_count").default(3),
+  timeoutSeconds: integer("timeout_seconds").default(30),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  lastTriggeredAt: timestamp("last_triggered_at"),
+}, (table) => ({
+  // Unique constraint on event type to prevent duplicate webhooks for same event
+  uniqueEventType: unique().on(table.eventType),
+}));
+
+// Webhook execution logs - track webhook calls for debugging
+export const webhookExecutionLogs = pgTable("webhook_execution_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  webhookConfigId: varchar("webhook_config_id").notNull(),
+  eventType: webhookEventTypeEnum("event_type").notNull(),
+  eventData: jsonb("event_data").notNull(), // The payload sent to webhook
+  httpStatusCode: integer("http_status_code"),
+  responseBody: text("response_body"),
+  responseHeaders: jsonb("response_headers"),
+  errorMessage: text("error_message"),
+  executionTimeMs: integer("execution_time_ms"),
+  isSuccess: boolean("is_success").default(false),
+  retryAttempt: integer("retry_attempt").default(0),
+  triggeredBy: varchar("triggered_by"), // System or user ID that triggered the event
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Notification preferences - user preferences for notifications
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  notificationType: notificationTypeEnum("notification_type").notNull(),
+  inAppEnabled: boolean("in_app_enabled").default(true),
+  webhookEnabled: boolean("webhook_enabled").default(false), // Whether user wants webhook notifications for this type
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  // Prevent duplicate preferences for same user and notification type
+  uniqueUserNotificationType: unique().on(table.userId, table.notificationType),
+}));
+
+// Notification templates - reusable templates for consistent messaging
+export const notificationTemplates = pgTable("notification_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: notificationTypeEnum("type").notNull(),
+  name: varchar("name").notNull(),
+  titleTemplate: varchar("title_template").notNull(), // Can include {{variables}}
+  messageTemplate: text("message_template").notNull(), // Can include {{variables}}
+  actionLabel: varchar("action_label"), // Default action button label
+  priority: notificationPriorityEnum("priority").default("medium"),
+  isActive: boolean("is_active").default(true),
+  variables: text("variables").array(), // List of available variables
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  // Unique constraint on type and name to prevent duplicate templates
+  uniqueTypeName: unique().on(table.type, table.name),
+}));
+
+// Notification Insert Schemas
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ 
+  id: true, 
+  createdAt: true, 
+  readAt: true, 
+  archivedAt: true 
+});
+export const insertN8nWebhookConfigSchema = createInsertSchema(n8nWebhookConfigs).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true, 
+  lastTriggeredAt: true 
+});
+export const insertWebhookExecutionLogSchema = createInsertSchema(webhookExecutionLogs).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export const insertNotificationPreferenceSchema = createInsertSchema(notificationPreferences).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export const insertNotificationTemplateSchema = createInsertSchema(notificationTemplates).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+// Notification Types
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type N8nWebhookConfig = typeof n8nWebhookConfigs.$inferSelect;
+export type InsertN8nWebhookConfig = z.infer<typeof insertN8nWebhookConfigSchema>;
+export type WebhookExecutionLog = typeof webhookExecutionLogs.$inferSelect;
+export type InsertWebhookExecutionLog = z.infer<typeof insertWebhookExecutionLogSchema>;
+export type NotificationPreference = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreference = z.infer<typeof insertNotificationPreferenceSchema>;
+export type NotificationTemplate = typeof notificationTemplates.$inferSelect;
+export type InsertNotificationTemplate = z.infer<typeof insertNotificationTemplateSchema>;

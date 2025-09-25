@@ -20,6 +20,7 @@ import {
   Route,
   Brain,
 } from "lucide-react";
+import { NotificationBadge } from "./NotificationCenter";
 import Dashboard from "./Dashboard";
 import Goals from "./Goals";
 import Development from "./Development";
@@ -221,9 +222,7 @@ export default function Layout() {
               <p className="text-muted-foreground">Here's your progress this week</p>
             </div>
             <div className="flex items-center space-x-3">
-              <Button variant="ghost" size="icon" data-testid="button-notifications">
-                <Bell className="w-5 h-5" />
-              </Button>
+              <NotificationBadge />
               <Button variant="ghost" size="icon" data-testid="button-menu">
                 <ChevronDown className="w-5 h-5" />
               </Button>

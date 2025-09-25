@@ -60,6 +60,12 @@ import {
   insertAnalyticsReportSchema,
   insertPerformanceSnapshotSchema,
   insertLearningInsightSchema,
+  // Notification System schemas
+  insertNotificationSchema,
+  insertN8nWebhookConfigSchema,
+  insertWebhookExecutionLogSchema,
+  insertNotificationPreferenceSchema,
+  insertNotificationTemplateSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -5483,6 +5489,423 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error in real-time learning path optimization:', error);
       res.status(500).json({ message: "Failed to optimize learning path" });
+    }
+  });
+
+  // =====================================================================
+  // NOTIFICATION SYSTEM API ROUTES - Phase 3 Implementation
+  // =====================================================================
+
+  // In-App Notifications
+  app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { isRead, isArchived, type, limit } = req.query;
+      
+      const filters = {
+        isRead: isRead === 'true' ? true : isRead === 'false' ? false : undefined,
+        isArchived: isArchived === 'true' ? true : isArchived === 'false' ? false : undefined,
+        type: type || undefined,
+        limit: limit ? parseInt(limit) : undefined
+      };
+      
+      const notifications = await storage.getUserNotifications(userId, filters);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.get('/api/notifications/count/unread', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const count = await storage.getUnreadNotificationCount(userId);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching unread notification count:", error);
+      res.status(500).json({ message: "Failed to fetch unread notification count" });
+    }
+  });
+
+  app.post('/api/notifications', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership' && user?.role !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Administrative role required." });
+      }
+
+      const validatedNotification = insertNotificationSchema.parse(req.body);
+      const notification = await storage.createNotification(validatedNotification);
+      res.status(201).json(notification);
+    } catch (error) {
+      console.error("Error creating notification:", error);
+      res.status(500).json({ message: "Failed to create notification" });
+    }
+  });
+
+  app.patch('/api/notifications/:id/read', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const notification = await storage.markNotificationAsRead(id, userId);
+      res.json(notification);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  app.patch('/api/notifications/read-all', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.markAllNotificationsAsRead(userId);
+      res.json({ message: "All notifications marked as read" });
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      res.status(500).json({ message: "Failed to mark all notifications as read" });
+    }
+  });
+
+  app.patch('/api/notifications/:id/archive', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const notification = await storage.archiveNotification(id, userId);
+      res.json(notification);
+    } catch (error) {
+      console.error("Error archiving notification:", error);
+      res.status(500).json({ message: "Failed to archive notification" });
+    }
+  });
+
+  // N8N Webhook Configuration (Admin only)
+  app.get('/api/notifications/webhooks', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { activeOnly } = req.query;
+      const configs = await storage.getN8nWebhookConfigs(activeOnly === 'true');
+      res.json(configs);
+    } catch (error) {
+      console.error("Error fetching webhook configurations:", error);
+      res.status(500).json({ message: "Failed to fetch webhook configurations" });
+    }
+  });
+
+  app.post('/api/notifications/webhooks', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const validatedConfig = insertN8nWebhookConfigSchema.parse({
+        ...req.body,
+        createdBy: currentUserId
+      });
+      
+      const config = await storage.createN8nWebhookConfig(validatedConfig);
+      res.status(201).json(config);
+    } catch (error) {
+      console.error("Error creating webhook configuration:", error);
+      res.status(500).json({ message: "Failed to create webhook configuration" });
+    }
+  });
+
+  app.patch('/api/notifications/webhooks/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const config = await storage.updateN8nWebhookConfig(id, updates);
+      res.json(config);
+    } catch (error) {
+      console.error("Error updating webhook configuration:", error);
+      res.status(500).json({ message: "Failed to update webhook configuration" });
+    }
+  });
+
+  app.delete('/api/notifications/webhooks/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      await storage.deleteN8nWebhookConfig(id);
+      res.json({ message: "Webhook configuration deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting webhook configuration:", error);
+      res.status(500).json({ message: "Failed to delete webhook configuration" });
+    }
+  });
+
+  app.post('/api/notifications/webhooks/:id/activate', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const config = await storage.activateWebhookConfig(id);
+      res.json(config);
+    } catch (error) {
+      console.error("Error activating webhook configuration:", error);
+      res.status(500).json({ message: "Failed to activate webhook configuration" });
+    }
+  });
+
+  app.post('/api/notifications/webhooks/:id/deactivate', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const config = await storage.deactivateWebhookConfig(id);
+      res.json(config);
+    } catch (error) {
+      console.error("Error deactivating webhook configuration:", error);
+      res.status(500).json({ message: "Failed to deactivate webhook configuration" });
+    }
+  });
+
+  // Webhook Testing and Execution
+  app.post('/api/notifications/webhooks/test/:eventType', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { eventType } = req.params;
+      const { testData } = req.body;
+      
+      const result = await storage.executeWebhook(eventType, testData || {}, currentUserId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error testing webhook:", error);
+      res.status(500).json({ message: "Failed to test webhook" });
+    }
+  });
+
+  // Webhook Execution Logs
+  app.get('/api/notifications/webhooks/logs', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { webhookConfigId, eventType, isSuccess, startDate, endDate, limit } = req.query;
+      
+      const filters = {
+        webhookConfigId: webhookConfigId || undefined,
+        eventType: eventType || undefined,
+        isSuccess: isSuccess === 'true' ? true : isSuccess === 'false' ? false : undefined,
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
+        limit: limit ? parseInt(limit) : undefined
+      };
+      
+      const logs = await storage.getWebhookExecutionLogs(filters);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching webhook execution logs:", error);
+      res.status(500).json({ message: "Failed to fetch webhook execution logs" });
+    }
+  });
+
+  // Webhook Statistics
+  app.get('/api/notifications/webhooks/:id/stats', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const { days } = req.query;
+      
+      const stats = await storage.getWebhookExecutionStats(id, days ? parseInt(days) : undefined);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching webhook statistics:", error);
+      res.status(500).json({ message: "Failed to fetch webhook statistics" });
+    }
+  });
+
+  // Notification Preferences
+  app.get('/api/notifications/preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const preferences = await storage.getUserNotificationPreferences(userId);
+      res.json(preferences);
+    } catch (error) {
+      console.error("Error fetching notification preferences:", error);
+      res.status(500).json({ message: "Failed to fetch notification preferences" });
+    }
+  });
+
+  app.patch('/api/notifications/preferences/:notificationType', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { notificationType } = req.params;
+      const { inAppEnabled, webhookEnabled } = req.body;
+      
+      const preference = await storage.updateNotificationPreference(userId, notificationType, {
+        inAppEnabled,
+        webhookEnabled
+      });
+      
+      res.json(preference);
+    } catch (error) {
+      console.error("Error updating notification preference:", error);
+      res.status(500).json({ message: "Failed to update notification preference" });
+    }
+  });
+
+  // Notification Templates (Admin only)
+  app.get('/api/notifications/templates', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership' && user?.role !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Administrative role required." });
+      }
+
+      const { type, activeOnly } = req.query;
+      const templates = await storage.getNotificationTemplates(type, activeOnly === 'true');
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching notification templates:", error);
+      res.status(500).json({ message: "Failed to fetch notification templates" });
+    }
+  });
+
+  app.post('/api/notifications/templates', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const validatedTemplate = insertNotificationTemplateSchema.parse({
+        ...req.body,
+        createdBy: currentUserId
+      });
+      
+      const template = await storage.createNotificationTemplate(validatedTemplate);
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating notification template:", error);
+      res.status(500).json({ message: "Failed to create notification template" });
+    }
+  });
+
+  // Event Triggers
+  app.post('/api/notifications/trigger/:eventType', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership' && user?.role !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Administrative role required." });
+      }
+
+      const { eventType } = req.params;
+      const eventData = req.body;
+      
+      const result = await storage.triggerNotificationForEvent(eventType, eventData);
+      res.json(result);
+    } catch (error) {
+      console.error("Error triggering notification event:", error);
+      res.status(500).json({ message: "Failed to trigger notification event" });
+    }
+  });
+
+  // Bulk Operations
+  app.post('/api/notifications/bulk', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership' && user?.role !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Administrative role required." });
+      }
+
+      const { notifications } = req.body;
+      
+      if (!Array.isArray(notifications)) {
+        return res.status(400).json({ message: "Notifications must be an array" });
+      }
+      
+      const validatedNotifications = notifications.map(n => insertNotificationSchema.parse(n));
+      const createdNotifications = await storage.createBulkNotifications(validatedNotifications);
+      
+      res.status(201).json(createdNotifications);
+    } catch (error) {
+      console.error("Error creating bulk notifications:", error);
+      res.status(500).json({ message: "Failed to create bulk notifications" });
+    }
+  });
+
+  app.delete('/api/notifications/cleanup', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const user = await storage.getUser(currentUserId);
+      
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { days } = req.query;
+      const deletedCount = await storage.deleteExpiredNotifications(days ? parseInt(days) : undefined);
+      
+      res.json({ 
+        message: `Successfully deleted ${deletedCount} expired notifications`,
+        deletedCount 
+      });
+    } catch (error) {
+      console.error("Error cleaning up notifications:", error);
+      res.status(500).json({ message: "Failed to clean up notifications" });
     }
   });
 

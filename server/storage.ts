@@ -28,11 +28,6 @@ import {
   badges,
   userBadges,
   trainingRequirements,
-  // Phase 2: Gamification tables
-  userPoints,
-  pointTransactions,
-  achievements,
-  userAchievements,
   pdpCourseLinks,
   // Learning path tables
   learningPaths,
@@ -56,6 +51,12 @@ import {
   analyticsReports,
   performanceSnapshots,
   learningInsights,
+  // Notification System tables
+  notifications,
+  n8nWebhookConfigs,
+  webhookExecutionLogs,
+  notificationPreferences,
+  notificationTemplates,
   type User,
   type UpsertUser,
   type CompanyObjective,
@@ -156,6 +157,17 @@ import {
   type InsertPerformanceSnapshot,
   type LearningInsight,
   type InsertLearningInsight,
+  // Notification System types
+  type Notification,
+  type InsertNotification,
+  type N8nWebhookConfig,
+  type InsertN8nWebhookConfig,
+  type WebhookExecutionLog,
+  type InsertWebhookExecutionLog,
+  type NotificationPreference,
+  type InsertNotificationPreference,
+  type NotificationTemplate,
+  type InsertNotificationTemplate,
   insertTeamSchema,
   updateUserProfileSchema,
   // Missing insert schemas
@@ -720,6 +732,92 @@ export interface IStorage {
     averageScore: number;
     progressRate: number;
   }>>;
+
+  // =====================================================================
+  // NOTIFICATION SYSTEM INTERFACE - Phase 3 Implementation
+  // =====================================================================
+
+  // In-App Notifications
+  getUserNotifications(userId: string, filters?: {
+    isRead?: boolean;
+    isArchived?: boolean;
+    type?: string;
+    limit?: number;
+  }): Promise<Notification[]>;
+  getNotification(notificationId: string): Promise<Notification | undefined>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationAsRead(notificationId: string, userId: string): Promise<Notification>;
+  markAllNotificationsAsRead(userId: string): Promise<void>;
+  archiveNotification(notificationId: string, userId: string): Promise<Notification>;
+  archiveExpiredNotifications(): Promise<number>; // Returns count of archived notifications
+  getUnreadNotificationCount(userId: string): Promise<number>;
+
+  // N8N Webhook Configuration
+  getN8nWebhookConfigs(activeOnly?: boolean): Promise<N8nWebhookConfig[]>;
+  getN8nWebhookConfig(configId: string): Promise<N8nWebhookConfig | undefined>;
+  getN8nWebhookConfigByEventType(eventType: string): Promise<N8nWebhookConfig | undefined>;
+  createN8nWebhookConfig(config: InsertN8nWebhookConfig): Promise<N8nWebhookConfig>;
+  updateN8nWebhookConfig(configId: string, updates: Partial<InsertN8nWebhookConfig>): Promise<N8nWebhookConfig>;
+  deleteN8nWebhookConfig(configId: string): Promise<void>;
+  activateWebhookConfig(configId: string): Promise<N8nWebhookConfig>;
+  deactivateWebhookConfig(configId: string): Promise<N8nWebhookConfig>;
+
+  // Webhook Execution & Logging
+  executeWebhook(eventType: string, eventData: any, triggeredBy?: string): Promise<{
+    success: boolean;
+    webhookConfig?: N8nWebhookConfig;
+    executionLog?: WebhookExecutionLog;
+    error?: string;
+  }>;
+  createWebhookExecutionLog(log: InsertWebhookExecutionLog): Promise<WebhookExecutionLog>;
+  getWebhookExecutionLogs(filters?: {
+    webhookConfigId?: string;
+    eventType?: string;
+    isSuccess?: boolean;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+  }): Promise<WebhookExecutionLog[]>;
+  getWebhookExecutionStats(configId: string, days?: number): Promise<{
+    totalExecutions: number;
+    successfulExecutions: number;
+    failedExecutions: number;
+    averageResponseTime: number;
+    lastExecution?: Date;
+  }>;
+
+  // Notification Preferences
+  getUserNotificationPreferences(userId: string): Promise<NotificationPreference[]>;
+  getNotificationPreference(userId: string, notificationType: string): Promise<NotificationPreference | undefined>;
+  updateNotificationPreference(userId: string, notificationType: string, preferences: {
+    inAppEnabled?: boolean;
+    webhookEnabled?: boolean;
+  }): Promise<NotificationPreference>;
+  initializeDefaultNotificationPreferences(userId: string): Promise<NotificationPreference[]>;
+
+  // Notification Templates
+  getNotificationTemplates(type?: string, activeOnly?: boolean): Promise<NotificationTemplate[]>;
+  getNotificationTemplate(templateId: string): Promise<NotificationTemplate | undefined>;
+  createNotificationTemplate(template: InsertNotificationTemplate): Promise<NotificationTemplate>;
+  updateNotificationTemplate(templateId: string, updates: Partial<InsertNotificationTemplate>): Promise<NotificationTemplate>;
+  deleteNotificationTemplate(templateId: string): Promise<void>;
+
+  // Event-Based Notification Triggers
+  triggerNotificationForEvent(eventType: string, eventData: {
+    userId?: string;
+    relatedEntityId?: string;
+    relatedEntityType?: string;
+    customData?: any;
+  }): Promise<{
+    notificationsCreated: number;
+    webhooksTriggered: number;
+    errors?: string[];
+  }>;
+
+  // Bulk Operations
+  createBulkNotifications(notifications: InsertNotification[]): Promise<Notification[]>;
+  archiveNotificationsByType(userId: string, type: string): Promise<number>;
+  deleteExpiredNotifications(days?: number): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -8110,6 +8208,613 @@ export class DatabaseStorage implements IStorage {
       case 'expert': return 4;
       default: return 2; // Default to intermediate
     }
+  }
+
+  // =====================================================================
+  // NOTIFICATION SYSTEM IMPLEMENTATION - Phase 3 Implementation
+  // =====================================================================
+
+  // In-App Notifications
+  async getUserNotifications(userId: string, filters?: {
+    isRead?: boolean;
+    isArchived?: boolean;
+    type?: string;
+    limit?: number;
+  }): Promise<Notification[]> {
+    let query = db.select().from(notifications).where(eq(notifications.userId, userId));
+    
+    if (filters?.isRead !== undefined) {
+      query = query.where(and(eq(notifications.userId, userId), eq(notifications.isRead, filters.isRead)));
+    }
+    
+    if (filters?.isArchived !== undefined) {
+      query = query.where(and(eq(notifications.userId, userId), eq(notifications.isArchived, filters.isArchived)));
+    }
+    
+    if (filters?.type) {
+      query = query.where(and(eq(notifications.userId, userId), eq(notifications.type, filters.type)));
+    }
+    
+    const results = await query
+      .orderBy(desc(notifications.createdAt))
+      .limit(filters?.limit || 50);
+    
+    return results;
+  }
+
+  async getNotification(notificationId: string): Promise<Notification | undefined> {
+    const results = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.id, notificationId))
+      .limit(1);
+    
+    return results[0];
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [result] = await db.insert(notifications).values(notification).returning();
+    return result;
+  }
+
+  async markNotificationAsRead(notificationId: string, userId: string): Promise<Notification> {
+    const [result] = await db
+      .update(notifications)
+      .set({ 
+        isRead: true, 
+        readAt: new Date() 
+      })
+      .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)))
+      .returning();
+    
+    return result;
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ 
+        isRead: true, 
+        readAt: new Date() 
+      })
+      .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+  }
+
+  async archiveNotification(notificationId: string, userId: string): Promise<Notification> {
+    const [result] = await db
+      .update(notifications)
+      .set({ 
+        isArchived: true, 
+        archivedAt: new Date() 
+      })
+      .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)))
+      .returning();
+    
+    return result;
+  }
+
+  async archiveExpiredNotifications(): Promise<number> {
+    const now = new Date();
+    const result = await db
+      .update(notifications)
+      .set({ 
+        isArchived: true, 
+        archivedAt: now 
+      })
+      .where(and(
+        lte(notifications.expiresAt, now),
+        eq(notifications.isArchived, false),
+        isNotNull(notifications.expiresAt)
+      ));
+    
+    return result.rowCount || 0;
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const results = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(notifications)
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.isRead, false),
+        eq(notifications.isArchived, false)
+      ));
+    
+    return results[0]?.count || 0;
+  }
+
+  // N8N Webhook Configuration
+  async getN8nWebhookConfigs(activeOnly?: boolean): Promise<N8nWebhookConfig[]> {
+    let query = db.select().from(n8nWebhookConfigs);
+    
+    if (activeOnly) {
+      query = query.where(eq(n8nWebhookConfigs.isActive, true));
+    }
+    
+    const results = await query.orderBy(desc(n8nWebhookConfigs.createdAt));
+    return results;
+  }
+
+  async getN8nWebhookConfig(configId: string): Promise<N8nWebhookConfig | undefined> {
+    const results = await db
+      .select()
+      .from(n8nWebhookConfigs)
+      .where(eq(n8nWebhookConfigs.id, configId))
+      .limit(1);
+    
+    return results[0];
+  }
+
+  async getN8nWebhookConfigByEventType(eventType: string): Promise<N8nWebhookConfig | undefined> {
+    const results = await db
+      .select()
+      .from(n8nWebhookConfigs)
+      .where(and(
+        eq(n8nWebhookConfigs.eventType, eventType),
+        eq(n8nWebhookConfigs.isActive, true)
+      ))
+      .limit(1);
+    
+    return results[0];
+  }
+
+  async createN8nWebhookConfig(config: InsertN8nWebhookConfig): Promise<N8nWebhookConfig> {
+    const [result] = await db.insert(n8nWebhookConfigs).values(config).returning();
+    return result;
+  }
+
+  async updateN8nWebhookConfig(configId: string, updates: Partial<InsertN8nWebhookConfig>): Promise<N8nWebhookConfig> {
+    const [result] = await db
+      .update(n8nWebhookConfigs)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(n8nWebhookConfigs.id, configId))
+      .returning();
+    
+    return result;
+  }
+
+  async deleteN8nWebhookConfig(configId: string): Promise<void> {
+    await db.delete(n8nWebhookConfigs).where(eq(n8nWebhookConfigs.id, configId));
+  }
+
+  async activateWebhookConfig(configId: string): Promise<N8nWebhookConfig> {
+    return this.updateN8nWebhookConfig(configId, { isActive: true });
+  }
+
+  async deactivateWebhookConfig(configId: string): Promise<N8nWebhookConfig> {
+    return this.updateN8nWebhookConfig(configId, { isActive: false });
+  }
+
+  // Webhook Execution & Logging
+  async executeWebhook(eventType: string, eventData: any, triggeredBy?: string): Promise<{
+    success: boolean;
+    webhookConfig?: N8nWebhookConfig;
+    executionLog?: WebhookExecutionLog;
+    error?: string;
+  }> {
+    const webhookConfig = await this.getN8nWebhookConfigByEventType(eventType);
+    
+    if (!webhookConfig) {
+      return {
+        success: false,
+        error: `No active webhook configuration found for event type: ${eventType}`
+      };
+    }
+
+    const startTime = Date.now();
+    
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...webhookConfig.headers as Record<string, string>
+      };
+
+      const response = await fetch(webhookConfig.webhookUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(eventData),
+        signal: AbortSignal.timeout(webhookConfig.timeoutSeconds * 1000)
+      });
+
+      const executionTimeMs = Date.now() - startTime;
+      const responseText = await response.text();
+
+      const executionLog = await this.createWebhookExecutionLog({
+        webhookConfigId: webhookConfig.id,
+        eventType,
+        eventData,
+        httpStatusCode: response.status,
+        responseBody: responseText,
+        responseHeaders: Object.fromEntries(response.headers.entries()),
+        executionTimeMs,
+        isSuccess: response.ok,
+        triggeredBy: triggeredBy || 'system'
+      });
+
+      // Update last triggered timestamp
+      await this.updateN8nWebhookConfig(webhookConfig.id, {
+        lastTriggeredAt: new Date()
+      });
+
+      return {
+        success: response.ok,
+        webhookConfig,
+        executionLog,
+        error: response.ok ? undefined : `HTTP ${response.status}: ${responseText}`
+      };
+
+    } catch (error: any) {
+      const executionTimeMs = Date.now() - startTime;
+      
+      const executionLog = await this.createWebhookExecutionLog({
+        webhookConfigId: webhookConfig.id,
+        eventType,
+        eventData,
+        errorMessage: error.message,
+        executionTimeMs,
+        isSuccess: false,
+        triggeredBy: triggeredBy || 'system'
+      });
+
+      return {
+        success: false,
+        webhookConfig,
+        executionLog,
+        error: error.message
+      };
+    }
+  }
+
+  async createWebhookExecutionLog(log: InsertWebhookExecutionLog): Promise<WebhookExecutionLog> {
+    const [result] = await db.insert(webhookExecutionLogs).values(log).returning();
+    return result;
+  }
+
+  async getWebhookExecutionLogs(filters?: {
+    webhookConfigId?: string;
+    eventType?: string;
+    isSuccess?: boolean;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+  }): Promise<WebhookExecutionLog[]> {
+    let query = db.select().from(webhookExecutionLogs);
+    
+    const conditions = [];
+    
+    if (filters?.webhookConfigId) {
+      conditions.push(eq(webhookExecutionLogs.webhookConfigId, filters.webhookConfigId));
+    }
+    
+    if (filters?.eventType) {
+      conditions.push(eq(webhookExecutionLogs.eventType, filters.eventType));
+    }
+    
+    if (filters?.isSuccess !== undefined) {
+      conditions.push(eq(webhookExecutionLogs.isSuccess, filters.isSuccess));
+    }
+    
+    if (filters?.startDate) {
+      conditions.push(gte(webhookExecutionLogs.createdAt, filters.startDate));
+    }
+    
+    if (filters?.endDate) {
+      conditions.push(lte(webhookExecutionLogs.createdAt, filters.endDate));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+    
+    const results = await query
+      .orderBy(desc(webhookExecutionLogs.createdAt))
+      .limit(filters?.limit || 100);
+    
+    return results;
+  }
+
+  async getWebhookExecutionStats(configId: string, days: number = 7): Promise<{
+    totalExecutions: number;
+    successfulExecutions: number;
+    failedExecutions: number;
+    averageResponseTime: number;
+    lastExecution?: Date;
+  }> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    
+    const results = await db
+      .select({
+        total: sql<number>`count(*)`,
+        successful: sql<number>`count(*) filter (where ${webhookExecutionLogs.isSuccess} = true)`,
+        failed: sql<number>`count(*) filter (where ${webhookExecutionLogs.isSuccess} = false)`,
+        avgTime: sql<number>`avg(${webhookExecutionLogs.executionTimeMs})`,
+        lastExecution: max(webhookExecutionLogs.createdAt)
+      })
+      .from(webhookExecutionLogs)
+      .where(and(
+        eq(webhookExecutionLogs.webhookConfigId, configId),
+        gte(webhookExecutionLogs.createdAt, cutoffDate)
+      ));
+    
+    const stats = results[0];
+    
+    return {
+      totalExecutions: stats?.total || 0,
+      successfulExecutions: stats?.successful || 0,
+      failedExecutions: stats?.failed || 0,
+      averageResponseTime: Math.round(stats?.avgTime || 0),
+      lastExecution: stats?.lastExecution || undefined
+    };
+  }
+
+  // Notification Preferences
+  async getUserNotificationPreferences(userId: string): Promise<NotificationPreference[]> {
+    const results = await db
+      .select()
+      .from(notificationPreferences)
+      .where(eq(notificationPreferences.userId, userId))
+      .orderBy(notificationPreferences.notificationType);
+    
+    return results;
+  }
+
+  async getNotificationPreference(userId: string, notificationType: string): Promise<NotificationPreference | undefined> {
+    const results = await db
+      .select()
+      .from(notificationPreferences)
+      .where(and(
+        eq(notificationPreferences.userId, userId),
+        eq(notificationPreferences.notificationType, notificationType)
+      ))
+      .limit(1);
+    
+    return results[0];
+  }
+
+  async updateNotificationPreference(userId: string, notificationType: string, preferences: {
+    inAppEnabled?: boolean;
+    webhookEnabled?: boolean;
+  }): Promise<NotificationPreference> {
+    const existingPreference = await this.getNotificationPreference(userId, notificationType);
+    
+    if (existingPreference) {
+      const [result] = await db
+        .update(notificationPreferences)
+        .set({ 
+          ...preferences, 
+          updatedAt: new Date() 
+        })
+        .where(and(
+          eq(notificationPreferences.userId, userId),
+          eq(notificationPreferences.notificationType, notificationType)
+        ))
+        .returning();
+      
+      return result;
+    } else {
+      const [result] = await db
+        .insert(notificationPreferences)
+        .values({
+          userId,
+          notificationType,
+          inAppEnabled: preferences.inAppEnabled ?? true,
+          webhookEnabled: preferences.webhookEnabled ?? false
+        })
+        .returning();
+      
+      return result;
+    }
+  }
+
+  async initializeDefaultNotificationPreferences(userId: string): Promise<NotificationPreference[]> {
+    const notificationTypes = [
+      'course_completion', 'learning_path_completion', 'quiz_passed', 'quiz_failed',
+      'certification_issued', 'certificate_expiring', 'training_due', 'training_overdue',
+      'competency_achieved', 'badge_awarded', 'enrollment_reminder', 'meeting_reminder',
+      'goal_deadline', 'development_plan_update', 'recognition_received', 'system_alert'
+    ];
+    
+    const defaultPreferences = notificationTypes.map(type => ({
+      userId,
+      notificationType: type,
+      inAppEnabled: true,
+      webhookEnabled: false
+    }));
+    
+    const results = await db
+      .insert(notificationPreferences)
+      .values(defaultPreferences)
+      .onConflictDoNothing()
+      .returning();
+    
+    return results;
+  }
+
+  // Notification Templates
+  async getNotificationTemplates(type?: string, activeOnly?: boolean): Promise<NotificationTemplate[]> {
+    let query = db.select().from(notificationTemplates);
+    
+    const conditions = [];
+    
+    if (type) {
+      conditions.push(eq(notificationTemplates.type, type));
+    }
+    
+    if (activeOnly) {
+      conditions.push(eq(notificationTemplates.isActive, true));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+    
+    const results = await query.orderBy(notificationTemplates.type, notificationTemplates.name);
+    return results;
+  }
+
+  async getNotificationTemplate(templateId: string): Promise<NotificationTemplate | undefined> {
+    const results = await db
+      .select()
+      .from(notificationTemplates)
+      .where(eq(notificationTemplates.id, templateId))
+      .limit(1);
+    
+    return results[0];
+  }
+
+  async createNotificationTemplate(template: InsertNotificationTemplate): Promise<NotificationTemplate> {
+    const [result] = await db.insert(notificationTemplates).values(template).returning();
+    return result;
+  }
+
+  async updateNotificationTemplate(templateId: string, updates: Partial<InsertNotificationTemplate>): Promise<NotificationTemplate> {
+    const [result] = await db
+      .update(notificationTemplates)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(notificationTemplates.id, templateId))
+      .returning();
+    
+    return result;
+  }
+
+  async deleteNotificationTemplate(templateId: string): Promise<void> {
+    await db.delete(notificationTemplates).where(eq(notificationTemplates.id, templateId));
+  }
+
+  // Event-Based Notification Triggers
+  async triggerNotificationForEvent(eventType: string, eventData: {
+    userId?: string;
+    relatedEntityId?: string;
+    relatedEntityType?: string;
+    customData?: any;
+  }): Promise<{
+    notificationsCreated: number;
+    webhooksTriggered: number;
+    errors?: string[];
+  }> {
+    const errors: string[] = [];
+    let notificationsCreated = 0;
+    let webhooksTriggered = 0;
+
+    try {
+      // Get notification template for this event type
+      const templates = await this.getNotificationTemplates(eventType, true);
+      
+      if (templates.length === 0) {
+        errors.push(`No active notification template found for event type: ${eventType}`);
+        return { notificationsCreated, webhooksTriggered, errors };
+      }
+
+      const template = templates[0]; // Use first active template
+
+      // Create in-app notification if user ID is provided
+      if (eventData.userId) {
+        try {
+          const userPrefs = await this.getNotificationPreference(eventData.userId, eventType);
+          
+          if (!userPrefs || userPrefs.inAppEnabled) {
+            const notification: InsertNotification = {
+              userId: eventData.userId,
+              type: eventType,
+              priority: template.priority || 'medium',
+              title: this.replaceTemplateVariables(template.titleTemplate, eventData),
+              message: this.replaceTemplateVariables(template.messageTemplate, eventData),
+              actionLabel: template.actionLabel,
+              relatedEntityId: eventData.relatedEntityId,
+              relatedEntityType: eventData.relatedEntityType,
+              metadata: eventData.customData
+            };
+
+            await this.createNotification(notification);
+            notificationsCreated++;
+          }
+        } catch (error: any) {
+          errors.push(`Failed to create notification: ${error.message}`);
+        }
+      }
+
+      // Trigger webhook if configured
+      try {
+        const webhookResult = await this.executeWebhook(eventType, eventData);
+        if (webhookResult.success) {
+          webhooksTriggered++;
+        } else if (webhookResult.error) {
+          errors.push(`Webhook execution failed: ${webhookResult.error}`);
+        }
+      } catch (error: any) {
+        errors.push(`Webhook trigger failed: ${error.message}`);
+      }
+
+    } catch (error: any) {
+      errors.push(`Event trigger failed: ${error.message}`);
+    }
+
+    return { 
+      notificationsCreated, 
+      webhooksTriggered, 
+      errors: errors.length > 0 ? errors : undefined 
+    };
+  }
+
+  // Bulk Operations
+  async createBulkNotifications(notifications: InsertNotification[]): Promise<Notification[]> {
+    if (notifications.length === 0) return [];
+    
+    const results = await db.insert(notifications).values(notifications).returning();
+    return results;
+  }
+
+  async archiveNotificationsByType(userId: string, type: string): Promise<number> {
+    const result = await db
+      .update(notifications)
+      .set({ 
+        isArchived: true, 
+        archivedAt: new Date() 
+      })
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.type, type),
+        eq(notifications.isArchived, false)
+      ));
+    
+    return result.rowCount || 0;
+  }
+
+  async deleteExpiredNotifications(days: number = 30): Promise<number> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    
+    const result = await db
+      .delete(notifications)
+      .where(and(
+        eq(notifications.isArchived, true),
+        lte(notifications.archivedAt, cutoffDate)
+      ));
+    
+    return result.rowCount || 0;
+  }
+
+  // Helper method for template variable replacement
+  private replaceTemplateVariables(template: string, data: any): string {
+    let result = template;
+    
+    // Replace common variables
+    const replacements: Record<string, any> = {
+      userId: data.userId,
+      userName: data.userName || 'User',
+      entityId: data.relatedEntityId,
+      entityType: data.relatedEntityType,
+      ...data.customData
+    };
+
+    for (const [key, value] of Object.entries(replacements)) {
+      if (value !== undefined) {
+        result = result.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+      }
+    }
+    
+    return result;
   }
 
   /**
