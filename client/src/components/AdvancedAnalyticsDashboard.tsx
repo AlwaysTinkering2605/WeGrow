@@ -9,7 +9,10 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartContainer, ChartTooltip, ChartLegend } from "@/components/ui/chart";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, subDays, subMonths } from "date-fns";
+import { useMutation } from "@tanstack/react-query";
 import {
   BarChart,
   Bar,
@@ -46,7 +49,13 @@ import {
   ArrowDown,
   Zap,
   Brain,
-  Trophy
+  Trophy,
+  Lightbulb,
+  Settings2,
+  UserCheck,
+  Sparkles,
+  Timer,
+  Shield
 } from "lucide-react";
 
 interface AnalyticsMetrics {
@@ -117,9 +126,11 @@ const chartConfig = {
 
 export default function AdvancedAnalyticsDashboard() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [selectedTimeRange, setSelectedTimeRange] = useState("30");
   const [selectedDimension, setSelectedDimension] = useState("user");
   const [selectedMetricType, setSelectedMetricType] = useState("engagement_score");
+  const [showIntegrationActions, setShowIntegrationActions] = useState(false);
 
   // Check access permissions
   if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
@@ -184,6 +195,76 @@ export default function AdvancedAnalyticsDashboard() {
   };
   const performance = performanceMetrics || [];
   const insights = learningInsights || [];
+
+  // Auto-assignment integration mutations
+  const triggerGapAnalysisMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await apiRequest(`/api/auto-assignments/trigger/gaps/${userId}`, {
+        method: 'POST'
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Gap Analysis Triggered",
+        description: "Competency gap analysis and auto-assignment initiated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/analytics'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Auto-Assignment Failed",
+        description: error.message || "Failed to trigger competency gap analysis.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const triggerClosedLoopMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await apiRequest(`/api/automation/trigger/user/${userId}`, {
+        method: 'POST'
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Closed-Loop Integration Triggered",
+        description: "Complete learning system integration initiated for improved performance.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/analytics'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Integration Failed",
+        description: error.message || "Failed to trigger closed-loop integration.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const triggerOrgWideIntegrationMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('/api/automation/trigger/organization', {
+        method: 'POST'
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Organization-Wide Integration Triggered",
+        description: "Complete organization analytics integration initiated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/analytics'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Organization Integration Failed",
+        description: error.message || "Failed to trigger organization-wide integration.",
+        variant: "destructive",
+      });
+    }
+  });
 
   // Sample data for demonstration - replace with real metrics
   const timeSeriesData = Array.from({ length: parseInt(selectedTimeRange) }, (_, i) => {
@@ -522,10 +603,78 @@ export default function AdvancedAnalyticsDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2">
               <CardHeader>
-                <CardTitle>AI-Generated Insights</CardTitle>
-                <CardDescription>Machine learning recommendations and predictions</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>AI-Generated Insights</CardTitle>
+                    <CardDescription>Machine learning recommendations with actionable integrations</CardDescription>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowIntegrationActions(!showIntegrationActions)}
+                    data-testid="toggle-integration-actions"
+                  >
+                    <Settings2 className="h-4 w-4 mr-2" />
+                    Integration Actions
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Integration Actions Panel */}
+                {showIntegrationActions && (
+                  <Card className="border-purple-200 bg-purple-50 dark:bg-purple-950/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center">
+                        <Sparkles className="h-4 w-4 mr-2 text-purple-600" />
+                        Smart Integration Actions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => user?.id && triggerGapAnalysisMutation.mutate(user.id)}
+                          disabled={triggerGapAnalysisMutation.isPending}
+                          data-testid="trigger-gap-analysis"
+                          className="text-xs"
+                        >
+                          <UserCheck className="h-3 w-3 mr-1" />
+                          {triggerGapAnalysisMutation.isPending ? "Analyzing..." : "Trigger Gap Analysis"}
+                        </Button>
+                        
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => user?.id && triggerClosedLoopMutation.mutate(user.id)}
+                          disabled={triggerClosedLoopMutation.isPending}
+                          data-testid="trigger-closed-loop"
+                          className="text-xs"
+                        >
+                          <Timer className="h-3 w-3 mr-1" />
+                          {triggerClosedLoopMutation.isPending ? "Integrating..." : "Closed-Loop Integration"}
+                        </Button>
+                        
+                        {user?.role === 'leadership' && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => triggerOrgWideIntegrationMutation.mutate()}
+                            disabled={triggerOrgWideIntegrationMutation.isPending}
+                            data-testid="trigger-org-integration"
+                            className="text-xs"
+                          >
+                            <Shield className="h-3 w-3 mr-1" />
+                            {triggerOrgWideIntegrationMutation.isPending ? "Processing..." : "Organization-Wide"}
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Use these actions to trigger automatic competency analysis and learning path assignments based on current analytics insights.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {insightsLoading ? (
                   <div className="space-y-2">
                     <Skeleton className="h-4 w-full" />
@@ -537,13 +686,25 @@ export default function AdvancedAnalyticsDashboard() {
                     <div className="p-4 border border-orange-200 rounded-lg bg-orange-50">
                       <div className="flex items-start space-x-3">
                         <AlertCircle className="h-5 w-5 text-orange-500 mt-0.5" />
-                        <div>
+                        <div className="flex-1">
                           <h4 className="font-medium text-orange-800">Performance Alert</h4>
-                          <p className="text-sm text-orange-700">
+                          <p className="text-sm text-orange-700 mb-2">
                             Learning velocity has decreased by 12% in the Technical Skills category. 
                             Consider reviewing course difficulty levels.
                           </p>
-                          <Badge variant="outline" className="mt-2 text-xs">High Priority</Badge>
+                          <div className="flex items-center justify-between">
+                            <Badge variant="outline" className="text-xs">High Priority</Badge>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={() => user?.id && triggerGapAnalysisMutation.mutate(user.id)}
+                              className="text-xs text-orange-700 hover:text-orange-800"
+                              data-testid="quick-gap-analysis"
+                            >
+                              <Lightbulb className="h-3 w-3 mr-1" />
+                              Auto-Fix
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -551,13 +712,25 @@ export default function AdvancedAnalyticsDashboard() {
                     <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
                       <div className="flex items-start space-x-3">
                         <BookOpen className="h-5 w-5 text-blue-500 mt-0.5" />
-                        <div>
+                        <div className="flex-1">
                           <h4 className="font-medium text-blue-800">Learning Recommendation</h4>
-                          <p className="text-sm text-blue-700">
+                          <p className="text-sm text-blue-700 mb-2">
                             Users completing Safety Protocols show 34% higher engagement in subsequent modules. 
                             Consider promoting this pathway.
                           </p>
-                          <Badge variant="outline" className="mt-2 text-xs">Medium Priority</Badge>
+                          <div className="flex items-center justify-between">
+                            <Badge variant="outline" className="text-xs">Medium Priority</Badge>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={() => user?.id && triggerClosedLoopMutation.mutate(user.id)}
+                              className="text-xs text-blue-700 hover:text-blue-800"
+                              data-testid="optimize-pathway"
+                            >
+                              <Zap className="h-3 w-3 mr-1" />
+                              Optimize
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -565,13 +738,27 @@ export default function AdvancedAnalyticsDashboard() {
                     <div className="p-4 border border-green-200 rounded-lg bg-green-50">
                       <div className="flex items-start space-x-3">
                         <Star className="h-5 w-5 text-green-500 mt-0.5" />
-                        <div>
+                        <div className="flex-1">
                           <h4 className="font-medium text-green-800">Achievement Milestone</h4>
-                          <p className="text-sm text-green-700">
+                          <p className="text-sm text-green-700 mb-2">
                             Team completion rate has exceeded 90% for the first time this quarter. 
                             Recognition program impact is highly positive.
                           </p>
-                          <Badge variant="outline" className="mt-2 text-xs">Celebration</Badge>
+                          <div className="flex items-center justify-between">
+                            <Badge variant="outline" className="text-xs">Celebration</Badge>
+                            {user?.role === 'leadership' && (
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                onClick={() => triggerOrgWideIntegrationMutation.mutate()}
+                                className="text-xs text-green-700 hover:text-green-800"
+                                data-testid="scale-success"
+                              >
+                                <Trophy className="h-3 w-3 mr-1" />
+                                Scale Success
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
