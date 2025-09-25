@@ -66,8 +66,8 @@ async function upsertUser(
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
-    // Preserve existing role, only set default for new users
-    role: existingUser ? existingUser.role : (claims["role"] || "operative"),
+    // Preserve existing role, always default new users to "operative" (security: never trust role from claims)
+    role: existingUser ? existingUser.role : "operative",
   });
 }
 

@@ -21,6 +21,13 @@ import {
   insertCourseModuleSchema,
   insertLessonSchema,
   insertQuizSchema,
+  // Analytics validation schemas
+  analyticsMetricsQuerySchema,
+  analyticsPerformanceQuerySchema,
+  analyticsPerformanceHistoryQuerySchema,
+  analyticsInsightsQuerySchema,
+  analyticsEngagementQuerySchema,
+  analyticsPerformanceMetricsQuerySchema,
   insertQuizQuestionSchema,
   insertEnrollmentSchema,
   insertLessonProgressSchema,
@@ -201,7 +208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: claims.first_name || "Test",
           lastName: claims.last_name || "User", 
           profileImageUrl: claims.profile_image_url,
-          role: claims.role || "operative", // SECURITY: Default to least privilege
+          role: "operative", // SECURITY: Always default to least privilege, never trust claims.role
         });
         
         const newUser = await storage.getUser(userId);
@@ -4740,14 +4747,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
       }
 
+      // Validate query parameters with Zod
+      const validationResult = analyticsMetricsQuerySchema.safeParse(req.query);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid query parameters", 
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const validatedParams = validationResult.data;
       const filters = {
-        metricType: req.query.metricType as string,
-        dimension: req.query.dimension as string,
-        dimensionId: req.query.dimensionId as string,
-        aggregationLevel: req.query.aggregationLevel as string,
-        startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
-        endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
-        limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+        metricType: validatedParams.metricType,
+        dimension: validatedParams.dimension,
+        dimensionId: validatedParams.dimensionId,
+        aggregationLevel: validatedParams.aggregationLevel,
+        startDate: validatedParams.startDate ? new Date(validatedParams.startDate) : undefined,
+        endDate: validatedParams.endDate ? new Date(validatedParams.endDate) : undefined,
+        limit: validatedParams.limit,
       };
 
       const metrics = await storage.getAnalyticsMetrics(filters);
@@ -4769,7 +4786,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied." });
       }
 
-      const date = req.query.date ? new Date(req.query.date as string) : undefined;
+      // Validate query parameters with Zod
+      const validationResult = analyticsPerformanceQuerySchema.safeParse(req.query);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid query parameters", 
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const validatedParams = validationResult.data;
+      const date = validatedParams.date ? new Date(validatedParams.date) : undefined;
       const snapshot = await storage.getUserPerformanceSnapshot(targetUserId, date);
       res.json(snapshot || null);
     } catch (error) {
@@ -4787,8 +4814,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied." });
       }
 
-      const days = req.query.days ? parseInt(req.query.days as string) : 30;
-      const history = await storage.getUserPerformanceHistory(targetUserId, days);
+      // Validate query parameters with Zod
+      const validationResult = analyticsPerformanceHistoryQuerySchema.safeParse(req.query);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid query parameters", 
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const validatedParams = validationResult.data;
+      const history = await storage.getUserPerformanceHistory(targetUserId, validatedParams.days);
       res.json(history);
     } catch (error) {
       console.error("Error fetching performance history:", error);
@@ -4806,8 +4842,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied." });
       }
 
-      const unreadOnly = req.query.unreadOnly === 'true';
-      const insights = await storage.getUserLearningInsights(targetUserId, unreadOnly);
+      // Validate query parameters with Zod
+      const validationResult = analyticsInsightsQuerySchema.safeParse(req.query);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid query parameters", 
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const validatedParams = validationResult.data;
+      const insights = await storage.getUserLearningInsights(targetUserId, validatedParams.unreadOnly);
       res.json(insights);
     } catch (error) {
       console.error("Error fetching learning insights:", error);
@@ -4834,11 +4879,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
       }
 
+      // Validate query parameters with Zod
+      const validationResult = analyticsEngagementQuerySchema.safeParse(req.query);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid query parameters", 
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const validatedParams = validationResult.data;
       const filters = {
-        userId: req.query.userId as string,
-        teamId: req.query.teamId as string,
-        startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
-        endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+        userId: validatedParams.userId,
+        teamId: validatedParams.teamId,
+        startDate: validatedParams.startDate ? new Date(validatedParams.startDate) : undefined,
+        endDate: validatedParams.endDate ? new Date(validatedParams.endDate) : undefined,
       };
 
       const metrics = await storage.getEngagementMetrics(filters);
@@ -4856,11 +4911,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
       }
 
+      // Validate query parameters with Zod
+      const validationResult = analyticsPerformanceMetricsQuerySchema.safeParse(req.query);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid query parameters", 
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const validatedParams = validationResult.data;
       const filters = {
-        userId: req.query.userId as string,
-        teamId: req.query.teamId as string,
-        startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
-        endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+        userId: validatedParams.userId,
+        teamId: validatedParams.teamId,
+        startDate: validatedParams.startDate ? new Date(validatedParams.startDate) : undefined,
+        endDate: validatedParams.endDate ? new Date(validatedParams.endDate) : undefined,
       };
 
       const metrics = await storage.getPerformanceMetrics(filters);

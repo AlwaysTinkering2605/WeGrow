@@ -2500,3 +2500,51 @@ export type InsertLearningInsight = z.infer<typeof insertLearningInsightSchema>;
 export type InsertTeam = z.infer<typeof insertTeamSchema>;
 export type CompetencyEvidenceData = z.infer<typeof competencyEvidenceDataSchema>;
 export type AutomationTriggerData = z.infer<typeof automationTriggerDataSchema>;
+
+// =====================================================================
+// ANALYTICS API VALIDATION SCHEMAS
+// =====================================================================
+
+export const analyticsMetricsQuerySchema = z.object({
+  metricType: z.enum(analyticsMetricTypeEnum.enumValues).optional(),
+  dimension: z.enum(analyticsDimensionEnum.enumValues).optional(),
+  dimensionId: z.string().optional(),
+  aggregationLevel: z.enum(analyticsAggregationEnum.enumValues).optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  limit: z.string().regex(/^\d+$/).transform(Number).optional()
+});
+
+export const analyticsPerformanceQuerySchema = z.object({
+  date: z.string().datetime().optional()
+});
+
+export const analyticsPerformanceHistoryQuerySchema = z.object({
+  days: z.string().regex(/^\d+$/).transform(Number).default('30')
+});
+
+export const analyticsInsightsQuerySchema = z.object({
+  unreadOnly: z.enum(['true', 'false']).transform(val => val === 'true').optional()
+});
+
+export const analyticsEngagementQuerySchema = z.object({
+  userId: z.string().optional(),
+  teamId: z.string().optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional()
+});
+
+export const analyticsPerformanceMetricsQuerySchema = z.object({
+  userId: z.string().optional(),
+  teamId: z.string().optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional()
+});
+
+// Analytics validation types
+export type AnalyticsMetricsQuery = z.infer<typeof analyticsMetricsQuerySchema>;
+export type AnalyticsPerformanceQuery = z.infer<typeof analyticsPerformanceQuerySchema>;
+export type AnalyticsPerformanceHistoryQuery = z.infer<typeof analyticsPerformanceHistoryQuerySchema>;
+export type AnalyticsInsightsQuery = z.infer<typeof analyticsInsightsQuerySchema>;
+export type AnalyticsEngagementQuery = z.infer<typeof analyticsEngagementQuerySchema>;
+export type AnalyticsPerformanceMetricsQuery = z.infer<typeof analyticsPerformanceMetricsQuerySchema>;
