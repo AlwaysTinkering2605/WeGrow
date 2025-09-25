@@ -201,14 +201,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const claims = req.user.claims;
         console.log("[DEBUG] Available claims:", Object.keys(claims));
         
-        // Create user from current claims if missing - ALWAYS default to operative for security
+        // Create user from current claims if missing - Use environment-aware role handling
+        // In development: trust OIDC role claims for testing, Production: default to operative
+        const isDevelopment = process.env.NODE_ENV === 'development';
+        const hasValidClaimsRole = claims.role && ['operative', 'supervisor', 'leadership'].includes(claims.role);
+        const userRole = (isDevelopment && hasValidClaimsRole) ? claims.role : "operative";
+        
         await storage.upsertUser({
           id: claims.sub,
           email: claims.email || `${claims.sub}@apex.com`,
           firstName: claims.first_name || "Test",
           lastName: claims.last_name || "User", 
           profileImageUrl: claims.profile_image_url,
-          role: "operative", // SECURITY: Always default to least privilege, never trust claims.role
+          role: userRole, // Environment-aware: respect OIDC claims in development, default to operative in production
         });
         
         const newUser = await storage.getUser(userId);

@@ -159,7 +159,9 @@ export default function AdvancedAnalyticsDashboard() {
   });
 
   const { data: engagementMetrics, isLoading: engagementLoading } = useQuery({
-    queryKey: ['/api/analytics/engagement', {
+    queryKey: ['/api/analytics/metrics', {
+      metricType: 'engagement_score',
+      dimension: 'user',
       startDate: new Date(Date.now() - parseInt(selectedTimeRange) * 24 * 60 * 60 * 1000).toISOString(),
       endDate: new Date().toISOString()
     }],
@@ -167,15 +169,14 @@ export default function AdvancedAnalyticsDashboard() {
   });
 
   const { data: performanceMetrics, isLoading: performanceLoading } = useQuery({
-    queryKey: ['/api/analytics/performance-metrics', {
-      startDate: new Date(Date.now() - parseInt(selectedTimeRange) * 24 * 60 * 60 * 1000).toISOString(),
-      endDate: new Date().toISOString()
+    queryKey: ['/api/analytics/performance', user?.id, 'history', {
+      days: parseInt(selectedTimeRange)
     }],
     retry: false,
   });
 
   const { data: learningInsights, isLoading: insightsLoading } = useQuery({
-    queryKey: [`/api/analytics/insights/${user.id}`, { unreadOnly: 'false' }],
+    queryKey: [`/api/adaptive-learning/insights/${user.id}`, { unreadOnly: 'false' }],
     retry: false,
   });
 
@@ -199,8 +200,11 @@ export default function AdvancedAnalyticsDashboard() {
   // Auto-assignment integration mutations
   const triggerGapAnalysisMutation = useMutation({
     mutationFn: async (userId: string) => {
+      // Use real POST trigger endpoint for gap analysis
       const response = await apiRequest(`/api/auto-assignments/trigger/gaps/${userId}`, {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trigger: 'analytics_dashboard', source: 'advanced_analytics' })
       });
       return response.json();
     },
@@ -209,7 +213,9 @@ export default function AdvancedAnalyticsDashboard() {
         title: "Gap Analysis Triggered",
         description: "Competency gap analysis and auto-assignment initiated successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/analytics/metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/analytics/performance', user.id, 'history'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/adaptive-learning/insights/${user.id}`] });
     },
     onError: (error: any) => {
       toast({
@@ -222,8 +228,11 @@ export default function AdvancedAnalyticsDashboard() {
 
   const triggerClosedLoopMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const response = await apiRequest(`/api/automation/trigger/user/${userId}`, {
-        method: 'POST'
+      // Use real POST trigger endpoint for user automation
+      const response = await apiRequest(`/api/automation-rules/execute-for-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, triggerEvent: 'analytics_trigger' })
       });
       return response.json();
     },
@@ -232,7 +241,9 @@ export default function AdvancedAnalyticsDashboard() {
         title: "Closed-Loop Integration Triggered",
         description: "Complete learning system integration initiated for improved performance.",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/analytics/metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/analytics/performance', user.id, 'history'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/adaptive-learning/insights/${user.id}`] });
     },
     onError: (error: any) => {
       toast({
@@ -245,8 +256,11 @@ export default function AdvancedAnalyticsDashboard() {
 
   const triggerOrgWideIntegrationMutation = useMutation({
     mutationFn: async () => {
+      // Use real POST trigger endpoint for organization-wide integration
       const response = await apiRequest('/api/automation/trigger/organization', {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trigger: 'analytics_dashboard', source: 'advanced_analytics' })
       });
       return response.json();
     },
@@ -255,7 +269,9 @@ export default function AdvancedAnalyticsDashboard() {
         title: "Organization-Wide Integration Triggered",
         description: "Complete organization analytics integration initiated successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/analytics/metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/analytics/performance', user.id, 'history'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/adaptive-learning/insights/${user.id}`] });
     },
     onError: (error: any) => {
       toast({

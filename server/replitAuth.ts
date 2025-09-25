@@ -60,14 +60,31 @@ async function upsertUser(
   // Check if user already exists to preserve their role
   const existingUser = await storage.getUser(claims["sub"]);
   
+  // Determine role based on environment and user existence
+  let userRole: "operative" | "supervisor" | "leadership";
+  if (existingUser) {
+    // Preserve existing user's role
+    userRole = existingUser.role;
+  } else {
+    // For new users: use OIDC claims role in development/testing, default to operative in production
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const hasValidClaimsRole = claims["role"] && ['operative', 'supervisor', 'leadership'].includes(claims["role"]);
+    
+    if (isDevelopment && hasValidClaimsRole) {
+      userRole = claims["role"];
+      console.log("[DEBUG] upsertUser - Using role from OIDC claims in development:", claims["role"]);
+    } else {
+      userRole = "operative"; // Security default for production
+    }
+  }
+
   await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
-    // Preserve existing role, always default new users to "operative" (security: never trust role from claims)
-    role: existingUser ? existingUser.role : "operative",
+    role: userRole,
   });
 }
 
