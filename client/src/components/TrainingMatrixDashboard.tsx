@@ -103,7 +103,330 @@ interface TeamCompetencyOverview {
   }>;
 }
 
-// Live Competency Status Matrix
+// Enterprise Training Matrix Grid View
+function EnterpriseMatrixGrid() {
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [selectedRole, setSelectedRole] = useState<string>("");
+  const [selectedTeam, setSelectedTeam] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const { user } = useAuth();
+
+  // Fetch matrix data with full competency mapping
+  const { data: matrixData, isLoading } = useQuery({
+    queryKey: ["/api/training-matrix/grid", { role: selectedRole, team: selectedTeam, search: searchTerm }],
+    refetchInterval: 30000,
+  }) as { data: any; isLoading: boolean };
+
+  const { data: competencies } = useQuery({
+    queryKey: ["/api/competency-library/active"]
+  }) as { data: Array<{ id: string; title: string; category: string; level: number; skillType: string }> | undefined };
+
+  const { data: employees } = useQuery({
+    queryKey: ["/api/users/employees", { role: selectedRole, team: selectedTeam }]
+  }) as { data: Array<{ id: string; firstName: string; lastName: string; role: string; teamId?: string; email: string }> | undefined };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <BarChart3 className="w-5 h-5" />
+          Enterprise Training Matrix
+        </CardTitle>
+        <CardDescription>
+          Complete competency status grid across your organization with live updates
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Enhanced Controls */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Button
+                variant={viewMode === "grid" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("grid")}
+                data-testid="view-grid"
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Grid View
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("list")}
+                data-testid="view-list"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                List View
+              </Button>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+              Competent
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              <div className="w-2 h-2 bg-yellow-500 rounded-full mr-1"></div>
+              In Progress
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div>
+              Gap/Expired
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              <div className="w-2 h-2 bg-gray-300 rounded-full mr-1"></div>
+              Not Started
+            </Badge>
+          </div>
+        </div>
+
+        {/* Enhanced Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+          <div className="flex items-center gap-2">
+            <Search className="w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search employees..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              data-testid="input-search-employees"
+            />
+          </div>
+
+          <Select value={selectedRole} onValueChange={setSelectedRole}>
+            <SelectTrigger data-testid="select-role-filter">
+              <SelectValue placeholder="Filter by role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All roles</SelectItem>
+              <SelectItem value="operative">Cleaning Operative</SelectItem>
+              <SelectItem value="supervisor">Area Supervisor</SelectItem>
+              <SelectItem value="leadership">Senior Leadership</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+            <SelectTrigger data-testid="select-team-filter">
+              <SelectValue placeholder="Filter by team" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All teams</SelectItem>
+              {/* Teams will be populated from API */}
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/training-matrix"] })}
+            data-testid="button-refresh-matrix"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+
+        {/* Grid/List View Display */}
+        {isLoading ? (
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        ) : viewMode === "grid" ? (
+          <EnterpriseMatrixGridView employees={employees} competencies={competencies} matrixData={matrixData} />
+        ) : (
+          <TrainingMatrixListView employees={employees} competencies={competencies} matrixData={matrixData} />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Enhanced Grid View Component
+function EnterpriseMatrixGridView({ employees, competencies, matrixData }: {
+  employees?: Array<{ id: string; firstName: string; lastName: string; role: string; teamId?: string; email: string }>;
+  competencies?: Array<{ id: string; title: string; category: string; level: number; skillType: string }>;
+  matrixData?: any;
+}) {
+  const getCompetencyStatus = (employeeId: string, competencyId: string) => {
+    const status = matrixData?.find((item: any) => 
+      item.userId === employeeId && item.competencyLibraryId === competencyId
+    );
+    return status?.currentStatus || "not_started";
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "competent": return "bg-green-500";
+      case "in_progress": return "bg-yellow-500";
+      case "expired": case "non_compliant": return "bg-red-500";
+      default: return "bg-gray-300";
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "competent": return <CheckCircle className="w-3 h-3 text-green-600" />;
+      case "in_progress": return <Clock className="w-3 h-3 text-yellow-600" />;
+      case "expired": case "non_compliant": return <XCircle className="w-3 h-3 text-red-600" />;
+      default: return <Minus className="w-3 h-3 text-gray-400" />;
+    }
+  };
+
+  if (!employees || !competencies) {
+    return (
+      <div className="text-center py-8">
+        <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+        <h3 className="font-medium mb-2">Loading matrix data...</h3>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-full">
+        {/* Header Row */}
+        <div className="grid gap-1 mb-2" style={{ gridTemplateColumns: `200px repeat(${competencies.length}, 120px)` }}>
+          <div className="p-2 font-medium text-sm bg-muted rounded">
+            Employee
+          </div>
+          {competencies.map((comp) => (
+            <div key={comp.id} className="p-2 text-xs bg-muted rounded text-center">
+              <div className="font-medium truncate" title={comp.title}>{comp.title}</div>
+              <div className="text-muted-foreground">L{comp.level}</div>
+              <Badge variant="secondary" className="text-xs mt-1">
+                {comp.skillType === "technical" ? "Tech" :
+                 comp.skillType === "safety" ? "Safety" :
+                 comp.skillType === "compliance" ? "Comp" : "Behavior"}
+              </Badge>
+            </div>
+          ))}
+        </div>
+
+        {/* Employee Rows */}
+        <div className="space-y-1">
+          {employees.map((employee) => (
+            <div key={employee.id} className="grid gap-1" style={{ gridTemplateColumns: `200px repeat(${competencies.length}, 120px)` }}>
+              <div className="p-3 bg-card border rounded flex items-center">
+                <div>
+                  <div className="font-medium text-sm">
+                    {employee.firstName} {employee.lastName}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {employee.role.charAt(0).toUpperCase() + employee.role.slice(1)}
+                  </div>
+                </div>
+              </div>
+              {competencies.map((comp) => {
+                const status = getCompetencyStatus(employee.id, comp.id);
+                return (
+                  <div 
+                    key={`${employee.id}-${comp.id}`} 
+                    className="p-2 bg-card border rounded flex items-center justify-center hover:bg-muted/50 cursor-pointer"
+                    data-testid={`matrix-cell-${employee.id}-${comp.id}`}
+                    title={`${employee.firstName} ${employee.lastName} - ${comp.title}: ${status}`}
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      <div className={`w-4 h-4 rounded-full ${getStatusColor(status)} flex items-center justify-center`}>
+                        {getStatusIcon(status)}
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {status === "competent" ? "✓" :
+                         status === "in_progress" ? "..." :
+                         status === "expired" || status === "non_compliant" ? "!" : "-"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Enhanced List View Component  
+function TrainingMatrixListView({ employees, competencies, matrixData }: {
+  employees?: Array<{ id: string; firstName: string; lastName: string; role: string; teamId?: string; email: string }>;
+  competencies?: Array<{ id: string; title: string; category: string; level: number; skillType: string }>;
+  matrixData?: any;
+}) {
+  const getEmployeeCompetencyStats = (employeeId: string) => {
+    const employeeRecords = matrixData?.filter((record: any) => record.userId === employeeId) || [];
+    const total = competencies?.length || 0;
+    const competent = employeeRecords.filter((r: any) => r.currentStatus === "competent").length;
+    const inProgress = employeeRecords.filter((r: any) => r.currentStatus === "in_progress").length;
+    const gaps = total - competent - inProgress;
+    
+    return { total, competent, inProgress, gaps, completionRate: total > 0 ? (competent / total) * 100 : 0 };
+  };
+
+  if (!employees || !competencies) {
+    return (
+      <div className="text-center py-8">
+        <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+        <h3 className="font-medium mb-2">Loading employee data...</h3>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {employees.map((employee) => {
+        const stats = getEmployeeCompetencyStats(employee.id);
+        return (
+          <Card key={employee.id} className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div>
+                  <h4 className="font-medium">
+                    {employee.firstName} {employee.lastName}
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    {employee.role.charAt(0).toUpperCase() + employee.role.slice(1)} • {employee.email}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-6">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{stats.competent}</div>
+                  <div className="text-xs text-muted-foreground">Competent</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-yellow-600">{stats.inProgress}</div>
+                  <div className="text-xs text-muted-foreground">In Progress</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-600">{stats.gaps}</div>
+                  <div className="text-xs text-muted-foreground">Gaps</div>
+                </div>
+
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{Math.round(stats.completionRate)}%</div>
+                  <div className="text-xs text-muted-foreground">Complete</div>
+                  <Progress value={stats.completionRate} className="w-20 mt-1" />
+                </div>
+
+                <Button variant="outline" size="sm" data-testid={`view-employee-${employee.id}`}>
+                  <Eye className="w-4 h-4 mr-2" />
+                  Details
+                </Button>
+              </div>
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// Live Competency Status Matrix (original function renamed for backward compatibility)
 function LiveCompetencyMatrix() {
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [selectedTeam, setSelectedTeam] = useState<string>("");
@@ -603,7 +926,7 @@ export default function TrainingMatrixDashboard() {
         </TabsList>
 
         <TabsContent value="matrix" className="space-y-6">
-          <LiveCompetencyMatrix />
+          <EnterpriseMatrixGrid />
         </TabsContent>
 
         <TabsContent value="gaps" className="space-y-6">
