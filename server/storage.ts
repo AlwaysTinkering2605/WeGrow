@@ -865,6 +865,43 @@ export class DatabaseStorage implements IStorage {
       .orderBy(competencies.name);
   }
 
+  /**
+   * Get active competency library items for API endpoint
+   */
+  async getActiveCompetencyLibraryItems(): Promise<any[]> {
+    try {
+      const items = await db
+        .select({
+          id: competencyLibrary.id,
+          competencyId: competencyLibrary.competencyId,
+          parentCompetencyLibraryId: competencyLibrary.parentCompetencyLibraryId,
+          hierarchyLevel: competencyLibrary.hierarchyLevel,
+          sortOrder: competencyLibrary.sortOrder,
+          proficiencyLevels: competencyLibrary.proficiencyLevels,
+          assessmentCriteria: competencyLibrary.assessmentCriteria,
+          renewalPeriodDays: competencyLibrary.renewalPeriodDays,
+          isComplianceRequired: competencyLibrary.isComplianceRequired,
+          evidenceRequirements: competencyLibrary.evidenceRequirements,
+          linkedLearningPaths: competencyLibrary.linkedLearningPaths,
+          createdAt: competencyLibrary.createdAt,
+          createdBy: competencyLibrary.createdBy
+        })
+        .from(competencyLibrary)
+        .innerJoin(competencies, eq(competencyLibrary.competencyId, competencies.id))
+        .where(eq(competencies.isActive, true))
+        .orderBy(
+          competencyLibrary.hierarchyLevel,
+          competencyLibrary.sortOrder,
+          competencies.name
+        );
+
+      return items;
+    } catch (error) {
+      console.error("Error fetching active competency library items:", error);
+      return [];
+    }
+  }
+
   async getUserCompetencies(userId: string): Promise<any[]> {
     return await db
       .select({
@@ -6399,6 +6436,458 @@ export class DatabaseStorage implements IStorage {
       console.error(`[AUTO-ASSIGN] Failed to log auto-assignment activity:`, error);
       // Don't throw - this is just logging
     }
+  }
+
+  // ========================
+  // COMPETENCY GAP AUTO-ASSIGNMENT ENGINE
+  // ========================
+
+  /**
+   * Triggers competency gap auto-assignment for a user
+   */
+  async triggerCompetencyGapAutoAssignment(userId: string, triggeredByUserId: string): Promise<void> {
+    console.log(`[GAP-ASSIGN] Starting competency gap auto-assignment for user ${userId}`);
+    
+    try {
+      // Analyze user performance across all competencies
+      const gapAnalysis = await this.analyzeCompetencyGaps(userId);
+      console.log(`[GAP-ASSIGN] Found ${gapAnalysis.length} competency gaps for user ${userId}`);
+
+      // Filter for gaps that require learning interventions
+      const actionableGaps = this.filterActionableGaps(gapAnalysis);
+      console.log(`[GAP-ASSIGN] ${actionableGaps.length} gaps require learning interventions`);
+
+      // Find learning paths for addressing gaps
+      const remediationCandidates = await this.findRemediationLearningPaths(actionableGaps, userId);
+      console.log(`[GAP-ASSIGN] Found ${remediationCandidates.length} remediation candidates`);
+
+      // Filter out existing enrollments
+      const filteredCandidates = await this.filterExistingEnrollments(userId, remediationCandidates);
+      console.log(`[GAP-ASSIGN] After filtering duplicates: ${filteredCandidates.length} new assignments needed`);
+
+      // Execute gap-based assignments
+      const assignments = await this.executeGapBasedAssignments(userId, filteredCandidates, triggeredByUserId);
+      
+      console.log(`[GAP-ASSIGN] Successfully completed ${assignments.length} competency gap assignments for user ${userId}`);
+      
+      // Log assignment for audit trail
+      await this.logAutoAssignmentActivity(userId, 'competency_gap', {
+        gapsAnalyzed: gapAnalysis.length,
+        actionableGaps: actionableGaps.length,
+        assignmentsCreated: assignments.length,
+        triggeredBy: triggeredByUserId,
+        averageGapScore: actionableGaps.length > 0 ? 
+          actionableGaps.reduce((sum, gap) => sum + gap.gapScore, 0) / actionableGaps.length : 0
+      });
+
+    } catch (error) {
+      console.error(`[GAP-ASSIGN] Error in competency gap auto-assignment:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Analyzes user performance to identify competency gaps
+   */
+  async analyzeCompetencyGaps(userId: string): Promise<Array<{
+    competencyLibraryId: string;
+    competencyTitle: string;
+    currentLevel: number;
+    requiredLevel: number;
+    gapScore: number;
+    priority: string;
+    assessmentData: {
+      lastAssessmentDate?: Date;
+      recentScores: number[];
+      averageScore: number;
+      completionRate: number;
+      consistencyScore: number;
+    };
+    linkedLearningPaths: string[];
+  }>> {
+    const gaps: Array<{
+      competencyLibraryId: string;
+      competencyTitle: string;
+      currentLevel: number;
+      requiredLevel: number;
+      gapScore: number;
+      priority: string;
+      assessmentData: {
+        lastAssessmentDate?: Date;
+        recentScores: number[];
+        averageScore: number;
+        completionRate: number;
+        consistencyScore: number;
+      };
+      linkedLearningPaths: string[];
+    }> = [];
+
+    // Get user's current role to find required competencies
+    const user = await this.getUser(userId);
+    if (!user) return gaps;
+
+    // Get required competencies for user's role
+    const requiredCompetencies = await this.getRequiredCompetenciesForRole(user.role, user.teamId);
+
+    for (const required of requiredCompetencies) {
+      // Get current training matrix status
+      const [matrixRecord] = await db
+        .select()
+        .from(trainingMatrixRecords)
+        .where(
+          and(
+            eq(trainingMatrixRecords.userId, userId),
+            eq(trainingMatrixRecords.competencyLibraryId, required.competencyLibraryId)
+          )
+        );
+
+      // Get performance analysis data
+      const performanceData = await this.analyzeCompetencyPerformance(userId, required.competencyLibraryId);
+
+      const currentLevel = matrixRecord?.currentLevel || 0;
+      const requiredLevel = this.parseRequiredLevel(required.requiredProficiencyLevel);
+      
+      // Calculate gap score (higher = more urgent)
+      const levelGap = Math.max(0, requiredLevel - currentLevel);
+      const performanceGap = Math.max(0, 75 - performanceData.averageScore); // 75% is minimum acceptable
+      const urgencyMultiplier = required.priority === 'critical' ? 2 : required.priority === 'high' ? 1.5 : 1;
+      
+      const gapScore = (levelGap * 10 + performanceGap * 0.5) * urgencyMultiplier;
+
+      // Only include gaps that need attention
+      if (gapScore > 5 || levelGap > 0) {
+        gaps.push({
+          competencyLibraryId: required.competencyLibraryId,
+          competencyTitle: required.competencyTitle,
+          currentLevel,
+          requiredLevel,
+          gapScore,
+          priority: required.priority,
+          assessmentData: performanceData,
+          linkedLearningPaths: required.linkedLearningPaths
+        });
+      }
+    }
+
+    // Sort by gap score (most urgent first)
+    return gaps.sort((a, b) => b.gapScore - a.gapScore);
+  }
+
+  /**
+   * Analyzes user performance data for a specific competency
+   */
+  async analyzeCompetencyPerformance(userId: string, competencyLibraryId: string): Promise<{
+    lastAssessmentDate?: Date;
+    recentScores: number[];
+    averageScore: number;
+    completionRate: number;
+    consistencyScore: number;
+  }> {
+    // Get competency status history for assessment scores
+    const statusHistory = await db
+      .select()
+      .from(competencyStatusHistory)
+      .where(
+        and(
+          eq(competencyStatusHistory.userId, userId),
+          eq(competencyStatusHistory.competencyLibraryId, competencyLibraryId)
+        )
+      )
+      .orderBy(desc(competencyStatusHistory.changedAt))
+      .limit(10);
+
+    // Extract recent scores
+    const recentScores = statusHistory
+      .filter(h => h.assessmentScore !== null)
+      .map(h => h.assessmentScore as number)
+      .slice(0, 5);
+
+    // Get learning path progress for this competency
+    const competencyLibraryRecord = await db
+      .select({ linkedLearningPaths: competencyLibrary.linkedLearningPaths })
+      .from(competencyLibrary)
+      .where(eq(competencyLibrary.id, competencyLibraryId));
+
+    const linkedPaths = (competencyLibraryRecord[0]?.linkedLearningPaths as string[]) || [];
+    
+    let totalProgress = 0;
+    let pathCount = 0;
+
+    if (linkedPaths.length > 0) {
+      const enrollments = await db
+        .select({ progress: learningPathEnrollments.progress })
+        .from(learningPathEnrollments)
+        .where(
+          and(
+            eq(learningPathEnrollments.userId, userId),
+            sql`${learningPathEnrollments.pathId} = ANY(${linkedPaths})`
+          )
+        );
+
+      totalProgress = enrollments.reduce((sum, e) => sum + (e.progress || 0), 0);
+      pathCount = enrollments.length;
+    }
+
+    const averageScore = recentScores.length > 0 ? 
+      recentScores.reduce((sum, score) => sum + score, 0) / recentScores.length : 50;
+    
+    const completionRate = pathCount > 0 ? totalProgress / pathCount : 0;
+    
+    // Calculate consistency (lower variance = higher consistency)
+    const variance = recentScores.length > 1 ?
+      recentScores.reduce((sum, score) => sum + Math.pow(score - averageScore, 2), 0) / recentScores.length : 0;
+    const consistencyScore = Math.max(0, 100 - variance);
+
+    return {
+      lastAssessmentDate: statusHistory[0]?.changedAt || undefined,
+      recentScores,
+      averageScore,
+      completionRate,
+      consistencyScore
+    };
+  }
+
+  /**
+   * Filters gaps to identify those that require learning interventions
+   */
+  filterActionableGaps(gaps: Array<{
+    competencyLibraryId: string;
+    competencyTitle: string;
+    currentLevel: number;
+    requiredLevel: number;
+    gapScore: number;
+    priority: string;
+    assessmentData: any;
+    linkedLearningPaths: string[];
+  }>): Array<{
+    competencyLibraryId: string;
+    competencyTitle: string;
+    currentLevel: number;
+    requiredLevel: number;
+    gapScore: number;
+    priority: string;
+    assessmentData: any;
+    linkedLearningPaths: string[];
+  }> {
+    return gaps.filter(gap => {
+      // Must have learning paths available
+      if (!gap.linkedLearningPaths || gap.linkedLearningPaths.length === 0) {
+        return false;
+      }
+
+      // Must meet minimum gap threshold
+      if (gap.gapScore < 5) {
+        return false;
+      }
+
+      // Critical and high priority gaps are always actionable
+      if (gap.priority === 'critical' || gap.priority === 'high') {
+        return true;
+      }
+
+      // For medium/low priority, check performance indicators
+      const { averageScore, completionRate, consistencyScore } = gap.assessmentData;
+      
+      // Poor performance indicators suggest need for intervention
+      return averageScore < 70 || completionRate < 50 || consistencyScore < 60;
+    });
+  }
+
+  /**
+   * Finds learning paths for addressing competency gaps
+   */
+  async findRemediationLearningPaths(gaps: Array<{
+    competencyLibraryId: string;
+    competencyTitle: string;
+    currentLevel: number;
+    requiredLevel: number;
+    gapScore: number;
+    priority: string;
+    linkedLearningPaths: string[];
+  }>, userId: string): Promise<Array<{
+    pathId: string;
+    competencyLibraryId: string;
+    competencyTitle: string;
+    gapScore: number;
+    priority: string;
+    pathTitle: string;
+    estimatedHours: number | null;
+    remediationType: 'foundational' | 'skill_building' | 'remedial' | 'advanced';
+  }>> {
+    const candidates: Array<{
+      pathId: string;
+      competencyLibraryId: string;
+      competencyTitle: string;
+      gapScore: number;
+      priority: string;
+      pathTitle: string;
+      estimatedHours: number | null;
+      remediationType: 'foundational' | 'skill_building' | 'remedial' | 'advanced';
+    }> = [];
+
+    for (const gap of gaps) {
+      if (gap.linkedLearningPaths && gap.linkedLearningPaths.length > 0) {
+        // Get learning path details
+        const paths = await db
+          .select({
+            id: learningPaths.id,
+            title: learningPaths.title,
+            estimatedHours: learningPaths.estimatedHours,
+            difficulty: learningPaths.difficulty,
+            category: learningPaths.category,
+            isPublished: learningPaths.isPublished,
+          })
+          .from(learningPaths)
+          .where(
+            and(
+              sql`${learningPaths.id} = ANY(${gap.linkedLearningPaths})`,
+              eq(learningPaths.isPublished, true),
+              isNull(learningPaths.deletedAt)
+            )
+          );
+
+        // Determine remediation type based on gap characteristics
+        const remediationType = this.determineRemediationType(gap);
+
+        for (const path of paths) {
+          candidates.push({
+            pathId: path.id,
+            competencyLibraryId: gap.competencyLibraryId,
+            competencyTitle: gap.competencyTitle,
+            gapScore: gap.gapScore,
+            priority: gap.priority,
+            pathTitle: path.title,
+            estimatedHours: path.estimatedHours,
+            remediationType
+          });
+        }
+      }
+    }
+
+    console.log(`[GAP-ASSIGN] Found ${candidates.length} remediation learning path candidates`);
+    return candidates;
+  }
+
+  /**
+   * Executes gap-based assignments with proper metadata
+   */
+  async executeGapBasedAssignments(
+    userId: string,
+    assignments: Array<{
+      pathId: string;
+      competencyLibraryId: string;
+      competencyTitle: string;
+      gapScore: number;
+      priority: string;
+      pathTitle: string;
+      remediationType: string;
+    }>,
+    assignedByUserId: string
+  ): Promise<Array<{ enrollmentId: string; pathId: string; pathTitle: string }>> {
+    const completedAssignments: Array<{ enrollmentId: string; pathId: string; pathTitle: string }> = [];
+
+    for (const assignment of assignments) {
+      try {
+        // Calculate due date based on priority and gap severity
+        const dueDate = this.calculateGapBasedDueDate(assignment.gapScore, assignment.priority);
+
+        // Create enrollment with gap-based metadata
+        const enrollmentData = {
+          userId,
+          pathId: assignment.pathId,
+          enrollmentStatus: 'enrolled' as const,
+          enrollmentSource: 'competency_gap_auto_assignment',
+          dueDate,
+          metadata: {
+            autoAssignment: true,
+            assignmentReason: 'competency_gap',
+            competencyLibraryId: assignment.competencyLibraryId,
+            competencyTitle: assignment.competencyTitle,
+            gapScore: assignment.gapScore,
+            priority: assignment.priority,
+            remediationType: assignment.remediationType,
+            assignedBy: assignedByUserId,
+            assignedAt: new Date().toISOString(),
+            urgencyLevel: assignment.gapScore > 20 ? 'high' : assignment.gapScore > 10 ? 'medium' : 'low'
+          }
+        };
+
+        const enrollment = await this.enrollUserInLearningPath(enrollmentData);
+        
+        completedAssignments.push({
+          enrollmentId: enrollment.id,
+          pathId: assignment.pathId,
+          pathTitle: assignment.pathTitle,
+        });
+
+        console.log(`[GAP-ASSIGN] Successfully enrolled user ${userId} in remediation path "${assignment.pathTitle}" for competency gap`);
+
+      } catch (error) {
+        console.error(`[GAP-ASSIGN] Failed to enroll user ${userId} in path ${assignment.pathId}:`, error);
+        // Continue with other assignments
+      }
+    }
+
+    return completedAssignments;
+  }
+
+  /**
+   * Helper: Parse required proficiency level to numeric value
+   */
+  private parseRequiredLevel(level: string): number {
+    switch (level?.toLowerCase()) {
+      case 'basic': return 1;
+      case 'intermediate': return 2;
+      case 'advanced': return 3;
+      case 'expert': return 4;
+      default: return 2; // Default to intermediate
+    }
+  }
+
+  /**
+   * Helper: Determine remediation type based on gap characteristics
+   */
+  private determineRemediationType(gap: {
+    currentLevel: number;
+    requiredLevel: number;
+    gapScore: number;
+    assessmentData: { averageScore: number; completionRate: number };
+  }): 'foundational' | 'skill_building' | 'remedial' | 'advanced' {
+    if (gap.currentLevel === 0) {
+      return 'foundational';
+    } else if (gap.assessmentData.averageScore < 60) {
+      return 'remedial';
+    } else if (gap.requiredLevel > gap.currentLevel + 1) {
+      return 'advanced';
+    } else {
+      return 'skill_building';
+    }
+  }
+
+  /**
+   * Helper: Calculate due date based on gap severity and priority
+   */
+  private calculateGapBasedDueDate(gapScore: number, priority: string): Date {
+    const dueDate = new Date();
+    
+    // Base days based on priority
+    let baseDays = 30;
+    switch (priority) {
+      case 'critical': baseDays = 7; break;
+      case 'high': baseDays = 14; break;
+      case 'medium': baseDays = 30; break;
+      case 'low': baseDays = 60; break;
+    }
+
+    // Adjust based on gap severity
+    if (gapScore > 20) {
+      baseDays = Math.floor(baseDays * 0.5); // Halve for severe gaps
+    } else if (gapScore > 10) {
+      baseDays = Math.floor(baseDays * 0.75); // Reduce for moderate gaps
+    }
+
+    dueDate.setDate(dueDate.getDate() + baseDays);
+    return dueDate;
   }
 }
 

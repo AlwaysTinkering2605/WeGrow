@@ -199,7 +199,7 @@ function EnterpriseMatrixGrid() {
               <SelectValue placeholder="Filter by role" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All roles</SelectItem>
+              <SelectItem value="all">All roles</SelectItem>
               <SelectItem value="operative">Cleaning Operative</SelectItem>
               <SelectItem value="supervisor">Area Supervisor</SelectItem>
               <SelectItem value="leadership">Senior Leadership</SelectItem>
@@ -211,7 +211,7 @@ function EnterpriseMatrixGrid() {
               <SelectValue placeholder="Filter by team" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All teams</SelectItem>
+              <SelectItem value="all">All teams</SelectItem>
               {/* Teams will be populated from API */}
             </SelectContent>
           </Select>

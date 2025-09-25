@@ -734,14 +734,14 @@ export default function TeamManagement() {
                           }
                         </div>
                         <Select
-                          value={user.teamId || ""}
-                          onValueChange={(value) => value && handleAssignUserToTeam(user.id, value)}
+                          value={user.teamId || "none"}
+                          onValueChange={(value) => handleAssignUserToTeam(user.id, value === "none" ? "" : value)}
                         >
                           <SelectTrigger className="w-48" data-testid={`select-user-team-${user.id}`}>
                             <SelectValue placeholder="Assign to team" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">No Team</SelectItem>
+                            <SelectItem value="none">No Team</SelectItem>
                             {teams.map((team: Team) => (
                               <SelectItem key={team.id} value={team.id}>
                                 {team.name}

@@ -941,6 +941,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get active competencies from competency library
+  app.get('/api/competency-library/active', isAuthenticated, async (req, res) => {
+    try {
+      const competencies = await storage.getActiveCompetencyLibraryItems();
+      res.json(competencies);
+    } catch (error) {
+      console.error("Error fetching active competencies from library:", error);
+      res.status(500).json({ message: "Failed to fetch active competencies from library" });
+    }
+  });
+
   app.get('/api/user-competencies', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -4006,6 +4017,213 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error fetching auto-assignment stats:", error);
       res.status(500).json({ message: "Failed to fetch auto-assignment statistics" });
+    }
+  });
+
+  // ========================
+  // COMPETENCY GAP AUTO-ASSIGNMENT API
+  // ========================
+
+  // Manual trigger for competency gap auto-assignment
+  app.post('/api/auto-assignments/trigger/gaps/:userId', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const currentUserId = req.user.claims.sub;
+      
+      // Verify user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Trigger competency gap auto-assignment
+      await storage.triggerCompetencyGapAutoAssignment(userId, currentUserId);
+      
+      res.json({ 
+        message: "Competency gap auto-assignment triggered successfully",
+        userId,
+        triggeredBy: currentUserId
+      });
+    } catch (error: any) {
+      console.error("Error triggering competency gap auto-assignment:", error);
+      res.status(500).json({ message: "Failed to trigger competency gap auto-assignment" });
+    }
+  });
+
+  // Get competency gap analysis for a user (preview without assignment)
+  app.get('/api/auto-assignments/gaps/analysis/:userId', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      
+      // Verify user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Analyze gaps without triggering assignments
+      const gapAnalysis = await storage.analyzeCompetencyGaps(userId);
+      
+      res.json({
+        userId,
+        analysisDate: new Date(),
+        totalGaps: gapAnalysis.length,
+        criticalGaps: gapAnalysis.filter(g => g.priority === 'critical').length,
+        highPriorityGaps: gapAnalysis.filter(g => g.priority === 'high').length,
+        averageGapScore: gapAnalysis.length > 0 ? 
+          gapAnalysis.reduce((sum, gap) => sum + gap.gapScore, 0) / gapAnalysis.length : 0,
+        gaps: gapAnalysis.map(gap => ({
+          competencyId: gap.competencyLibraryId,
+          competencyTitle: gap.competencyTitle,
+          currentLevel: gap.currentLevel,
+          requiredLevel: gap.requiredLevel,
+          gapScore: gap.gapScore,
+          priority: gap.priority,
+          hasLearningPaths: gap.linkedLearningPaths.length > 0,
+          assessmentData: {
+            averageScore: gap.assessmentData.averageScore,
+            completionRate: gap.assessmentData.completionRate,
+            consistencyScore: gap.assessmentData.consistencyScore,
+            recentScores: gap.assessmentData.recentScores
+          }
+        }))
+      });
+    } catch (error: any) {
+      console.error("Error analyzing competency gaps:", error);
+      res.status(500).json({ message: "Failed to analyze competency gaps" });
+    }
+  });
+
+  // Get competency gap assignments for monitoring
+  app.get('/api/auto-assignments/gaps/assignments', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { userId, status, priority } = req.query;
+      
+      // Get learning path enrollments created by gap-based auto-assignment
+      let enrollments = await storage.getLearningPathEnrollments(userId);
+      
+      // Filter for gap-based assignments
+      const gapAssignments = enrollments.filter(enrollment => 
+        enrollment.enrollmentSource === 'competency_gap_auto_assignment'
+      );
+
+      // Apply additional filters
+      let filteredAssignments = gapAssignments;
+
+      if (status) {
+        filteredAssignments = filteredAssignments.filter(e => e.enrollmentStatus === status);
+      }
+
+      if (priority) {
+        filteredAssignments = filteredAssignments.filter(e => {
+          const metadata = e.metadata as any;
+          return metadata?.priority === priority;
+        });
+      }
+
+      // Enrich with metadata for display
+      const enrichedAssignments = await Promise.all(
+        filteredAssignments.map(async (enrollment) => {
+          const path = await storage.getLearningPath(enrollment.pathId);
+          const user = await storage.getUser(enrollment.userId);
+          const metadata = enrollment.metadata as any;
+
+          return {
+            enrollmentId: enrollment.id,
+            userId: enrollment.userId,
+            userName: user ? `${user.firstName} ${user.lastName}` : 'Unknown User',
+            userRole: user?.role,
+            pathId: enrollment.pathId,
+            pathTitle: path?.title || 'Unknown Path',
+            enrollmentStatus: enrollment.enrollmentStatus,
+            progress: enrollment.progress,
+            dueDate: enrollment.dueDate,
+            assignedDate: enrollment.createdAt,
+            competencyInfo: {
+              competencyId: metadata?.competencyLibraryId,
+              competencyTitle: metadata?.competencyTitle,
+              gapScore: metadata?.gapScore,
+              priority: metadata?.priority,
+              remediationType: metadata?.remediationType,
+              urgencyLevel: metadata?.urgencyLevel
+            },
+            assignedBy: metadata?.assignedBy
+          };
+        })
+      );
+
+      res.json({
+        totalAssignments: enrichedAssignments.length,
+        assignments: enrichedAssignments,
+        summary: {
+          byStatus: {
+            enrolled: enrichedAssignments.filter(a => a.enrollmentStatus === 'enrolled').length,
+            in_progress: enrichedAssignments.filter(a => a.enrollmentStatus === 'in_progress').length,
+            completed: enrichedAssignments.filter(a => a.enrollmentStatus === 'completed').length,
+            expired: enrichedAssignments.filter(a => a.enrollmentStatus === 'expired').length
+          },
+          byPriority: {
+            critical: enrichedAssignments.filter(a => a.competencyInfo.priority === 'critical').length,
+            high: enrichedAssignments.filter(a => a.competencyInfo.priority === 'high').length,
+            medium: enrichedAssignments.filter(a => a.competencyInfo.priority === 'medium').length,
+            low: enrichedAssignments.filter(a => a.competencyInfo.priority === 'low').length
+          },
+          byRemediationType: {
+            foundational: enrichedAssignments.filter(a => a.competencyInfo.remediationType === 'foundational').length,
+            skill_building: enrichedAssignments.filter(a => a.competencyInfo.remediationType === 'skill_building').length,
+            remedial: enrichedAssignments.filter(a => a.competencyInfo.remediationType === 'remedial').length,
+            advanced: enrichedAssignments.filter(a => a.competencyInfo.remediationType === 'advanced').length
+          }
+        }
+      });
+    } catch (error: any) {
+      console.error("Error fetching competency gap assignments:", error);
+      res.status(500).json({ message: "Failed to fetch competency gap assignments" });
+    }
+  });
+
+  // Get gap-based assignment statistics
+  app.get('/api/auto-assignments/gaps/stats', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const logs = await storage.getAutomationRunLogs();
+      const gapAssignmentLogs = logs.filter(log => 
+        log.runType === 'auto_assignment' && 
+        log.executionDetails && 
+        (log.executionDetails as any).assignmentType === 'competency_gap'
+      );
+
+      const stats = {
+        totalGapAnalyses: gapAssignmentLogs.length,
+        successfulAssignments: gapAssignmentLogs.filter(log => log.status === 'completed').length,
+        failedAssignments: gapAssignmentLogs.filter(log => log.status === 'failed').length,
+        totalEnrollmentsCreated: gapAssignmentLogs.reduce((sum, log) => sum + (log.assignmentsCreated || 0), 0),
+        averageGapsPerUser: gapAssignmentLogs.length > 0 ? 
+          gapAssignmentLogs.reduce((sum, log) => {
+            const details = log.executionDetails as any;
+            return sum + (details?.gapsAnalyzed || 0);
+          }, 0) / gapAssignmentLogs.length : 0,
+        averageGapScore: gapAssignmentLogs.length > 0 ?
+          gapAssignmentLogs.reduce((sum, log) => {
+            const details = log.executionDetails as any;
+            return sum + (details?.averageGapScore || 0);
+          }, 0) / gapAssignmentLogs.length : 0,
+        recentActivity: gapAssignmentLogs
+          .filter(log => log.startedAt && new Date(log.startedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+          .length,
+        trends: {
+          last7Days: gapAssignmentLogs
+            .filter(log => log.startedAt && new Date(log.startedAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+            .length,
+          last30Days: gapAssignmentLogs
+            .filter(log => log.startedAt && new Date(log.startedAt) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+            .length
+        }
+      };
+      
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Error fetching gap assignment stats:", error);
+      res.status(500).json({ message: "Failed to fetch gap assignment statistics" });
     }
   });
 
