@@ -2931,6 +2931,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Adaptive Learning Paths (Phase 2)
+  app.post('/api/learning-paths/adaptive', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { 
+        title, 
+        description, 
+        category, 
+        estimatedDuration, 
+        relativeDueDays, 
+        skipThreshold, 
+        remedialThreshold, 
+        baseStepsRequired, 
+        adaptationEnabled 
+      } = req.body;
+      
+      // Basic validation
+      if (!title) {
+        return res.status(400).json({ message: "Missing required field: title" });
+      }
+      
+      // Validate thresholds if provided
+      if (skipThreshold !== undefined && (skipThreshold < 0 || skipThreshold > 100)) {
+        return res.status(400).json({ message: "skipThreshold must be between 0 and 100" });
+      }
+      
+      if (remedialThreshold !== undefined && (remedialThreshold < 0 || remedialThreshold > 100)) {
+        return res.status(400).json({ message: "remedialThreshold must be between 0 and 100" });
+      }
+      
+      if (baseStepsRequired !== undefined && baseStepsRequired <= 0) {
+        return res.status(400).json({ message: "baseStepsRequired must be greater than 0" });
+      }
+      
+      const pathData = {
+        title,
+        description,
+        category,
+        estimatedDuration,
+        relativeDueDays,
+        skipThreshold,
+        remedialThreshold,
+        baseStepsRequired,
+        adaptationEnabled,
+        createdBy: userId
+      };
+      
+      const newPath = await storage.createAdaptiveLearningPath(pathData);
+      res.status(201).json(newPath);
+    } catch (error: any) {
+      console.error("Error creating adaptive learning path:", error);
+      return res.status(500).json({ message: "Failed to create adaptive learning path" });
+    }
+  });
+
+  app.put('/api/learning-paths/:id/adaptive-criteria', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { skipThreshold, remedialThreshold, baseStepsRequired, adaptationEnabled } = req.body;
+      
+      // Validate thresholds if provided
+      if (skipThreshold !== undefined && (skipThreshold < 0 || skipThreshold > 100)) {
+        return res.status(400).json({ message: "skipThreshold must be between 0 and 100" });
+      }
+      
+      if (remedialThreshold !== undefined && (remedialThreshold < 0 || remedialThreshold > 100)) {
+        return res.status(400).json({ message: "remedialThreshold must be between 0 and 100" });
+      }
+      
+      if (baseStepsRequired !== undefined && baseStepsRequired <= 0) {
+        return res.status(400).json({ message: "baseStepsRequired must be greater than 0" });
+      }
+      
+      const criteria = { skipThreshold, remedialThreshold, baseStepsRequired, adaptationEnabled };
+      const updatedPath = await storage.updateAdaptivePathCriteria(id, criteria);
+      res.json(updatedPath);
+    } catch (error: any) {
+      console.error("Error updating adaptive path criteria:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(500).json({ message: "Failed to update adaptive path criteria" });
+    }
+  });
+
+  app.get('/api/learning-path-enrollments/:enrollmentId/adaptive-progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const { enrollmentId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Check if user owns this enrollment or is admin
+      const enrollment = await storage.getLearningPathEnrollment(enrollmentId);
+      if (!enrollment) {
+        return res.status(404).json({ message: "Learning path enrollment not found" });
+      }
+      
+      const user = await storage.getUser(userId);
+      const isAdmin = user?.role === 'supervisor' || user?.role === 'leadership';
+      
+      if (!isAdmin && enrollment.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const progress = await storage.getAdaptivePathProgress(enrollmentId);
+      res.json(progress);
+    } catch (error: any) {
+      console.error("Error fetching adaptive path progress:", error);
+      if (error.message.includes("not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(500).json({ message: "Failed to fetch adaptive path progress" });
+    }
+  });
+
   // Learning Path Steps Management
   app.get('/api/learning-paths/:pathId/steps', isAuthenticated, async (req: any, res) => {
     try {

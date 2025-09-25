@@ -432,6 +432,48 @@ export interface IStorage {
     availableSteps: LearningPathStep[];
     completedStepDetails: Array<LearningPathStepProgress & { step: LearningPathStep }>;
   }>;
+
+  // Adaptive Learning Paths (Phase 2)
+  createAdaptiveLearningPath(pathData: {
+    title: string;
+    description?: string;
+    category?: string;
+    estimatedDuration?: number;
+    relativeDueDays?: number;
+    skipThreshold?: number;
+    remedialThreshold?: number;
+    baseStepsRequired?: number;
+    adaptationEnabled?: boolean;
+    createdBy: string;
+  }): Promise<LearningPath>;
+  updateAdaptivePathCriteria(pathId: string, criteria: {
+    skipThreshold?: number;
+    remedialThreshold?: number;
+    baseStepsRequired?: number;
+    adaptationEnabled?: boolean;
+  }): Promise<LearningPath>;
+  getAdaptivePathProgress(enrollmentId: string): Promise<{
+    enrollmentId: string;
+    pathType: string;
+    completionCriteria: any;
+    performance: {
+      averageScore: number;
+      trend: 'improving' | 'declining' | 'stable';
+      consistencyScore: number;
+      recentScores: number[];
+    };
+    adaptations: {
+      skipBasics: boolean;
+      addRemedial: boolean;
+      originalRequirement: number;
+      adaptedRequirement: number;
+    };
+    completedSteps: number;
+    isCompleted: boolean;
+    progressPercentage: number;
+    availableSteps: LearningPathStep[];
+    stepProgresses: LearningPathStepProgress[];
+  }>;
   
   // Competency Library Management
   getCompetencyLibrary(): Promise<CompetencyLibraryItem[]>;
@@ -3117,6 +3159,179 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  // Adaptive Learning Path Methods (Phase 2)
+  async createAdaptiveLearningPath(pathData: {
+    title: string;
+    description?: string;
+    category?: string;
+    estimatedDuration?: number;
+    relativeDueDays?: number;
+    skipThreshold?: number;
+    remedialThreshold?: number;
+    baseStepsRequired?: number;
+    adaptationEnabled?: boolean;
+    createdBy: string;
+  }): Promise<LearningPath> {
+    const completionCriteria = {
+      type: "adaptive",
+      skipThreshold: pathData.skipThreshold || 85,
+      remedialThreshold: pathData.remedialThreshold || 60,
+      baseStepsRequired: pathData.baseStepsRequired || 3,
+      adaptationEnabled: pathData.adaptationEnabled !== false,
+      description: `Adaptive learning path that adjusts based on performance. Skip basics at ${pathData.skipThreshold || 85}%, add remedial at ${pathData.remedialThreshold || 60}%`
+    };
+
+    const [learningPath] = await db.insert(learningPaths).values({
+      title: pathData.title,
+      description: pathData.description,
+      pathType: "adaptive",
+      category: pathData.category,
+      estimatedDuration: pathData.estimatedDuration,
+      relativeDueDays: pathData.relativeDueDays,
+      completionCriteria,
+      createdBy: pathData.createdBy
+    }).returning();
+
+    return learningPath;
+  }
+
+  async updateAdaptivePathCriteria(pathId: string, criteria: {
+    skipThreshold?: number;
+    remedialThreshold?: number;
+    baseStepsRequired?: number;
+    adaptationEnabled?: boolean;
+  }): Promise<LearningPath> {
+    // Get existing criteria to preserve other settings
+    const [existingPath] = await db.select()
+      .from(learningPaths)
+      .where(and(eq(learningPaths.id, pathId), isNull(learningPaths.deletedAt)));
+
+    if (!existingPath) {
+      throw new Error("Learning path not found");
+    }
+
+    const existingCriteria = existingPath.completionCriteria as any || {};
+    const completionCriteria = {
+      ...existingCriteria,
+      ...criteria,
+      type: "adaptive",
+      description: `Adaptive learning path that adjusts based on performance. Skip basics at ${criteria.skipThreshold || existingCriteria.skipThreshold || 85}%, add remedial at ${criteria.remedialThreshold || existingCriteria.remedialThreshold || 60}%`
+    };
+
+    const [updatedPath] = await db.update(learningPaths)
+      .set({ 
+        completionCriteria,
+        updatedAt: new Date() 
+      })
+      .where(and(eq(learningPaths.id, pathId), isNull(learningPaths.deletedAt)))
+      .returning();
+
+    if (!updatedPath) {
+      throw new Error("Learning path not found");
+    }
+
+    return updatedPath;
+  }
+
+  async getAdaptivePathProgress(enrollmentId: string): Promise<{
+    enrollmentId: string;
+    pathType: string;
+    completionCriteria: any;
+    performance: {
+      averageScore: number;
+      trend: 'improving' | 'declining' | 'stable';
+      consistencyScore: number;
+      recentScores: number[];
+    };
+    adaptations: {
+      skipBasics: boolean;
+      addRemedial: boolean;
+      originalRequirement: number;
+      adaptedRequirement: number;
+    };
+    completedSteps: number;
+    isCompleted: boolean;
+    progressPercentage: number;
+    availableSteps: LearningPathStep[];
+    stepProgresses: LearningPathStepProgress[];
+  }> {
+    // Get enrollment and path details
+    const [enrollment] = await db.select()
+      .from(learningPathEnrollments)
+      .where(eq(learningPathEnrollments.id, enrollmentId));
+
+    if (!enrollment) {
+      throw new Error("Learning path enrollment not found");
+    }
+
+    const [learningPath] = await db.select()
+      .from(learningPaths)
+      .where(and(eq(learningPaths.id, enrollment.pathId), isNull(learningPaths.deletedAt)));
+
+    if (!learningPath) {
+      throw new Error("Learning path not found");
+    }
+
+    // Get all steps and progress
+    const pathSteps = await db.select()
+      .from(learningPathSteps)
+      .where(and(eq(learningPathSteps.pathId, enrollment.pathId), isNull(learningPathSteps.deletedAt)))
+      .orderBy(asc(learningPathSteps.stepOrder));
+
+    const stepProgresses = await this.getLearningPathStepProgress(enrollmentId);
+
+    // Analyze performance
+    const performance = await this.analyzeLearnPerformance(enrollmentId);
+    
+    // Get completion criteria and evaluate adaptations
+    const criteria = learningPath.completionCriteria as any || {};
+    const { 
+      skipThreshold = 85, 
+      remedialThreshold = 60, 
+      baseStepsRequired = 3,
+      adaptationEnabled = true 
+    } = criteria;
+
+    const completedSteps = stepProgresses.filter(step => step.status === "completed");
+    const completedCount = completedSteps.length;
+
+    // Determine adaptations
+    let requiredSteps = baseStepsRequired;
+    let skipBasics = false;
+    let addRemedial = false;
+
+    if (adaptationEnabled && completedCount >= 2) {
+      if (performance.averageScore >= skipThreshold) {
+        skipBasics = true;
+        requiredSteps = Math.max(baseStepsRequired - 1, 2);
+      } else if (performance.averageScore <= remedialThreshold && performance.averageScore > 0) {
+        addRemedial = true;
+        requiredSteps = baseStepsRequired + 1;
+      }
+    }
+
+    const progressPercentage = Math.min(100, Math.round((completedCount / requiredSteps) * 100));
+    const isCompleted = completedCount >= requiredSteps;
+
+    return {
+      enrollmentId,
+      pathType: learningPath.pathType,
+      completionCriteria: criteria,
+      performance,
+      adaptations: {
+        skipBasics,
+        addRemedial,
+        originalRequirement: baseStepsRequired,
+        adaptedRequirement: requiredSteps
+      },
+      completedSteps: completedCount,
+      isCompleted,
+      progressPercentage,
+      availableSteps: pathSteps,
+      stepProgresses
+    };
+  }
+
   async deleteLearningPath(pathId: string): Promise<void> {
     // Soft delete the path and all its steps
     await db.transaction(async (tx) => {
@@ -3712,6 +3927,11 @@ export class DatabaseStorage implements IStorage {
         // Calculate progress based on choice criteria (only count completed, not skipped)
         progressPercentage = Math.min(100, Math.round((actualCompletedSteps / requiredCompletions) * 100));
         isCompleted = actualCompletedSteps >= requiredCompletions;
+      } else if (criteria.type === "adaptive") {
+        // Adaptive completion: modify path based on performance
+        const adaptiveResult = await this.evaluateAdaptivePath(enrollmentId, stepProgresses, criteria);
+        progressPercentage = adaptiveResult.progressPercentage;
+        isCompleted = adaptiveResult.isCompleted;
       } else if (criteria.type === "minimum_score") {
         // Score-based completion
         const averageScore = this.calculateAverageScore(stepProgresses);
@@ -3752,6 +3972,135 @@ export class DatabaseStorage implements IStorage {
     
     const totalScore = scoredSteps.reduce((sum, step) => sum + (step.score || 0), 0);
     return Math.round(totalScore / scoredSteps.length);
+  }
+
+  // Adaptive Learning Path Evaluation (Phase 2)
+  private async evaluateAdaptivePath(
+    enrollmentId: string, 
+    stepProgresses: LearningPathStepProgress[], 
+    criteria: any
+  ): Promise<{progressPercentage: number; isCompleted: boolean}> {
+    const { 
+      skipThreshold = 85, 
+      remedialThreshold = 60, 
+      baseStepsRequired = 3,
+      adaptationEnabled = true 
+    } = criteria;
+
+    // Get enrollment details
+    const [enrollment] = await db.select()
+      .from(learningPathEnrollments)
+      .where(eq(learningPathEnrollments.id, enrollmentId));
+
+    if (!enrollment) {
+      throw new Error("Enrollment not found for adaptive evaluation");
+    }
+
+    // Analyze performance and determine adaptations
+    const performance = await this.analyzeLearnPerformance(enrollmentId);
+    
+    // Count completed steps by category
+    const completedSteps = stepProgresses.filter(step => step.status === "completed");
+    const completedCount = completedSteps.length;
+
+    // Determine if adaptations should be applied
+    let requiredSteps = baseStepsRequired;
+    let skipBasics = false;
+    let addRemedial = false;
+
+    if (adaptationEnabled && completedCount >= 2) { // Need at least 2 completed steps to evaluate
+      if (performance.averageScore >= skipThreshold) {
+        // High performer: can skip basic content
+        skipBasics = true;
+        requiredSteps = Math.max(baseStepsRequired - 1, 2); // Skip at least 1 step, minimum 2 required
+      } else if (performance.averageScore <= remedialThreshold && performance.averageScore > 0) {
+        // Low performer: add remedial content
+        addRemedial = true;
+        requiredSteps = baseStepsRequired + 1; // Add extra requirement
+      }
+    }
+
+    // Calculate progress based on adaptive requirements
+    const progressPercentage = Math.min(100, Math.round((completedCount / requiredSteps) * 100));
+    const isCompleted = completedCount >= requiredSteps;
+
+    // Log adaptation decisions for audit trail
+    if (skipBasics || addRemedial) {
+      console.log(`Adaptive learning adjustment for enrollment ${enrollmentId}:`, {
+        averageScore: performance.averageScore,
+        completedSteps: completedCount,
+        originalRequirement: baseStepsRequired,
+        adaptedRequirement: requiredSteps,
+        skipBasics,
+        addRemedial,
+        isCompleted
+      });
+    }
+
+    return { progressPercentage, isCompleted };
+  }
+
+  // Analyze learner performance patterns
+  private async analyzeLearnPerformance(enrollmentId: string): Promise<{
+    averageScore: number;
+    trend: 'improving' | 'declining' | 'stable';
+    consistencyScore: number;
+    recentScores: number[];
+  }> {
+    // Get quiz attempts for this enrollment through step progress
+    const stepProgresses = await this.getLearningPathStepProgress(enrollmentId);
+    
+    // Extract scores from completed steps with quiz data
+    const scoresWithDates: Array<{score: number, date: Date}> = [];
+    
+    for (const progress of stepProgresses) {
+      if (progress.status === "completed" && progress.score !== null && progress.score !== undefined) {
+        scoresWithDates.push({
+          score: progress.score,
+          date: progress.completionDate || progress.updatedAt
+        });
+      }
+    }
+
+    // Sort by completion date
+    scoresWithDates.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    const scores = scoresWithDates.map(s => s.score);
+    const recentScores = scores.slice(-3); // Last 3 scores for trend analysis
+
+    // Calculate average score
+    const averageScore = scores.length > 0 
+      ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+      : 0;
+
+    // Determine trend (improving, declining, stable)
+    let trend: 'improving' | 'declining' | 'stable' = 'stable';
+    if (recentScores.length >= 2) {
+      const firstHalf = recentScores.slice(0, Math.ceil(recentScores.length / 2));
+      const secondHalf = recentScores.slice(Math.ceil(recentScores.length / 2));
+      
+      const firstAvg = firstHalf.reduce((sum, score) => sum + score, 0) / firstHalf.length;
+      const secondAvg = secondHalf.reduce((sum, score) => sum + score, 0) / secondHalf.length;
+      
+      const difference = secondAvg - firstAvg;
+      if (difference > 5) trend = 'improving';
+      else if (difference < -5) trend = 'declining';
+    }
+
+    // Calculate consistency score (lower standard deviation = higher consistency)
+    let consistencyScore = 100;
+    if (scores.length > 1) {
+      const variance = scores.reduce((sum, score) => sum + Math.pow(score - averageScore, 2), 0) / scores.length;
+      const standardDeviation = Math.sqrt(variance);
+      consistencyScore = Math.max(0, Math.round(100 - standardDeviation));
+    }
+
+    return {
+      averageScore,
+      trend,
+      consistencyScore,
+      recentScores
+    };
   }
 
   // Competency Library Management (Vertical Slice 4)
