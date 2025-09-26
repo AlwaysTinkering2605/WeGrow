@@ -1,4 +1,7 @@
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -11,6 +14,7 @@ import {
   User,
   Bell,
   ChevronDown,
+  ChevronRight,
   BarChart3,
   Settings,
   UsersRound,
@@ -20,6 +24,9 @@ import {
   Route,
   Brain,
   Webhook,
+  Building2,
+  TrendingUp,
+  UserPlus,
 } from "lucide-react";
 import { NotificationBadge } from "./NotificationCenter";
 import Dashboard from "./Dashboard";
@@ -31,6 +38,7 @@ import Profile from "./Profile";
 import Learning from "./Learning";
 
 // Role-based components
+import UserManagement from "./UserManagement";
 import TeamManagement from "./TeamManagement";
 import CompanyObjectives from "./CompanyObjectives";
 import TeamObjectives from "./TeamObjectives";
@@ -43,12 +51,20 @@ import AutomationEngine from "./AutomationEngine";
 import AdvancedAnalyticsDashboard from "./AdvancedAnalyticsDashboard";
 import WebhookConfiguration from "../pages/WebhookConfiguration";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks";
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks";
 
 export default function Layout() {
   const [location] = useLocation();
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  
+  // Dropdown state management
+  const [openDropdowns, setOpenDropdowns] = useState<{[key: string]: boolean}>({
+    company: false,
+    people: false,
+    talent: false,
+    analytics: false,
+  });
 
   // Extract active tab from URL
   const getActiveTab = (): TabType => {
@@ -63,6 +79,7 @@ export default function Layout() {
     if (location === "/recognition") return "recognition";
     if (location === "/meetings") return "meetings";
     if (location === "/profile") return "profile";
+    if (location === "/user-management") return "user-management";
     if (location === "/team") return "team";
     if (location === "/company-objectives") return "company-objectives";
     if (location === "/team-objectives") return "team-objectives";
@@ -77,8 +94,8 @@ export default function Layout() {
   const activeTab = getActiveTab();
   
 
-  // Base tabs available to all users
-  const baseTabs = [
+  // User Views - available to all users
+  const userViews = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, component: Dashboard },
     { id: "goals", label: "My Goals", icon: Target, component: Goals },
     { id: "development", label: "Development", icon: BookOpen, component: Development },
@@ -88,50 +105,92 @@ export default function Layout() {
     { id: "profile", label: "Profile", icon: User, component: Profile },
   ];
 
-  // Additional tabs for supervisors and leadership
-  const supervisorTabs = [
-    { id: "team", label: "Team Management", icon: UsersRound, component: TeamManagement },
-    { id: "team-objectives", label: "Team Objectives", icon: Target, component: TeamObjectives },
-    { id: "analytics", label: "Advanced Analytics", icon: Brain, component: AdvancedAnalyticsDashboard },
-    { id: "learning-paths", label: "Learning Paths", icon: Route, component: LearningPathsManagement },
-    { id: "training-matrix", label: "Training Matrix", icon: BarChart3, component: TrainingMatrixDashboard },
-  ];
-
-  const leadershipTabs = [
-    { id: "team", label: "Team Management", icon: UsersRound, component: TeamManagement },
-    { id: "company-objectives", label: "Company Objectives", icon: Target, component: CompanyObjectives },
-    { id: "team-objectives", label: "Team Objectives", icon: Target, component: TeamObjectives },
-    { id: "analytics", label: "Advanced Analytics", icon: Brain, component: AdvancedAnalyticsDashboard },
-    { id: "learning-paths", label: "Learning Paths", icon: Route, component: LearningPathsManagement },
-    { id: "automation-engine", label: "Automation Engine", icon: Zap, component: AutomationEngine },
-    { id: "competency-management", label: "Competency Management", icon: Layers, component: CompetencyManagement },
-    { id: "training-matrix", label: "Training Matrix", icon: BarChart3, component: TrainingMatrixDashboard },
-    { id: "webhooks", label: "Webhook Configuration", icon: Webhook, component: WebhookConfiguration },
-    { id: "reports", label: "Reports", icon: BarChart3, component: Reports },
-    { id: "settings", label: "Company Settings", icon: Settings, component: CompanySettings },
-  ];
-
-  // Determine tabs based on user role
-  const getRoleTabs = () => {
-    if (user?.role === 'leadership') {
-      return [...baseTabs, ...leadershipTabs];
-    } else if (user?.role === 'supervisor') {
-      return [...baseTabs, ...supervisorTabs];
+  // Admin Dropdowns - only for supervisor/leadership
+  const adminDropdowns = {
+    company: {
+      id: "company",
+      label: "Company",
+      icon: Building2,
+      items: [
+        { id: "settings", label: "Company Settings", icon: Settings, component: CompanySettings },
+        { id: "company-objectives", label: "Company Objectives", icon: Target, component: CompanyObjectives },
+        { id: "webhooks", label: "Webhook Configuration", icon: Webhook, component: WebhookConfiguration },
+        { id: "automation-engine", label: "Automation Engine", icon: Zap, component: AutomationEngine },
+      ]
+    },
+    people: {
+      id: "people",
+      label: "People Management",
+      icon: UsersRound,
+      items: [
+        { id: "user-management", label: "User Management", icon: UserPlus, component: UserManagement },
+        { id: "team", label: "Team Management", icon: UsersRound, component: TeamManagement },
+        { id: "team-objectives", label: "Team Objectives", icon: Target, component: TeamObjectives },
+      ]
+    },
+    talent: {
+      id: "talent",
+      label: "Talent Development",
+      icon: TrendingUp,
+      items: [
+        { id: "competency-management", label: "Competency Management", icon: Layers, component: CompetencyManagement },
+        { id: "learning-paths", label: "Learning Paths", icon: Route, component: LearningPathsManagement },
+        { id: "training-matrix", label: "Training Matrix", icon: BarChart3, component: TrainingMatrixDashboard },
+      ]
+    },
+    analytics: {
+      id: "analytics",
+      label: "Analytics & Reports",
+      icon: Brain,
+      items: [
+        { id: "reports", label: "Reports", icon: BarChart3, component: Reports },
+        { id: "analytics", label: "Advanced Analytics", icon: Brain, component: AdvancedAnalyticsDashboard },
+      ]
     }
-    return baseTabs; // operative or default
   };
 
-  const tabs = getRoleTabs();
+  // Get available admin dropdowns based on role
+  const getAdminDropdowns = () => {
+    if (user?.role === 'leadership') {
+      return adminDropdowns;
+    } else if (user?.role === 'supervisor') {
+      // Supervisors get all except company management
+      const { company, ...supervisorDropdowns } = adminDropdowns;
+      return supervisorDropdowns;
+    }
+    return {};
+  };
 
-  const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component || Dashboard;
+  // Get all available components for routing
+  const getAllComponents = () => {
+    const components = new Map();
+    
+    // Add user view components
+    userViews.forEach(view => {
+      components.set(view.id, view.component);
+    });
+    
+    // Add admin dropdown components
+    Object.values(getAdminDropdowns()).forEach((dropdown: any) => {
+      dropdown.items.forEach((item: any) => {
+        components.set(item.id, item.component);
+      });
+    });
+    
+    return components;
+  };
+
+  const allComponents = getAllComponents();
+
+  const ActiveComponent = allComponents.get(activeTab) || Dashboard;
 
   const renderNavigation = () => {
     if (isMobile) {
       return (
         <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50">
           <div className="grid grid-cols-5 gap-1 py-2">
-            {/* Show only the first 5 base tabs to avoid overcrowding */}
-            {baseTabs.slice(0, 5).map((tab) => {
+            {/* Show only the first 5 user views to avoid overcrowding */}
+            {userViews.slice(0, 5).map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               const href = tab.id === "dashboard" ? "/" : `/${tab.id}`;
@@ -165,27 +224,94 @@ export default function Layout() {
             <span className="text-xl font-bold">Apex</span>
           </div>
           
-          <nav className="space-y-2">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              const href = tab.id === "dashboard" ? "/" : `/${tab.id}`;
+          <nav className="space-y-2 overflow-y-auto max-h-[calc(100vh-120px)]">
+            {/* User Views */}
+            {userViews.map((view) => {
+              const Icon = view.icon;
+              const isActive = activeTab === view.id;
+              const href = view.id === "dashboard" ? "/" : `/${view.id}`;
               return (
                 <Link
-                  key={tab.id}
+                  key={view.id}
                   href={href}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left no-underline ${
                     isActive
                       ? "text-primary bg-primary/10"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
-                  data-testid={`tab-${tab.id}`}
+                  data-testid={`tab-${view.id}`}
                 >
                   <Icon className="w-5 h-5" />
-                  <span>{tab.label}</span>
+                  <span>{view.label}</span>
                 </Link>
               );
             })}
+            
+            {/* Admin Dropdowns */}
+            {(user?.role === 'supervisor' || user?.role === 'leadership') && (
+              <>
+                <div className="mt-6 mb-4">
+                  <div className="px-4 py-2">
+                    <div className="h-px bg-border" />
+                  </div>
+                </div>
+                
+                {Object.values(getAdminDropdowns()).map((dropdown: any) => {
+                  const DropdownIcon = dropdown.icon;
+                  const isAnyItemActive = dropdown.items.some((item: any) => item.id === activeTab);
+                  const isOpen = openDropdowns[dropdown.id] || isAnyItemActive;
+                  
+                  const toggleDropdown = () => {
+                    setOpenDropdowns(prev => ({
+                      ...prev,
+                      [dropdown.id]: !prev[dropdown.id]
+                    }));
+                  };
+                  
+                  return (
+                    <Collapsible key={dropdown.id} open={isOpen} onOpenChange={toggleDropdown}>
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className={`w-full justify-start px-4 py-3 h-auto ${
+                            isAnyItemActive ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"
+                          }`}
+                          data-testid={`dropdown-${dropdown.id}`}
+                        >
+                          <DropdownIcon className="w-5 h-5 mr-3" />
+                          <span className="flex-1 text-left">{dropdown.label}</span>
+                          <ChevronRight className={`w-4 h-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+                        </Button>
+                      </CollapsibleTrigger>
+                      
+                      <CollapsibleContent className="space-y-1">
+                        {dropdown.items.map((item: any) => {
+                          const ItemIcon = item.icon;
+                          const isActive = activeTab === item.id;
+                          const href = `/${item.id}`;
+                          
+                          return (
+                            <Link
+                              key={item.id}
+                              href={href}
+                              className={`w-full flex items-center space-x-3 px-4 py-2 ml-6 rounded-lg text-left no-underline text-sm ${
+                                isActive
+                                  ? "text-primary bg-primary/10"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                              }`}
+                              data-testid={`tab-${item.id}`}
+                            >
+                              <ItemIcon className="w-4 h-4" />
+                              <span>{item.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  );
+                })}
+              </>
+            )}
           </nav>
         </div>
 
