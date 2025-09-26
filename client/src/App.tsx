@@ -26,9 +26,8 @@ function Router() {
   if (!isAuthenticated) {
     return (
       <Switch>
-        <Route path="/" component={Landing} />
         <Route path="/login" component={Landing} />
-        <Route component={NotFound} />
+        <Route path="/:rest*" component={Landing} />
       </Switch>
     );
   }

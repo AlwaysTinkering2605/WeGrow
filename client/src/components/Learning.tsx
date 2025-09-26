@@ -1067,6 +1067,13 @@ export default function Learning() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedRole, setSelectedRole] = useState("all");
 
+  // Training Matrix filter state
+  const [selectedJobRole, setSelectedJobRole] = useState<string>("all");
+  const [selectedTeam, setSelectedTeam] = useState<string>("all");
+  const [selectedLearningPath, setSelectedLearningPath] = useState<string>("all");
+  const [selectedCourse, setSelectedCourse] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
+
   // Course player state
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [currentLesson, setCurrentLesson] = useState<any>(null);
@@ -1387,6 +1394,12 @@ export default function Learning() {
     queryKey: ["/api/training-matrix"],
     retry: false,
   });
+
+  // Training Matrix Filter Data
+  const { data: filterJobRoles = [] } = useQuery({ queryKey: ["/api/filter/job-roles"] }) as { data: Array<{ value: string; label: string }> };
+  const { data: filterTeams = [] } = useQuery({ queryKey: ["/api/filter/teams"] }) as { data: Array<{ id: string; name: string }> };
+  const { data: filterLearningPaths = [] } = useQuery({ queryKey: ["/api/filter/learning-paths"] }) as { data: Array<{ id: string; title: string }> };
+  const { data: filterCourses = [] } = useQuery({ queryKey: ["/api/filter/courses"] }) as { data: Array<{ id: string; title: string }> };
 
   // Fetch available courses for the catalog
   const { data: availableCourses, isLoading: coursesLoading, error: coursesError, refetch: refetchCourses } = useQuery<any[]>({
@@ -8518,8 +8531,8 @@ Authorized by Apex Learning Management System
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col md:flex-row gap-4 mb-6">
-                <Select defaultValue="all">
+              <div className="flex flex-col md:flex-row gap-4 mb-6 flex-wrap">
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                   <SelectTrigger className="w-48" data-testid="select-training-status">
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
@@ -8531,7 +8544,7 @@ Authorized by Apex Learning Management System
                     <SelectItem value="overdue">Overdue</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select defaultValue="all">
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                   <SelectTrigger className="w-48" data-testid="select-training-category">
                     <SelectValue placeholder="Filter by category" />
                   </SelectTrigger>
@@ -8543,18 +8556,58 @@ Authorized by Apex Learning Management System
                     <SelectItem value="technical">Technical Skills</SelectItem>
                   </SelectContent>
                 </Select>
-                {(user?.role === 'supervisor' || user?.role === 'leadership') && (
-                  <Select defaultValue="my-team">
-                    <SelectTrigger className="w-48" data-testid="select-team-view">
-                      <SelectValue placeholder="View" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="my-team">My Team</SelectItem>
-                      <SelectItem value="all-teams">All Teams</SelectItem>
-                      <SelectItem value="department">Department</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
+                <Select value={selectedJobRole} onValueChange={setSelectedJobRole}>
+                  <SelectTrigger className="w-48" data-testid="select-job-role-filter">
+                    <SelectValue placeholder="Filter by Job Role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Job Roles</SelectItem>
+                    {filterJobRoles.map((role: any) => (
+                      <SelectItem key={role.value} value={role.value}>
+                        {role.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                  <SelectTrigger className="w-48" data-testid="select-team-filter">
+                    <SelectValue placeholder="Filter by Team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Teams</SelectItem>
+                    {filterTeams.map((team: any) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedLearningPath} onValueChange={setSelectedLearningPath}>
+                  <SelectTrigger className="w-48" data-testid="select-learning-path-filter">
+                    <SelectValue placeholder="Filter by Learning Path" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Learning Paths</SelectItem>
+                    {filterLearningPaths.map((path: any) => (
+                      <SelectItem key={path.id} value={path.id}>
+                        {path.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedCourse} onValueChange={setSelectedCourse}>
+                  <SelectTrigger className="w-48" data-testid="select-course-filter">
+                    <SelectValue placeholder="Filter by Course" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Courses</SelectItem>
+                    {filterCourses.map((course: any) => (
+                      <SelectItem key={course.id} value={course.id}>
+                        {course.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Training Matrix Grid */}

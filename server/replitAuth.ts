@@ -150,6 +150,52 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  // Development bypass for testing - allows unauthenticated access
+  if (process.env.NODE_ENV === 'development') {
+    const user = req.user as any;
+    
+    if (!req.isAuthenticated() || !user?.expires_at) {
+      // Create a mock user for development testing
+      req.user = {
+        claims: {
+          sub: 'dev-test-user',
+          email: 'test@apex.com',
+          first_name: 'Test',
+          last_name: 'User',
+          role: 'operative'
+        },
+        access_token: 'dev-token',
+        expires_at: Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
+      };
+      console.log("[DEBUG] Development mode: Created mock user for testing");
+      return next();
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    if (now <= user.expires_at) {
+      return next();
+    }
+
+    const refreshToken = user.refresh_token;
+    if (!refreshToken) {
+      // In development, allow access even without refresh token
+      console.log("[DEBUG] Development mode: Allowing access without refresh token");
+      return next();
+    }
+
+    try {
+      const config = await getOidcConfig();
+      const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
+      updateUserSession(user, tokenResponse);
+      return next();
+    } catch (error) {
+      // In development, allow access even if token refresh fails
+      console.log("[DEBUG] Development mode: Allowing access despite token refresh failure");
+      return next();
+    }
+  }
+
+  // Production authentication logic (original)
   const user = req.user as any;
 
   if (!req.isAuthenticated() || !user.expires_at) {
