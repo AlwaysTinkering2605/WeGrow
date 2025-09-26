@@ -4186,6 +4186,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manual assignment of learning path to job role (admin only)
+  app.post('/api/learning-paths/:pathId/assign-to-job-role', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
+    try {
+      const { pathId } = req.params;
+      const { jobRole } = req.body;
+      const assignedBy = req.user.claims.sub;
+      
+      // Validate job role
+      const validJobRoles = [
+        'cleaner_contract', 'cleaner_specialised', 'team_leader_contract', 
+        'team_leader_specialised', 'mobile_cleaner', 'supervisor', 'manager', 'director'
+      ];
+      
+      if (!jobRole || !validJobRoles.includes(jobRole)) {
+        return res.status(400).json({ 
+          message: "Invalid job role. Must be one of: " + validJobRoles.join(', ') 
+        });
+      }
+      
+      // Check if learning path exists and is published
+      const learningPath = await storage.getLearningPath(pathId);
+      if (!learningPath) {
+        return res.status(404).json({ message: "Learning path not found" });
+      }
+      
+      if (!learningPath.isPublished) {
+        return res.status(400).json({ message: "Cannot assign unpublished learning path" });
+      }
+      
+      // Get all users with this job role
+      const usersWithJobRole = await storage.getUsersByJobRole(jobRole);
+      
+      if (usersWithJobRole.length === 0) {
+        return res.status(404).json({ message: `No users found with job role: ${jobRole}` });
+      }
+      
+      const enrollments = [];
+      const errors = [];
+      
+      // Enroll each user in the learning path
+      for (const user of usersWithJobRole) {
+        try {
+          const enrollment = await storage.enrollUserInLearningPath({
+            userId: user.id,
+            pathId,
+            enrollmentSource: "manual_job_role_assignment",
+            assignedBy,
+            metadata: {
+              assignmentType: "job_role",
+              jobRole: jobRole,
+              assignedAt: new Date().toISOString()
+            }
+          });
+          enrollments.push(enrollment);
+        } catch (error: any) {
+          if (error.message.includes("already enrolled")) {
+            // Skip already enrolled users but don't consider it an error
+            continue;
+          }
+          errors.push(`Failed to enroll user ${user.firstName} ${user.lastName}: ${error.message}`);
+        }
+      }
+      
+      res.status(201).json({
+        message: `Learning path assigned to ${enrollments.length} users with job role: ${jobRole}`,
+        enrollments: enrollments.length,
+        errors: errors.length > 0 ? errors : undefined,
+        jobRole,
+        pathTitle: learningPath.title
+      });
+    } catch (error: any) {
+      console.error("Error assigning learning path to job role:", error);
+      res.status(500).json({ message: "Failed to assign learning path to job role" });
+    }
+  });
+
   // Get specific enrollment details
   app.get('/api/learning-path-enrollments/:enrollmentId', isAuthenticated, async (req: any, res) => {
     try {

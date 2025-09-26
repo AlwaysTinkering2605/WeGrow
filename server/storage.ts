@@ -298,6 +298,7 @@ export interface IStorage {
   updateUserRole(userId: string, newRole: string, updatedByUserId: string): Promise<User>;
   getUsersByManager(managerId: string): Promise<User[]>;
   getUsersInTeam(teamId: string): Promise<User[]>;
+  getUsersByJobRole(jobRole: string): Promise<User[]>;
 
   // Company Reports
   getCompanyMetrics(): Promise<{
@@ -1765,6 +1766,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(users)
       .where(eq(users.teamId, teamId))
+      .orderBy(users.firstName, users.lastName);
+  }
+
+  async getUsersByJobRole(jobRole: string): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(eq(users.jobRole, jobRole))
       .orderBy(users.firstName, users.lastName);
   }
 
