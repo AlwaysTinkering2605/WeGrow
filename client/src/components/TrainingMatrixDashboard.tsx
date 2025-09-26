@@ -108,16 +108,26 @@ function EnterpriseMatrixGrid() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [selectedTeam, setSelectedTeam] = useState<string>("");
+  const [selectedLearningPath, setSelectedLearningPath] = useState<string>("");
+  const [selectedCourse, setSelectedCourse] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
+
+  // Fetch filter data
+  const { data: jobRoles } = useQuery({ queryKey: ["/api/filter/job-roles"] });
+  const { data: teams } = useQuery({ queryKey: ["/api/filter/teams"] });
+  const { data: learningPaths } = useQuery({ queryKey: ["/api/filter/learning-paths"] });
+  const { data: courses } = useQuery({ queryKey: ["/api/filter/courses"] });
   const { user } = useAuth();
 
   // Fetch matrix data with full competency mapping
   const { data: matrixData, isLoading } = useQuery({
-    queryKey: ["/api/training-matrix/grid", selectedRole, selectedTeam, searchTerm],
+    queryKey: ["/api/training-matrix/grid", selectedRole, selectedTeam, selectedLearningPath, selectedCourse, searchTerm],
     queryFn: () => {
       const params = new URLSearchParams();
       if (selectedRole) params.set('role', selectedRole);
-      if (selectedTeam) params.set('team', selectedTeam);
+      if (selectedTeam) params.set('teamId', selectedTeam);
+      if (selectedLearningPath) params.set('learningPath', selectedLearningPath);
+      if (selectedCourse) params.set('course', selectedCourse);
       if (searchTerm) params.set('search', searchTerm);
       const queryString = params.toString();
       return fetch(`/api/training-matrix/grid?${queryString}`).then(res => res.json());
@@ -130,11 +140,13 @@ function EnterpriseMatrixGrid() {
   }) as { data: Array<{ id: string; title: string; category: string; level: number; skillType: string }> | undefined };
 
   const { data: employees } = useQuery({
-    queryKey: ["/api/users/employees", selectedRole, selectedTeam],
+    queryKey: ["/api/users/employees", selectedRole, selectedTeam, selectedLearningPath, selectedCourse],
     queryFn: () => {
       const params = new URLSearchParams();
       if (selectedRole) params.set('role', selectedRole);
-      if (selectedTeam) params.set('team', selectedTeam);
+      if (selectedTeam) params.set('teamId', selectedTeam);
+      if (selectedLearningPath) params.set('learningPath', selectedLearningPath);
+      if (selectedCourse) params.set('course', selectedCourse);
       const queryString = params.toString();
       return fetch(`/api/users/employees?${queryString}`).then(res => res.json());
     },
@@ -210,30 +222,67 @@ function EnterpriseMatrixGrid() {
           </div>
 
           <Select value={selectedRole} onValueChange={setSelectedRole}>
-            <SelectTrigger data-testid="select-role-filter">
-              <SelectValue placeholder="Filter by role" />
+            <SelectTrigger data-testid="select-job-role-filter">
+              <SelectValue placeholder="Filter by Job Role" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All roles</SelectItem>
-              <SelectItem value="operative">Cleaning Operative</SelectItem>
-              <SelectItem value="supervisor">Area Supervisor</SelectItem>
-              <SelectItem value="leadership">Senior Leadership</SelectItem>
+              <SelectItem value="">All Job Roles</SelectItem>
+              {jobRoles?.map((role: any) => (
+                <SelectItem key={role.value} value={role.value}>
+                  {role.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
           <Select value={selectedTeam} onValueChange={setSelectedTeam}>
             <SelectTrigger data-testid="select-team-filter">
-              <SelectValue placeholder="Filter by team" />
+              <SelectValue placeholder="Filter by Team" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All teams</SelectItem>
-              {/* Teams will be populated from API */}
+              <SelectItem value="">All Teams</SelectItem>
+              {teams?.map((team: any) => (
+                <SelectItem key={team.id} value={team.id}>
+                  {team.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedLearningPath} onValueChange={setSelectedLearningPath}>
+            <SelectTrigger data-testid="select-learning-path-filter">
+              <SelectValue placeholder="Filter by Learning Path" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Learning Paths</SelectItem>
+              {learningPaths?.map((path: any) => (
+                <SelectItem key={path.id} value={path.id}>
+                  {path.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedCourse} onValueChange={setSelectedCourse}>
+            <SelectTrigger data-testid="select-course-filter">
+              <SelectValue placeholder="Filter by Course" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Courses</SelectItem>
+              {courses?.map((course: any) => (
+                <SelectItem key={course.id} value={course.id}>
+                  {course.title}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
           <Button
             variant="outline"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/training-matrix"] })}
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ["/api/training-matrix/grid"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/users/employees"] });
+            }}
             data-testid="button-refresh-matrix"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -450,7 +499,15 @@ function TrainingMatrixListView({ employees, competencies, matrixData }: {
 function LiveCompetencyMatrix() {
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [selectedTeam, setSelectedTeam] = useState<string>("");
+  const [selectedLearningPath, setSelectedLearningPath] = useState<string>("");
+  const [selectedCourse, setSelectedCourse] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
+
+  // Fetch filter data
+  const { data: jobRoles } = useQuery({ queryKey: ["/api/filter/job-roles"] });
+  const { data: teams } = useQuery({ queryKey: ["/api/filter/teams"] });
+  const { data: learningPaths } = useQuery({ queryKey: ["/api/filter/learning-paths"] });
+  const { data: courses } = useQuery({ queryKey: ["/api/filter/courses"] });
   const { user } = useAuth();
 
   const { data: competencyStatuses, isLoading } = useQuery({
@@ -458,9 +515,6 @@ function LiveCompetencyMatrix() {
     refetchInterval: 30000, // Refresh every 30 seconds for live updates
   }) as { data: CompetencyStatus[] | undefined; isLoading: boolean };
 
-  const { data: teams } = useQuery({
-    queryKey: ["/api/teams"]
-  }) as { data: Array<{ id: string; name: string }> | undefined };
 
   const filteredStatuses = competencyStatuses?.filter(status => {
     const matchesRole = !selectedRole || status.user.role === selectedRole;
@@ -518,12 +572,12 @@ function LiveCompetencyMatrix() {
           </div>
 
           <Select value={selectedRole} onValueChange={setSelectedRole}>
-            <SelectTrigger className="w-48" data-testid="select-role-filter">
-              <SelectValue placeholder="Filter by role" />
+            <SelectTrigger className="w-48" data-testid="select-job-role-filter">
+              <SelectValue placeholder="Filter by Job Role" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All roles</SelectItem>
-              {roles.map((role) => (
+              <SelectItem value="">All Job Roles</SelectItem>
+              {jobRoles?.map((role: any) => (
                 <SelectItem key={role.value} value={role.value}>
                   {role.label}
                 </SelectItem>
@@ -533,11 +587,11 @@ function LiveCompetencyMatrix() {
 
           <Select value={selectedTeam} onValueChange={setSelectedTeam}>
             <SelectTrigger className="w-48" data-testid="select-team-filter">
-              <SelectValue placeholder="Filter by team" />
+              <SelectValue placeholder="Filter by Team" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All teams</SelectItem>
-              {teams?.map((team) => (
+              <SelectItem value="">All Teams</SelectItem>
+              {teams?.map((team: any) => (
                 <SelectItem key={team.id} value={team.id}>
                   {team.name}
                 </SelectItem>
@@ -545,9 +599,40 @@ function LiveCompetencyMatrix() {
             </SelectContent>
           </Select>
 
+          <Select value={selectedLearningPath} onValueChange={setSelectedLearningPath}>
+            <SelectTrigger className="w-48" data-testid="select-learning-path-filter">
+              <SelectValue placeholder="Filter by Learning Path" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Learning Paths</SelectItem>
+              {learningPaths?.map((path: any) => (
+                <SelectItem key={path.id} value={path.id}>
+                  {path.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedCourse} onValueChange={setSelectedCourse}>
+            <SelectTrigger className="w-48" data-testid="select-course-filter">
+              <SelectValue placeholder="Filter by Course" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Courses</SelectItem>
+              {courses?.map((course: any) => (
+                <SelectItem key={course.id} value={course.id}>
+                  {course.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Button
             variant="outline"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/training-matrix"] })}
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ["/api/training-matrix/grid"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/users/employees"] });
+            }}
             data-testid="button-refresh-matrix"
           >
             <RefreshCw className="w-4 h-4 mr-2" />

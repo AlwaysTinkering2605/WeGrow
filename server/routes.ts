@@ -1504,10 +1504,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Training Matrix Grid View - for dashboard visualization (must come before :id route)
   app.get('/api/training-matrix/grid', isAuthenticated, async (req, res) => {
     try {
-      const { role, team, search } = req.query;
+      const { role, teamId, learningPath, course, search } = req.query;
       const gridData = await storage.getTrainingMatrixGrid({
         role: role as string,
-        teamId: team as string,
+        teamId: teamId as string,
+        learningPath: learningPath as string,
+        course: course as string,
         search: search as string
       });
       res.json(gridData);
@@ -1572,10 +1574,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Employee data endpoint for training matrix
   app.get('/api/users/employees', isAuthenticated, async (req, res) => {
     try {
-      const { role, team } = req.query;
+      const { role, teamId, learningPath, course } = req.query;
       const employees = await storage.getEmployees({
         role: role as string,
-        teamId: team as string
+        teamId: teamId as string,
+        learningPath: learningPath as string,
+        course: course as string
       });
       res.json(employees);
     } catch (error) {
@@ -1621,6 +1625,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(courses);
     } catch (error) {
       console.error("Error fetching courses:", error);
+      res.status(500).json({ message: "Failed to fetch courses" });
+    }
+  });
+
+  // Filter data endpoints for training matrix dropdowns
+  app.get('/api/filter/job-roles', isAuthenticated, async (req, res) => {
+    try {
+      const jobRoles = await storage.getJobRoles();
+      res.json(jobRoles);
+    } catch (error) {
+      console.error("Error fetching job roles for filter:", error);
+      res.status(500).json({ message: "Failed to fetch job roles" });
+    }
+  });
+
+  app.get('/api/filter/teams', isAuthenticated, async (req, res) => {
+    try {
+      const teams = await storage.getTeams();
+      res.json(teams);
+    } catch (error) {
+      console.error("Error fetching teams for filter:", error);
+      res.status(500).json({ message: "Failed to fetch teams" });
+    }
+  });
+
+  app.get('/api/filter/learning-paths', isAuthenticated, async (req, res) => {
+    try {
+      const learningPaths = await storage.getLearningPathsForFilter();
+      res.json(learningPaths);
+    } catch (error) {
+      console.error("Error fetching learning paths for filter:", error);
+      res.status(500).json({ message: "Failed to fetch learning paths" });
+    }
+  });
+
+  app.get('/api/filter/courses', isAuthenticated, async (req, res) => {
+    try {
+      const courses = await storage.getCoursesForFilter();
+      res.json(courses);
+    } catch (error) {
+      console.error("Error fetching courses for filter:", error);
       res.status(500).json({ message: "Failed to fetch courses" });
     }
   });

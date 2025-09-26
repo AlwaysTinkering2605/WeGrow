@@ -305,12 +305,14 @@ export interface IStorage {
   getUsersByManager(managerId: string): Promise<User[]>;
   getUsersInTeam(teamId: string): Promise<User[]>;
   getUsersByJobRole(jobRole: string): Promise<User[]>;
-  getEmployees(filters?: { role?: string; teamId?: string }): Promise<User[]>;
-  getTrainingMatrixGrid(filters?: { role?: string; teamId?: string; search?: string }): Promise<any[]>;
+  getEmployees(filters?: { role?: string; teamId?: string; learningPath?: string; course?: string }): Promise<User[]>;
+  getTrainingMatrixGrid(filters?: { role?: string; teamId?: string; learningPath?: string; course?: string; search?: string }): Promise<any[]>;
   
   // Filter data methods for training matrix
   getJobRoles(): Promise<Array<{ value: string; label: string }>>;
   getTeams(): Promise<Array<{ id: string; name: string }>>;
+  getLearningPathsForFilter(): Promise<Array<{ id: string; title: string }>>;
+  getCoursesForFilter(): Promise<Array<{ id: string; title: string }>>;
 
   // Company Reports
   getCompanyMetrics(): Promise<{
@@ -1822,25 +1824,55 @@ export class DatabaseStorage implements IStorage {
       .orderBy(users.firstName, users.lastName);
   }
 
-  async getEmployees(filters?: { role?: string; teamId?: string }): Promise<User[]> {
-    let query = db.select().from(users);
+  async getEmployees(filters?: { role?: string; teamId?: string; learningPath?: string; course?: string }): Promise<User[]> {
+    let query = db.select({
+      id: users.id,
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      role: users.role,
+      jobRole: users.jobRole,
+      teamId: users.teamId,
+      managerId: users.managerId,
+      employeeId: users.employeeId,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt
+    }).from(users);
+    
+    // Add joins for learning path and course filtering
+    if (filters?.learningPath && filters.learningPath !== "all" && filters.learningPath !== "") {
+      query = query.innerJoin(learningPathEnrollments, eq(users.id, learningPathEnrollments.userId));
+    }
+    
+    if (filters?.course && filters.course !== "all" && filters.course !== "") {
+      query = query
+        .innerJoin(enrollments, eq(users.id, enrollments.userId))
+        .innerJoin(courseVersions, eq(enrollments.courseVersionId, courseVersions.id));
+    }
     
     const conditions = [];
-    if (filters?.role) {
+    if (filters?.role && filters.role !== "all" && filters.role !== "") {
       conditions.push(eq(users.role, filters.role));
     }
-    if (filters?.teamId) {
+    if (filters?.teamId && filters.teamId !== "all" && filters.teamId !== "") {
       conditions.push(eq(users.teamId, filters.teamId));
+    }
+    if (filters?.learningPath && filters.learningPath !== "all" && filters.learningPath !== "") {
+      conditions.push(eq(learningPathEnrollments.pathId, filters.learningPath));
+    }
+    if (filters?.course && filters.course !== "all" && filters.course !== "") {
+      conditions.push(eq(courseVersions.courseId, filters.course));
     }
     
     if (conditions.length > 0) {
       query = query.where(and(...conditions));
     }
     
-    return await query.orderBy(users.firstName, users.lastName);
+    // Use distinct to avoid duplicates from joins and ensure proper ordering
+    return await query.groupBy(users.id).orderBy(users.firstName, users.lastName);
   }
 
-  async getTrainingMatrixGrid(filters?: { role?: string; teamId?: string; search?: string }): Promise<any[]> {
+  async getTrainingMatrixGrid(filters?: { role?: string; teamId?: string; learningPath?: string; course?: string; search?: string }): Promise<any[]> {
     // Get all training matrix records with user and competency details
     let userQuery = db
       .select({
@@ -1853,12 +1885,29 @@ export class DatabaseStorage implements IStorage {
       })
       .from(users);
 
+    // Add joins for learning path and course filtering
+    if (filters?.learningPath && filters.learningPath !== "all" && filters.learningPath !== "") {
+      userQuery = userQuery.innerJoin(learningPathEnrollments, eq(users.id, learningPathEnrollments.userId));
+    }
+
+    if (filters?.course && filters.course !== "all" && filters.course !== "") {
+      userQuery = userQuery
+        .innerJoin(enrollments, eq(users.id, enrollments.userId))
+        .innerJoin(courseVersions, eq(enrollments.courseVersionId, courseVersions.id));
+    }
+
     const userConditions = [];
-    if (filters?.role) {
+    if (filters?.role && filters.role !== "all" && filters.role !== "") {
       userConditions.push(eq(users.role, filters.role));
     }
-    if (filters?.teamId) {
+    if (filters?.teamId && filters.teamId !== "all" && filters.teamId !== "") {
       userConditions.push(eq(users.teamId, filters.teamId));
+    }
+    if (filters?.learningPath && filters.learningPath !== "all" && filters.learningPath !== "") {
+      userConditions.push(eq(learningPathEnrollments.pathId, filters.learningPath));
+    }
+    if (filters?.course && filters.course !== "all" && filters.course !== "") {
+      userConditions.push(eq(courseVersions.courseId, filters.course));
     }
     if (filters?.search) {
       userConditions.push(
@@ -1905,6 +1954,14 @@ export class DatabaseStorage implements IStorage {
 
   async getTeams(): Promise<Array<{ id: string; name: string }>> {
     return await db.select({ id: teams.id, name: teams.name }).from(teams).orderBy(teams.name);
+  }
+
+  async getLearningPathsForFilter(): Promise<Array<{ id: string; title: string }>> {
+    return await db.select({ id: learningPaths.id, title: learningPaths.title }).from(learningPaths).orderBy(learningPaths.title);
+  }
+
+  async getCoursesForFilter(): Promise<Array<{ id: string; title: string }>> {
+    return await db.select({ id: courses.id, title: courses.title }).from(courses).orderBy(courses.title);
   }
 
   // LMS - Course Management (stub implementations)
