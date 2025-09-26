@@ -47,6 +47,7 @@ export default function LearningPathsManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isStepDialogOpen, setIsStepDialogOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<any>(null);
+  const [editingPath, setEditingPath] = useState<any>(null);
 
   // Learning Paths queries
   const { data: learningPaths = [], isLoading } = useQuery<any[]>({
@@ -186,7 +187,16 @@ export default function LearningPathsManagement() {
   });
 
   const handleCreatePath = (data: LearningPathFormData) => {
-    createPathMutation.mutate(data);
+    if (editingPath) {
+      // TODO: Implement update path mutation when backend supports it
+      toast({
+        title: "Feature Coming Soon",
+        description: "Path editing will be available in a future update.",
+        variant: "default",
+      });
+    } else {
+      createPathMutation.mutate(data);
+    }
   };
 
   const handleCreateStep = (data: PathStepFormData) => {
@@ -269,17 +279,31 @@ export default function LearningPathsManagement() {
         </div>
         
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-create-path">
-              <Plus className="mr-2 h-4 w-4" />
-              Create Learning Path
-            </Button>
-          </DialogTrigger>
+          <Button 
+            onClick={() => {
+              setEditingPath(null);
+              pathForm.reset({ 
+                title: "", 
+                description: "", 
+                pathType: "linear", 
+                category: "", 
+                estimatedDuration: 60 
+              });
+              setIsCreateDialogOpen(true);
+            }}
+            data-testid="button-create-path"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Create Learning Path
+          </Button>
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
-              <DialogTitle>Create Learning Path</DialogTitle>
+              <DialogTitle>{editingPath ? 'Edit Learning Path' : 'Create Learning Path'}</DialogTitle>
               <DialogDescription>
-                Design a structured learning experience with multiple steps and content types.
+                {editingPath 
+                  ? 'Update the learning path details and configuration.'
+                  : 'Design a structured learning experience with multiple steps and content types.'
+                }
               </DialogDescription>
             </DialogHeader>
             <Form {...pathForm}>
@@ -378,7 +402,10 @@ export default function LearningPathsManagement() {
                     Cancel
                   </Button>
                   <Button type="submit" disabled={createPathMutation.isPending} data-testid="button-submit-path">
-                    {createPathMutation.isPending ? "Creating..." : "Create Path"}
+                    {editingPath 
+                      ? (createPathMutation.isPending ? "Updating..." : "Update Path")
+                      : (createPathMutation.isPending ? "Creating..." : "Create Path")
+                    }
                   </Button>
                 </div>
               </form>
@@ -472,6 +499,26 @@ export default function LearningPathsManagement() {
                         </Button>
                       )}
                       
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setEditingPath(selectedPath);
+                          pathForm.reset({
+                            title: selectedPath.title,
+                            description: selectedPath.description || "",
+                            pathType: selectedPath.pathType,
+                            category: selectedPath.category || "",
+                            estimatedDuration: selectedPath.estimatedDuration || 60,
+                          });
+                          setIsCreateDialogOpen(true);
+                        }}
+                        data-testid="button-edit-path"
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </Button>
+                      
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="destructive" size="sm" data-testid="button-delete-path">
@@ -521,12 +568,28 @@ export default function LearningPathsManagement() {
                   <div className="flex justify-between items-center">
                     <CardTitle>Learning Path Steps</CardTitle>
                     <Dialog open={isStepDialogOpen} onOpenChange={setIsStepDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button size="sm" data-testid="button-add-step">
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add Step
-                        </Button>
-                      </DialogTrigger>
+                      <Button 
+                        size="sm" 
+                        onClick={() => {
+                          setEditingStep(null);
+                          stepForm.reset({
+                            title: "",
+                            description: "",
+                            stepType: "course",
+                            resourceId: "",
+                            resourceType: "",
+                            resourceUrl: "",
+                            isOptional: false,
+                            passingScore: 80,
+                            estimatedDuration: 30,
+                          });
+                          setIsStepDialogOpen(true);
+                        }}
+                        data-testid="button-add-step"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Step
+                      </Button>
                       <DialogContent className="sm:max-w-[600px]">
                         <DialogHeader>
                           <DialogTitle>{editingStep ? 'Edit Step' : 'Add Step'}</DialogTitle>
