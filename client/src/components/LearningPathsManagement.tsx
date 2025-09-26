@@ -114,8 +114,14 @@ export default function LearningPathsManagement() {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    onSuccess: () => {
+    onSuccess: (updatedPath, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/learning-paths'] });
+      
+      // Update selectedPath if it's the same path that was updated
+      if (selectedPath && selectedPath.id === variables.id) {
+        setSelectedPath({ ...selectedPath, ...variables.data });
+      }
+      
       toast({ title: "Success", description: "Learning path updated successfully" });
       setIsCreateDialogOpen(false);
       setEditingPath(null);
