@@ -307,6 +307,10 @@ export interface IStorage {
   getUsersByJobRole(jobRole: string): Promise<User[]>;
   getEmployees(filters?: { role?: string; teamId?: string }): Promise<User[]>;
   getTrainingMatrixGrid(filters?: { role?: string; teamId?: string; search?: string }): Promise<any[]>;
+  
+  // Filter data methods for training matrix
+  getJobRoles(): Promise<Array<{ value: string; label: string }>>;
+  getTeams(): Promise<Array<{ id: string; name: string }>>;
 
   // Company Reports
   getCompanyMetrics(): Promise<{
@@ -1883,6 +1887,24 @@ export class DatabaseStorage implements IStorage {
       ...user,
       competencyRecords: matrixRecords.filter(record => record.userId === user.userId)
     }));
+  }
+
+  // Filter data methods for training matrix
+  async getJobRoles(): Promise<Array<{ value: string; label: string }>> {
+    const jobRoles = await db
+      .selectDistinct({ jobRole: users.jobRole })
+      .from(users)
+      .where(isNotNull(users.jobRole))
+      .orderBy(users.jobRole);
+
+    return jobRoles.map(row => ({
+      value: row.jobRole,
+      label: row.jobRole.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+    }));
+  }
+
+  async getTeams(): Promise<Array<{ id: string; name: string }>> {
+    return await db.select({ id: teams.id, name: teams.name }).from(teams).orderBy(teams.name);
   }
 
   // LMS - Course Management (stub implementations)

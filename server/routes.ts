@@ -1584,6 +1584,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Filter data endpoints for training matrix
+  app.get('/api/job-roles', isAuthenticated, async (req, res) => {
+    try {
+      const jobRoles = await storage.getJobRoles();
+      res.json(jobRoles);
+    } catch (error) {
+      console.error("Error fetching job roles:", error);
+      res.status(500).json({ message: "Failed to fetch job roles" });
+    }
+  });
+
+  app.get('/api/teams', isAuthenticated, async (req, res) => {
+    try {
+      const teams = await storage.getTeams();
+      res.json(teams);
+    } catch (error) {
+      console.error("Error fetching teams:", error);
+      res.status(500).json({ message: "Failed to fetch teams" });
+    }
+  });
+
+  app.get('/api/learning-paths', isAuthenticated, async (req, res) => {
+    try {
+      const learningPaths = await storage.getLearningPaths();
+      res.json(learningPaths);
+    } catch (error) {
+      console.error("Error fetching learning paths:", error);
+      res.status(500).json({ message: "Failed to fetch learning paths" });
+    }
+  });
+
+  app.get('/api/courses', isAuthenticated, async (req, res) => {
+    try {
+      const courses = await storage.getCourses();
+      res.json(courses);
+    } catch (error) {
+      console.error("Error fetching courses:", error);
+      res.status(500).json({ message: "Failed to fetch courses" });
+    }
+  });
+
   app.put('/api/competency-status/:userId/:competencyLibraryId', isAuthenticated, async (req, res) => {
     try {
       const { userId, competencyLibraryId } = req.params;
