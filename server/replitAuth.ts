@@ -162,7 +162,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
           email: 'test@apex.com',
           first_name: 'Test',
           last_name: 'User',
-          role: 'operative'
+          role: 'supervisor'
         },
         access_token: 'dev-token',
         expires_at: Math.floor(Date.now() / 1000) + 3600 // 1 hour from now

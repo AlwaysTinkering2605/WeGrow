@@ -106,10 +106,10 @@ interface TeamCompetencyOverview {
 // Enterprise Training Matrix Grid View
 function EnterpriseMatrixGrid() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [selectedRole, setSelectedRole] = useState<string>("");
-  const [selectedTeam, setSelectedTeam] = useState<string>("");
-  const [selectedLearningPath, setSelectedLearningPath] = useState<string>("");
-  const [selectedCourse, setSelectedCourse] = useState<string>("");
+  const [selectedRole, setSelectedRole] = useState<string>("all");
+  const [selectedTeam, setSelectedTeam] = useState<string>("all");
+  const [selectedLearningPath, setSelectedLearningPath] = useState<string>("all");
+  const [selectedCourse, setSelectedCourse] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
 
   // Fetch filter data
@@ -226,7 +226,7 @@ function EnterpriseMatrixGrid() {
               <SelectValue placeholder="Filter by Job Role" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Job Roles</SelectItem>
+              <SelectItem value="all">All Job Roles</SelectItem>
               {jobRoles?.map((role: any) => (
                 <SelectItem key={role.value} value={role.value}>
                   {role.label}
@@ -240,7 +240,7 @@ function EnterpriseMatrixGrid() {
               <SelectValue placeholder="Filter by Team" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Teams</SelectItem>
+              <SelectItem value="all">All Teams</SelectItem>
               {teams?.map((team: any) => (
                 <SelectItem key={team.id} value={team.id}>
                   {team.name}
@@ -254,7 +254,7 @@ function EnterpriseMatrixGrid() {
               <SelectValue placeholder="Filter by Learning Path" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Learning Paths</SelectItem>
+              <SelectItem value="all">All Learning Paths</SelectItem>
               {learningPaths?.map((path: any) => (
                 <SelectItem key={path.id} value={path.id}>
                   {path.title}
@@ -268,7 +268,7 @@ function EnterpriseMatrixGrid() {
               <SelectValue placeholder="Filter by Course" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Courses</SelectItem>
+              <SelectItem value="all">All Courses</SelectItem>
               {courses?.map((course: any) => (
                 <SelectItem key={course.id} value={course.id}>
                   {course.title}
@@ -497,10 +497,10 @@ function TrainingMatrixListView({ employees, competencies, matrixData }: {
 
 // Live Competency Status Matrix (original function renamed for backward compatibility)
 function LiveCompetencyMatrix() {
-  const [selectedRole, setSelectedRole] = useState<string>("");
-  const [selectedTeam, setSelectedTeam] = useState<string>("");
-  const [selectedLearningPath, setSelectedLearningPath] = useState<string>("");
-  const [selectedCourse, setSelectedCourse] = useState<string>("");
+  const [selectedRole, setSelectedRole] = useState<string>("all");
+  const [selectedTeam, setSelectedTeam] = useState<string>("all");
+  const [selectedLearningPath, setSelectedLearningPath] = useState<string>("all");
+  const [selectedCourse, setSelectedCourse] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
 
   // Fetch filter data
