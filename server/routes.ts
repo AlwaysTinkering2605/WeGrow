@@ -1501,6 +1501,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Training Matrix Grid View - for dashboard visualization (must come before :id route)
+  app.get('/api/training-matrix/grid', isAuthenticated, async (req, res) => {
+    try {
+      const { role, team, search } = req.query;
+      const gridData = await storage.getTrainingMatrixGrid({
+        role: role as string,
+        teamId: team as string,
+        search: search as string
+      });
+      res.json(gridData);
+    } catch (error) {
+      console.error("Error fetching training matrix grid:", error);
+      res.status(500).json({ message: "Failed to fetch training matrix grid data" });
+    }
+  });
+
   app.get('/api/training-matrix/:id', isAuthenticated, async (req, res) => {
     try {
       const record = await storage.getTrainingMatrixRecord(req.params.id);
@@ -1550,6 +1566,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(500).json({ message: "Failed to update training matrix record" });
+    }
+  });
+
+  // Employee data endpoint for training matrix
+  app.get('/api/users/employees', isAuthenticated, async (req, res) => {
+    try {
+      const { role, team } = req.query;
+      const employees = await storage.getEmployees({
+        role: role as string,
+        teamId: team as string
+      });
+      res.json(employees);
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+      res.status(500).json({ message: "Failed to fetch employee data" });
     }
   });
 

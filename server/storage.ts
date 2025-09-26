@@ -197,7 +197,7 @@ import {
   type AutomationTriggerData,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, ne, sql, inArray, isNull, isNotNull, max, gte, lte } from "drizzle-orm";
+import { eq, and, desc, asc, ne, sql, inArray, isNull, isNotNull, max, gte, lte, or, ilike } from "drizzle-orm";
 
 export interface IStorage {
   // User operations - required for Replit Auth
@@ -305,6 +305,8 @@ export interface IStorage {
   getUsersByManager(managerId: string): Promise<User[]>;
   getUsersInTeam(teamId: string): Promise<User[]>;
   getUsersByJobRole(jobRole: string): Promise<User[]>;
+  getEmployees(filters?: { role?: string; teamId?: string }): Promise<User[]>;
+  getTrainingMatrixGrid(filters?: { role?: string; teamId?: string; search?: string }): Promise<any[]>;
 
   // Company Reports
   getCompanyMetrics(): Promise<{
@@ -1814,6 +1816,73 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(eq(users.jobRole, jobRole))
       .orderBy(users.firstName, users.lastName);
+  }
+
+  async getEmployees(filters?: { role?: string; teamId?: string }): Promise<User[]> {
+    let query = db.select().from(users);
+    
+    const conditions = [];
+    if (filters?.role) {
+      conditions.push(eq(users.role, filters.role));
+    }
+    if (filters?.teamId) {
+      conditions.push(eq(users.teamId, filters.teamId));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+    
+    return await query.orderBy(users.firstName, users.lastName);
+  }
+
+  async getTrainingMatrixGrid(filters?: { role?: string; teamId?: string; search?: string }): Promise<any[]> {
+    // Get all training matrix records with user and competency details
+    let userQuery = db
+      .select({
+        userId: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        role: users.role,
+        email: users.email,
+        teamId: users.teamId
+      })
+      .from(users);
+
+    const userConditions = [];
+    if (filters?.role) {
+      userConditions.push(eq(users.role, filters.role));
+    }
+    if (filters?.teamId) {
+      userConditions.push(eq(users.teamId, filters.teamId));
+    }
+    if (filters?.search) {
+      userConditions.push(
+        or(
+          ilike(users.firstName, `%${filters.search}%`),
+          ilike(users.lastName, `%${filters.search}%`),
+          ilike(users.email, `%${filters.search}%`)
+        )
+      );
+    }
+
+    if (userConditions.length > 0) {
+      userQuery = userQuery.where(and(...userConditions));
+    }
+
+    const userList = await userQuery.orderBy(users.firstName, users.lastName);
+
+    // Get all training matrix records for these users
+    const matrixRecords = await db
+      .select()
+      .from(trainingMatrixRecords)
+      .where(inArray(trainingMatrixRecords.userId, userList.map(u => u.userId)));
+
+    // Combine user data with matrix records
+    return userList.map(user => ({
+      ...user,
+      competencyRecords: matrixRecords.filter(record => record.userId === user.userId)
+    }));
   }
 
   // LMS - Course Management (stub implementations)

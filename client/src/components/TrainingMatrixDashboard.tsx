@@ -113,7 +113,15 @@ function EnterpriseMatrixGrid() {
 
   // Fetch matrix data with full competency mapping
   const { data: matrixData, isLoading } = useQuery({
-    queryKey: ["/api/training-matrix/grid", { role: selectedRole, team: selectedTeam, search: searchTerm }],
+    queryKey: ["/api/training-matrix/grid", selectedRole, selectedTeam, searchTerm],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (selectedRole) params.set('role', selectedRole);
+      if (selectedTeam) params.set('team', selectedTeam);
+      if (searchTerm) params.set('search', searchTerm);
+      const queryString = params.toString();
+      return fetch(`/api/training-matrix/grid?${queryString}`).then(res => res.json());
+    },
     refetchInterval: 30000,
   }) as { data: any; isLoading: boolean };
 
@@ -122,7 +130,14 @@ function EnterpriseMatrixGrid() {
   }) as { data: Array<{ id: string; title: string; category: string; level: number; skillType: string }> | undefined };
 
   const { data: employees } = useQuery({
-    queryKey: ["/api/users/employees", { role: selectedRole, team: selectedTeam }]
+    queryKey: ["/api/users/employees", selectedRole, selectedTeam],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (selectedRole) params.set('role', selectedRole);
+      if (selectedTeam) params.set('team', selectedTeam);
+      const queryString = params.toString();
+      return fetch(`/api/users/employees?${queryString}`).then(res => res.json());
+    },
   }) as { data: Array<{ id: string; firstName: string; lastName: string; role: string; teamId?: string; email: string }> | undefined };
 
   return (
@@ -250,7 +265,10 @@ function EnterpriseMatrixGridView({ employees, competencies, matrixData }: {
   matrixData?: any;
 }) {
   const getCompetencyStatus = (employeeId: string, competencyId: string) => {
-    const status = matrixData?.find((item: any) => 
+    if (!Array.isArray(matrixData)) {
+      return "not_started";
+    }
+    const status = matrixData.find((item: any) => 
       item.userId === employeeId && item.competencyLibraryId === competencyId
     );
     return status?.currentStatus || "not_started";
@@ -355,7 +373,9 @@ function TrainingMatrixListView({ employees, competencies, matrixData }: {
   matrixData?: any;
 }) {
   const getEmployeeCompetencyStats = (employeeId: string) => {
-    const employeeRecords = matrixData?.filter((record: any) => record.userId === employeeId) || [];
+    const employeeRecords = Array.isArray(matrixData) 
+      ? matrixData.filter((record: any) => record.userId === employeeId) 
+      : [];
     const total = competencies?.length || 0;
     const competent = employeeRecords.filter((r: any) => r.currentStatus === "competent").length;
     const inProgress = employeeRecords.filter((r: any) => r.currentStatus === "in_progress").length;
