@@ -259,12 +259,13 @@ export default function Layout() {
                 {Object.values(getAdminDropdowns()).map((dropdown: any) => {
                   const DropdownIcon = dropdown.icon;
                   const isAnyItemActive = dropdown.items.some((item: any) => item.id === activeTab);
-                  const isOpen = openDropdowns[dropdown.id] || isAnyItemActive;
+                  const hasExplicitState = openDropdowns.hasOwnProperty(dropdown.id);
+                  const isOpen = hasExplicitState ? openDropdowns[dropdown.id] : isAnyItemActive;
                   
                   const toggleDropdown = () => {
                     setOpenDropdowns(prev => ({
                       ...prev,
-                      [dropdown.id]: !prev[dropdown.id]
+                      [dropdown.id]: !isOpen
                     }));
                   };
                   
