@@ -117,6 +117,9 @@ export default function LearningPathsManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/learning-paths'] });
       toast({ title: "Success", description: "Learning path updated successfully" });
+      setIsCreateDialogOpen(false);
+      setEditingPath(null);
+      pathForm.reset();
     },
   });
 
