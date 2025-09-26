@@ -1852,7 +1852,7 @@ export class DatabaseStorage implements IStorage {
     
     const conditions = [];
     if (filters?.role && filters.role !== "all" && filters.role !== "") {
-      conditions.push(eq(users.role, filters.role));
+      conditions.push(eq(users.jobRole, filters.role as any));
     }
     if (filters?.teamId && filters.teamId !== "all" && filters.teamId !== "") {
       conditions.push(eq(users.teamId, filters.teamId));
@@ -1898,7 +1898,7 @@ export class DatabaseStorage implements IStorage {
 
     const userConditions = [];
     if (filters?.role && filters.role !== "all" && filters.role !== "") {
-      userConditions.push(eq(users.role, filters.role));
+      userConditions.push(eq(users.jobRole, filters.role as any));
     }
     if (filters?.teamId && filters.teamId !== "all" && filters.teamId !== "") {
       userConditions.push(eq(users.teamId, filters.teamId));
