@@ -49,13 +49,18 @@ export default function LearningPathsManagement() {
   const [editingStep, setEditingStep] = useState<any>(null);
 
   // Learning Paths queries
-  const { data: learningPaths = [], isLoading } = useQuery({
+  const { data: learningPaths = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/learning-paths'],
   });
 
-  const { data: pathSteps = [] } = useQuery({
+  const { data: pathSteps = [] } = useQuery<any[]>({
     queryKey: ['/api/learning-paths', selectedPath?.id, 'steps'],
     enabled: !!selectedPath?.id,
+  });
+
+  // Courses query for selection when step type is "course"
+  const { data: availableCourses = [] } = useQuery<any[]>({
+    queryKey: ['/api/lms/courses'],
   });
 
   // Forms
@@ -204,6 +209,23 @@ export default function LearningPathsManagement() {
       estimatedDuration: step.estimatedDuration || 30,
     });
     setIsStepDialogOpen(true);
+  };
+
+  // Helper function to get course details by ID
+  const getCourseById = (courseId: string) => {
+    return availableCourses.find((course: any) => course.id === courseId);
+  };
+
+  // Helper function to auto-populate step title when course is selected
+  const handleCourseSelection = (courseId: string, onChange: (value: string) => void) => {
+    onChange(courseId);
+    const selectedCourse = getCourseById(courseId);
+    if (selectedCourse && !stepForm.getValues("title")) {
+      stepForm.setValue("title", selectedCourse.title);
+    }
+    if (selectedCourse && selectedCourse.estimatedDuration && !stepForm.getValues("estimatedDuration")) {
+      stepForm.setValue("estimatedDuration", selectedCourse.estimatedDuration);
+    }
   };
 
   const handleUpdateStep = (data: PathStepFormData) => {
@@ -554,20 +576,64 @@ export default function LearningPathsManagement() {
                               )}
                             />
                             
-                            <div className="grid grid-cols-2 gap-4">
+                            {/* Course selection dropdown - only visible when step type is "course" */}
+                            {stepForm.watch("stepType") === "course" && (
                               <FormField
                                 control={stepForm.control}
-                                name="resourceUrl"
+                                name="resourceId"
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel>Resource URL (if external)</FormLabel>
-                                    <FormControl>
-                                      <Input {...field} placeholder="https://..." data-testid="input-step-url" />
-                                    </FormControl>
+                                    <FormLabel>Select Course</FormLabel>
+                                    <Select value={field.value || ""} onValueChange={(value) => handleCourseSelection(value, field.onChange)}>
+                                      <FormControl>
+                                        <SelectTrigger data-testid="select-course">
+                                          <SelectValue placeholder="Choose a course..." />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {availableCourses.map((course: any) => (
+                                          <SelectItem key={course.id} value={course.id}>
+                                            <div className="flex flex-col">
+                                              <span className="font-medium">{course.title}</span>
+                                              {course.category && (
+                                                <span className="text-sm text-muted-foreground">
+                                                  {course.category} • {course.estimatedDuration || 0}min
+                                                </span>
+                                              )}
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormDescription>
+                                      Select an existing course from the system to include in this learning path.
+                                    </FormDescription>
                                     <FormMessage />
                                   </FormItem>
                                 )}
                               />
+                            )}
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                              {/* Resource URL - only show for external step types */}
+                              {(stepForm.watch("stepType") === "external" || stepForm.watch("stepType") === "video") && (
+                                <FormField
+                                  control={stepForm.control}
+                                  name="resourceUrl"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Resource URL</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} placeholder="https://..." data-testid="input-step-url" />
+                                      </FormControl>
+                                      <FormDescription>
+                                        {stepForm.watch("stepType") === "external" ? "External link URL" : "Video URL"}
+                                      </FormDescription>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              )}
                               
                               <FormField
                                 control={stepForm.control}
@@ -636,8 +702,17 @@ export default function LearningPathsManagement() {
                               <div>
                                 <div className="font-medium">{step.title}</div>
                                 <div className="text-sm text-muted-foreground">
-                                  {step.stepType} • {step.estimatedDuration || 0}m
-                                  {step.isOptional && <Badge variant="outline" className="ml-2">Optional</Badge>}
+                                  {step.stepType === "course" && step.resourceId ? (
+                                    <>
+                                      Course: {getCourseById(step.resourceId)?.title || "Unknown Course"} • {step.estimatedDuration || 0}m
+                                      {step.isOptional && <Badge variant="outline" className="ml-2">Optional</Badge>}
+                                    </>
+                                  ) : (
+                                    <>
+                                      {step.stepType} • {step.estimatedDuration || 0}m
+                                      {step.isOptional && <Badge variant="outline" className="ml-2">Optional</Badge>}
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             </div>
