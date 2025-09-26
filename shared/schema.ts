@@ -30,6 +30,18 @@ export const sessions = pgTable(
 // User roles enum
 export const userRoleEnum = pgEnum("user_role", ["operative", "supervisor", "leadership"]);
 
+// Job roles enum for HR integration
+export const jobRoleEnum = pgEnum("job_role", [
+  "cleaner_contract", 
+  "cleaner_specialised", 
+  "team_leader_contract", 
+  "team_leader_specialised", 
+  "mobile_cleaner", 
+  "supervisor", 
+  "manager", 
+  "director"
+]);
+
 // Confidence levels enum
 export const confidenceLevelEnum = pgEnum("confidence_level", ["green", "amber", "red"]);
 
@@ -109,6 +121,8 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   mobilePhone: varchar("mobile_phone"),
   role: userRoleEnum("role").default("operative").notNull(),
+  jobRole: jobRoleEnum("job_role"), // New field for HR integration
+  employeeId: varchar("employee_id").unique(), // New field for external HR software integration
   managerId: varchar("manager_id"),
   teamId: varchar("team_id"), // Reference to teams table
   teamName: varchar("team_name"), // Keep for backward compatibility during transition
