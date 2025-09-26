@@ -799,6 +799,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get team competency overview (Supervisor+ with team access control)
+  app.get('/api/team-competency-overview', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Role-based access control
+      if (currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const teamOverviews = await storage.getTeamCompetencyOverview();
+      res.json(teamOverviews);
+    } catch (error) {
+      console.error("Error fetching team competency overview:", error);
+      res.status(500).json({ message: "Failed to fetch team competency overview" });
+    }
+  });
+
   // Get team learning trends (Supervisor+ with team access control)
   app.get('/api/analytics/teams/:teamId/trends', isAuthenticated, async (req: any, res) => {
     try {

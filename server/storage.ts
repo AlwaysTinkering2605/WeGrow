@@ -6459,9 +6459,9 @@ export class DatabaseStorage implements IStorage {
         lastName: users.lastName,
         role: users.role,
         totalAssignments: sql<number>`COUNT(${trainingMatrixRecords.id})`,
-        achievedAssignments: sql<number>`COUNT(CASE WHEN ${trainingMatrixRecords.status} = 'achieved' THEN 1 END)`,
-        inProgressAssignments: sql<number>`COUNT(CASE WHEN ${trainingMatrixRecords.status} = 'in_progress' THEN 1 END)`,
-        overdueAssignments: sql<number>`COUNT(CASE WHEN ${trainingMatrixRecords.status} = 'overdue' THEN 1 END)`
+        achievedAssignments: sql<number>`COUNT(CASE WHEN ${trainingMatrixRecords.currentStatus} = 'competent' THEN 1 END)`,
+        inProgressAssignments: sql<number>`COUNT(CASE WHEN ${trainingMatrixRecords.currentStatus} = 'in_progress' THEN 1 END)`,
+        overdueAssignments: sql<number>`COUNT(CASE WHEN ${trainingMatrixRecords.currentStatus} = 'expired' THEN 1 END)`
       })
       .from(teams)
       .leftJoin(users, eq(teams.id, users.teamId))
