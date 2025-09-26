@@ -559,6 +559,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User Management - Administrative Updates (role, jobRole, employeeId, etc.)
+  app.put('/api/users/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      const targetUser = await storage.getUser(id);
+
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Only leadership can perform administrative user updates
+      if (currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required for administrative updates." });
+      }
+
+      const { role, jobRole, employeeId, jobTitle } = req.body;
+      
+      // Validate role if provided
+      if (role && !['operative', 'supervisor', 'leadership'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      // Validate job role if provided
+      const validJobRoles = [
+        "cleaner_contract", "cleaner_specialised", "team_leader_contract", 
+        "team_leader_specialised", "mobile_cleaner", "supervisor", "manager", "director"
+      ];
+      if (jobRole && !validJobRoles.includes(jobRole)) {
+        return res.status(400).json({ message: "Invalid job role" });
+      }
+
+      const updatedUser = await storage.updateUserAdministrative(id, {
+        role,
+        jobRole, 
+        employeeId,
+        jobTitle
+      });
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
   app.put('/api/users/:id/role', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;

@@ -295,6 +295,12 @@ export interface IStorage {
 
   // Enhanced User Profile Management
   updateUserProfile(userId: string, updates: UserProfileUpdate, updatedByUserId: string): Promise<User>;
+  updateUserAdministrative(userId: string, updates: {
+    role?: string;
+    jobRole?: string; 
+    employeeId?: string;
+    jobTitle?: string;
+  }): Promise<User>;
   updateUserRole(userId: string, newRole: string, updatedByUserId: string): Promise<User>;
   getUsersByManager(managerId: string): Promise<User[]>;
   getUsersInTeam(teamId: string): Promise<User[]>;
@@ -1731,6 +1737,39 @@ export class DatabaseStorage implements IStorage {
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(users.id, userId))
       .returning();
+    return user;
+  }
+
+  async updateUserAdministrative(userId: string, updates: {
+    role?: string;
+    jobRole?: string; 
+    employeeId?: string;
+    jobTitle?: string;
+  }): Promise<User> {
+    // Filter out undefined values
+    const cleanUpdates: any = {};
+    if (updates.role !== undefined) cleanUpdates.role = updates.role;
+    if (updates.jobRole !== undefined) cleanUpdates.jobRole = updates.jobRole;
+    if (updates.employeeId !== undefined) cleanUpdates.employeeId = updates.employeeId;
+    if (updates.jobTitle !== undefined) cleanUpdates.jobTitle = updates.jobTitle;
+    
+    const [user] = await db
+      .update(users)
+      .set({ ...cleanUpdates, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+      
+    // Trigger role-based auto-assignment if role was updated
+    if (updates.role && user) {
+      try {
+        await this.triggerRoleBasedAutoAssignment(userId, updates.role, userId);
+        console.log(`[AUTO-ASSIGN] Triggered role-based auto-assignment for user ${userId} with new role: ${updates.role}`);
+      } catch (error) {
+        console.error('Error triggering role-based auto-assignment:', error);
+        // Don't fail the user update if auto-assignment fails
+      }
+    }
+    
     return user;
   }
 
