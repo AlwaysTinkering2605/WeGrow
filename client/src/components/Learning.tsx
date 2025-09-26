@@ -7317,9 +7317,34 @@ export default function Learning() {
                             Design a structured learning journey with sequential steps
                           </DialogDescription>
                         </DialogHeader>
-                        {/* Learning Path Create Form will go here */}
+                        {/* Redirect to proper Learning Paths Management */}
                         <div className="space-y-4">
-                          <p className="text-sm text-muted-foreground">Learning path creation form coming soon...</p>
+                          <p className="text-sm text-muted-foreground">
+                            Learning path creation is available in the dedicated Learning Paths management area.
+                          </p>
+                          <div className="flex justify-end space-x-2">
+                            <Button 
+                              variant="outline" 
+                              onClick={() => {
+                                // Close this dialog
+                                const dialog = document.querySelector('[role="dialog"]');
+                                if (dialog) {
+                                  const closeButton = dialog.querySelector('[data-radix-dismiss]');
+                                  if (closeButton) closeButton.click();
+                                }
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button 
+                              onClick={() => {
+                                // Navigate to learning paths management
+                                window.location.href = '/learning-paths';
+                              }}
+                            >
+                              Go to Learning Paths
+                            </Button>
+                          </div>
                         </div>
                       </DialogContent>
                     </Dialog>
