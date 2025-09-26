@@ -48,6 +48,8 @@ export default function LearningPathsManagement() {
   const [isStepDialogOpen, setIsStepDialogOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<any>(null);
   const [editingPath, setEditingPath] = useState<any>(null);
+  const [isJobRoleAssignDialogOpen, setIsJobRoleAssignDialogOpen] = useState(false);
+  const [selectedJobRole, setSelectedJobRole] = useState<string>("");
 
   // Learning Paths queries
   const { data: learningPaths = [], isLoading } = useQuery<any[]>({
@@ -192,6 +194,29 @@ export default function LearningPathsManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/learning-paths', selectedPath?.id, 'steps'] });
       toast({ title: "Success", description: "Step deleted successfully" });
+    },
+  });
+
+  const assignToJobRoleMutation = useMutation({
+    mutationFn: ({ pathId, jobRole }: { pathId: string; jobRole: string }) =>
+      apiRequest(`/api/learning-paths/${pathId}/assign-to-job-role`, {
+        method: 'POST',
+        body: JSON.stringify({ jobRole }),
+      }),
+    onSuccess: (result) => {
+      toast({ 
+        title: "Success", 
+        description: `Learning path assigned to ${result.enrollments} users with ${result.jobRole} role`
+      });
+      setIsJobRoleAssignDialogOpen(false);
+      setSelectedJobRole("");
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to assign learning path to job role", 
+        variant: "destructive" 
+      });
     },
   });
 
@@ -523,6 +548,19 @@ export default function LearningPathsManagement() {
                         <Edit className="mr-2 h-4 w-4" />
                         Edit
                       </Button>
+
+                      {selectedPath.isPublished && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setIsJobRoleAssignDialogOpen(true)}
+                          disabled={assignToJobRoleMutation.isPending}
+                          data-testid="button-assign-job-role"
+                        >
+                          <Users className="mr-2 h-4 w-4" />
+                          Assign to Job Role
+                        </Button>
+                      )}
                       
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -842,6 +880,64 @@ export default function LearningPathsManagement() {
           )}
         </div>
       </div>
+
+      {/* Job Role Assignment Dialog */}
+      <Dialog open={isJobRoleAssignDialogOpen} onOpenChange={setIsJobRoleAssignDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Assign to Job Role</DialogTitle>
+            <DialogDescription>
+              Assign "{selectedPath?.title}" to all users with a specific job role.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="jobRole">Select Job Role</Label>
+              <Select onValueChange={setSelectedJobRole} value={selectedJobRole}>
+                <SelectTrigger data-testid="select-job-role">
+                  <SelectValue placeholder="Choose a job role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cleaner_contract">Cleaner (Contract)</SelectItem>
+                  <SelectItem value="cleaner_specialised">Cleaner (Specialised)</SelectItem>
+                  <SelectItem value="team_leader_contract">Team Leader (Contract)</SelectItem>
+                  <SelectItem value="team_leader_specialised">Team Leader (Specialised)</SelectItem>
+                  <SelectItem value="mobile_cleaner">Mobile Cleaner</SelectItem>
+                  <SelectItem value="supervisor">Supervisor</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="director">Director</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setIsJobRoleAssignDialogOpen(false);
+                  setSelectedJobRole("");
+                }}
+                data-testid="button-cancel-assign"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (selectedPath && selectedJobRole) {
+                    assignToJobRoleMutation.mutate({
+                      pathId: selectedPath.id,
+                      jobRole: selectedJobRole
+                    });
+                  }
+                }}
+                disabled={!selectedJobRole || assignToJobRoleMutation.isPending}
+                data-testid="button-confirm-assign"
+              >
+                {assignToJobRoleMutation.isPending ? "Assigning..." : "Assign"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
