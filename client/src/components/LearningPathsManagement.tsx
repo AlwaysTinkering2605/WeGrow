@@ -188,12 +188,8 @@ export default function LearningPathsManagement() {
 
   const handleCreatePath = (data: LearningPathFormData) => {
     if (editingPath) {
-      // TODO: Implement update path mutation when backend supports it
-      toast({
-        title: "Feature Coming Soon",
-        description: "Path editing will be available in a future update.",
-        variant: "default",
-      });
+      // Use the update mutation for editing existing paths
+      updatePathMutation.mutate({ id: editingPath.id, data });
     } else {
       createPathMutation.mutate(data);
     }
