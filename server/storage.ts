@@ -1,6 +1,8 @@
 import {
   users,
   teams,
+  jobRoles,
+  learningPathJobRoles,
   companyObjectives,
   teamObjectives,
   teamKeyResults,
@@ -59,6 +61,10 @@ import {
   notificationTemplates,
   type User,
   type UpsertUser,
+  type JobRole,
+  type LearningPathJobRole,
+  type InsertJobRole,
+  type InsertLearningPathJobRole,
   type CompanyObjective,
   type TeamObjective,
   type TeamKeyResult,
@@ -199,6 +205,46 @@ import {
 import { db } from "./db";
 import { eq, and, desc, asc, ne, sql, inArray, isNull, isNotNull, max, gte, lte, or, ilike } from "drizzle-orm";
 
+// Org Chart Types
+export interface JobRoleHierarchyNode {
+  id: string;
+  name: string;
+  code: string;
+  level: number;
+  department: string | null;
+  reportsToJobRoleId: string | null;
+  children: JobRoleHierarchyNode[];
+  employeeCount?: number;
+}
+
+export interface JobRoleOrgChartNode {
+  id: string;
+  name: string;
+  code: string;
+  level: number;
+  department: string | null;
+  reportsTo: string | null;
+  reportsToName: string | null;
+  employeeCount: number;
+  employees: Array<{
+    id: string;
+    name: string;
+    jobTitle: string | null;
+  }>;
+}
+
+export interface ManagerOrgChartNode {
+  id: string;
+  name: string;
+  email: string | null;
+  jobTitle: string | null;
+  jobRoleName: string | null;
+  managerId: string | null;
+  managerName: string | null;
+  directReports: ManagerOrgChartNode[];
+  directReportCount: number;
+}
+
 export interface IStorage {
   // User operations - required for Replit Auth
   getUser(id: string): Promise<User | undefined>;
@@ -292,6 +338,28 @@ export interface IStorage {
   deleteTeam(teamId: string): Promise<void>;
   getTeamHierarchy(): Promise<TeamHierarchyNode[]>;
   assignUserToTeam(userId: string, teamId: string): Promise<User>;
+
+  // Job Roles Management
+  getAllJobRoles(): Promise<JobRole[]>;
+  getJobRole(jobRoleId: string): Promise<JobRole | undefined>;
+  createJobRole(jobRole: InsertJobRole): Promise<JobRole>;
+  updateJobRole(jobRoleId: string, updates: Partial<InsertJobRole>): Promise<JobRole>;
+  deleteJobRole(jobRoleId: string): Promise<void>;
+  getUsersByJobRoleId(jobRoleId: string): Promise<User[]>;
+  getJobRolesByParentId(parentJobRoleId: string): Promise<JobRole[]>;
+  getJobRoleHierarchy(): Promise<JobRoleHierarchyNode[]>;
+  getJobRoleOrgChart(): Promise<JobRoleOrgChartNode[]>;
+  
+  // Real Manager Org Chart
+  getManagerOrgChart(): Promise<ManagerOrgChartNode[]>;
+  getUserOrgChainUp(userId: string): Promise<User[]>;
+  getUserDirectReports(userId: string): Promise<User[]>;
+  
+  // Learning Path Job Role Mappings
+  getLearningPathJobRoles(learningPathId: string): Promise<LearningPathJobRole[]>;
+  getJobRoleLearningPaths(jobRoleId: string): Promise<LearningPathJobRole[]>;
+  assignLearningPathToJobRole(mapping: InsertLearningPathJobRole): Promise<LearningPathJobRole>;
+  removeLearningPathFromJobRole(learningPathId: string, jobRoleId: string): Promise<void>;
 
   // Enhanced User Profile Management
   updateUserProfile(userId: string, updates: UserProfileUpdate, updatedByUserId: string): Promise<User>;
@@ -1734,6 +1802,275 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return user;
+  }
+
+  // Job Roles Management
+  async getAllJobRoles(): Promise<JobRole[]> {
+    return await db
+      .select()
+      .from(jobRoles)
+      .where(eq(jobRoles.isActive, true))
+      .orderBy(jobRoles.level, jobRoles.name);
+  }
+
+  async getJobRole(jobRoleId: string): Promise<JobRole | undefined> {
+    const [jobRole] = await db.select().from(jobRoles).where(eq(jobRoles.id, jobRoleId));
+    return jobRole;
+  }
+
+  async createJobRole(jobRoleData: InsertJobRole): Promise<JobRole> {
+    const [jobRole] = await db
+      .insert(jobRoles)
+      .values(jobRoleData)
+      .returning();
+    return jobRole;
+  }
+
+  async updateJobRole(jobRoleId: string, updates: Partial<InsertJobRole>): Promise<JobRole> {
+    const [jobRole] = await db
+      .update(jobRoles)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(jobRoles.id, jobRoleId))
+      .returning();
+    return jobRole;
+  }
+
+  async deleteJobRole(jobRoleId: string): Promise<void> {
+    await db
+      .update(jobRoles)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(jobRoles.id, jobRoleId));
+  }
+
+  async getUsersByJobRoleId(jobRoleId: string): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(eq(users.jobRoleId, jobRoleId));
+  }
+
+  async getJobRolesByParentId(parentJobRoleId: string): Promise<JobRole[]> {
+    return await db
+      .select()
+      .from(jobRoles)
+      .where(and(
+        eq(jobRoles.reportsToJobRoleId, parentJobRoleId),
+        eq(jobRoles.isActive, true)
+      ));
+  }
+
+  async getJobRoleHierarchy(): Promise<JobRoleHierarchyNode[]> {
+    const allJobRoles = await db
+      .select()
+      .from(jobRoles)
+      .where(eq(jobRoles.isActive, true))
+      .orderBy(jobRoles.level, jobRoles.name);
+
+    // Build hierarchy structure
+    const jobRoleMap = new Map<string, JobRoleHierarchyNode>();
+    const rootJobRoles: JobRoleHierarchyNode[] = [];
+
+    // First pass: create map of all job roles
+    allJobRoles.forEach(jobRole => {
+      jobRoleMap.set(jobRole.id, { 
+        id: jobRole.id,
+        name: jobRole.name,
+        code: jobRole.code,
+        level: jobRole.level,
+        department: jobRole.department,
+        reportsToJobRoleId: jobRole.reportsToJobRoleId,
+        children: []
+      });
+    });
+
+    // Second pass: build hierarchy
+    allJobRoles.forEach(jobRole => {
+      if (jobRole.reportsToJobRoleId && jobRoleMap.has(jobRole.reportsToJobRoleId)) {
+        jobRoleMap.get(jobRole.reportsToJobRoleId)!.children.push(jobRoleMap.get(jobRole.id)!);
+      } else {
+        rootJobRoles.push(jobRoleMap.get(jobRole.id)!);
+      }
+    });
+
+    return rootJobRoles;
+  }
+
+  async getJobRoleOrgChart(): Promise<JobRoleOrgChartNode[]> {
+    // Get all job roles with employee counts
+    const jobRolesWithCounts = await db
+      .select({
+        id: jobRoles.id,
+        name: jobRoles.name,
+        code: jobRoles.code,
+        level: jobRoles.level,
+        department: jobRoles.department,
+        reportsTo: jobRoles.reportsToJobRoleId,
+        employeeCount: sql<number>`CAST(COUNT(${users.id}) AS INTEGER)`,
+      })
+      .from(jobRoles)
+      .leftJoin(users, eq(users.jobRoleId, jobRoles.id))
+      .where(eq(jobRoles.isActive, true))
+      .groupBy(jobRoles.id, jobRoles.name, jobRoles.code, jobRoles.level, jobRoles.department, jobRoles.reportsToJobRoleId)
+      .orderBy(jobRoles.level, jobRoles.name);
+
+    // Get employee details for each job role
+    const result: JobRoleOrgChartNode[] = [];
+    
+    for (const jobRole of jobRolesWithCounts) {
+      const employees = await db
+        .select({
+          id: users.id,
+          name: sql<string>`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
+          jobTitle: users.jobTitle,
+        })
+        .from(users)
+        .where(eq(users.jobRoleId, jobRole.id))
+        .orderBy(users.firstName, users.lastName);
+
+      // Get reports to name
+      let reportsToName: string | null = null;
+      if (jobRole.reportsTo) {
+        const [reportsToRole] = await db
+          .select({ name: jobRoles.name })
+          .from(jobRoles)
+          .where(eq(jobRoles.id, jobRole.reportsTo));
+        reportsToName = reportsToRole?.name || null;
+      }
+
+      result.push({
+        id: jobRole.id,
+        name: jobRole.name,
+        code: jobRole.code,
+        level: jobRole.level,
+        department: jobRole.department,
+        reportsTo: jobRole.reportsTo,
+        reportsToName,
+        employeeCount: jobRole.employeeCount || 0,
+        employees,
+      });
+    }
+
+    return result;
+  }
+
+  // Real Manager Org Chart
+  async getManagerOrgChart(): Promise<ManagerOrgChartNode[]> {
+    // Get all users with their manager info and job role
+    const allUsers = await db
+      .select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        jobTitle: users.jobTitle,
+        managerId: users.managerId,
+        jobRoleId: users.jobRoleId,
+      })
+      .from(users)
+      .orderBy(users.firstName, users.lastName);
+
+    // Get job role names
+    const jobRoleIds = [...new Set(allUsers.map(u => u.jobRoleId).filter(Boolean))];
+    const jobRoleNames = new Map<string, string>();
+    
+    if (jobRoleIds.length > 0) {
+      const roles = await db
+        .select({ id: jobRoles.id, name: jobRoles.name })
+        .from(jobRoles)
+        .where(inArray(jobRoles.id, jobRoleIds as string[]));
+      roles.forEach(r => jobRoleNames.set(r.id, r.name));
+    }
+
+    // Build user map
+    const userMap = new Map<string, ManagerOrgChartNode>();
+    const rootUsers: ManagerOrgChartNode[] = [];
+
+    // First pass: create map of all users
+    allUsers.forEach(user => {
+      const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown';
+      userMap.set(user.id, {
+        id: user.id,
+        name,
+        email: user.email,
+        jobTitle: user.jobTitle,
+        jobRoleName: user.jobRoleId ? jobRoleNames.get(user.jobRoleId) || null : null,
+        managerId: user.managerId,
+        managerName: null,
+        directReports: [],
+        directReportCount: 0,
+      });
+    });
+
+    // Second pass: build hierarchy and set manager names
+    allUsers.forEach(user => {
+      const node = userMap.get(user.id)!;
+      if (user.managerId && userMap.has(user.managerId)) {
+        const manager = userMap.get(user.managerId)!;
+        manager.directReports.push(node);
+        manager.directReportCount++;
+        node.managerName = manager.name;
+      } else {
+        rootUsers.push(node);
+      }
+    });
+
+    return rootUsers;
+  }
+
+  async getUserOrgChainUp(userId: string): Promise<User[]> {
+    const chain: User[] = [];
+    let currentUserId: string | null = userId;
+
+    while (currentUserId) {
+      const user = await this.getUser(currentUserId);
+      if (!user) break;
+      chain.push(user);
+      currentUserId = user.managerId;
+    }
+
+    return chain;
+  }
+
+  async getUserDirectReports(userId: string): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(eq(users.managerId, userId))
+      .orderBy(users.firstName, users.lastName);
+  }
+
+  // Learning Path Job Role Mappings
+  async getLearningPathJobRoles(learningPathId: string): Promise<LearningPathJobRole[]> {
+    return await db
+      .select()
+      .from(learningPathJobRoles)
+      .where(eq(learningPathJobRoles.learningPathId, learningPathId));
+  }
+
+  async getJobRoleLearningPaths(jobRoleId: string): Promise<LearningPathJobRole[]> {
+    return await db
+      .select()
+      .from(learningPathJobRoles)
+      .where(eq(learningPathJobRoles.jobRoleId, jobRoleId));
+  }
+
+  async assignLearningPathToJobRole(mapping: InsertLearningPathJobRole): Promise<LearningPathJobRole> {
+    const [result] = await db
+      .insert(learningPathJobRoles)
+      .values(mapping)
+      .returning();
+    return result;
+  }
+
+  async removeLearningPathFromJobRole(learningPathId: string, jobRoleId: string): Promise<void> {
+    await db
+      .delete(learningPathJobRoles)
+      .where(
+        and(
+          eq(learningPathJobRoles.learningPathId, learningPathId),
+          eq(learningPathJobRoles.jobRoleId, jobRoleId)
+        )
+      );
   }
 
   // Enhanced User Profile Management

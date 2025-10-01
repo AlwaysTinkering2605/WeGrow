@@ -124,7 +124,15 @@ export const jobRoles = pgTable("job_roles", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  foreignKey({
+    columns: [table.reportsToJobRoleId],
+    foreignColumns: [table.id],
+    name: "job_roles_reports_to_fk"
+  }).onDelete("set null"),
+  index("job_roles_reports_to_idx").on(table.reportsToJobRoleId),
+  index("job_roles_level_idx").on(table.level),
+]);
 
 // Users table - required for Replit Auth
 export const users = pgTable("users", {
@@ -145,7 +153,26 @@ export const users = pgTable("users", {
   startDate: timestamp("start_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  foreignKey({
+    columns: [table.jobRoleId],
+    foreignColumns: [jobRoles.id],
+    name: "users_job_role_fk"
+  }).onDelete("set null"),
+  foreignKey({
+    columns: [table.managerId],
+    foreignColumns: [table.id],
+    name: "users_manager_fk"
+  }).onDelete("set null"),
+  foreignKey({
+    columns: [table.teamId],
+    foreignColumns: [teams.id],
+    name: "users_team_fk"
+  }).onDelete("set null"),
+  index("users_job_role_idx").on(table.jobRoleId),
+  index("users_manager_idx").on(table.managerId),
+  index("users_team_idx").on(table.teamId),
+]);
 
 // Company objectives
 export const companyObjectives = pgTable("company_objectives", {

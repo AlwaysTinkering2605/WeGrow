@@ -529,6 +529,207 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Job Roles Routes
+  app.get('/api/job-roles', isAuthenticated, async (req: any, res) => {
+    try {
+      const jobRoles = await storage.getAllJobRoles();
+      res.json(jobRoles);
+    } catch (error) {
+      console.error("Error fetching job roles:", error);
+      res.status(500).json({ message: "Failed to fetch job roles" });
+    }
+  });
+
+  app.get('/api/job-roles/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const jobRole = await storage.getJobRole(id);
+      if (!jobRole) {
+        return res.status(404).json({ message: "Job role not found" });
+      }
+      res.json(jobRole);
+    } catch (error) {
+      console.error("Error fetching job role:", error);
+      res.status(500).json({ message: "Failed to fetch job role" });
+    }
+  });
+
+  app.post('/api/job-roles', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      // Validate request body using Zod schema
+      const jobRoleData = insertJobRoleSchema.parse(req.body);
+      
+      // Prevent self-referencing
+      if (jobRoleData.reportsToJobRoleId === jobRoleData.id) {
+        return res.status(400).json({ message: "Job role cannot report to itself" });
+      }
+
+      const jobRole = await storage.createJobRole(jobRoleData);
+      res.json(jobRole);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating job role:", error);
+      res.status(500).json({ message: "Failed to create job role" });
+    }
+  });
+
+  app.put('/api/job-roles/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      
+      // Validate request body using Zod schema (partial for updates)
+      const jobRoleData = insertJobRoleSchema.partial().parse(req.body);
+      
+      // Prevent self-referencing
+      if (jobRoleData.reportsToJobRoleId === id) {
+        return res.status(400).json({ message: "Job role cannot report to itself" });
+      }
+
+      const jobRole = await storage.updateJobRole(id, jobRoleData);
+      if (!jobRole) {
+        return res.status(404).json({ message: "Job role not found" });
+      }
+      res.json(jobRole);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating job role:", error);
+      res.status(500).json({ message: "Failed to update job role" });
+    }
+  });
+
+  app.delete('/api/job-roles/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      
+      // Check if job role is in use by any users
+      const usersWithRole = await storage.getUsersByJobRoleId(id);
+      if (usersWithRole.length > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete job role that is assigned to users",
+          usersCount: usersWithRole.length
+        });
+      }
+      
+      // Check if job role has child roles
+      const childRoles = await storage.getJobRolesByParentId(id);
+      if (childRoles.length > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete job role that has child roles reporting to it",
+          childRolesCount: childRoles.length
+        });
+      }
+
+      await storage.deleteJobRole(id);
+      res.json({ message: "Job role deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting job role:", error);
+      res.status(500).json({ message: "Failed to delete job role" });
+    }
+  });
+
+  // Org Chart Routes
+  app.get('/api/org-chart/job-roles', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const orgChart = await storage.getJobRoleOrgChart();
+      res.json(orgChart);
+    } catch (error) {
+      console.error("Error fetching job role org chart:", error);
+      res.status(500).json({ message: "Failed to fetch job role org chart" });
+    }
+  });
+
+  app.get('/api/org-chart/managers', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const orgChart = await storage.getManagerOrgChart();
+      res.json(orgChart);
+    } catch (error) {
+      console.error("Error fetching manager org chart:", error);
+      res.status(500).json({ message: "Failed to fetch manager org chart" });
+    }
+  });
+
+  app.get('/api/org-chart/hierarchy/job-roles', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const hierarchy = await storage.getJobRoleHierarchy();
+      res.json(hierarchy);
+    } catch (error) {
+      console.error("Error fetching job role hierarchy:", error);
+      res.status(500).json({ message: "Failed to fetch job role hierarchy" });
+    }
+  });
+
+  app.get('/api/users/:id/direct-reports', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Users can view their own direct reports, or leadership can view anyone's
+      if (id !== currentUserId && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const directReports = await storage.getUserDirectReports(id);
+      res.json(directReports);
+    } catch (error) {
+      console.error("Error fetching direct reports:", error);
+      res.status(500).json({ message: "Failed to fetch direct reports" });
+    }
+  });
+
+  app.get('/api/users/:id/manager-chain', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Users can view their own chain, or leadership can view anyone's
+      if (id !== currentUserId && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const chain = await storage.getUserOrgChainUp(id);
+      res.json(chain);
+    } catch (error) {
+      console.error("Error fetching manager chain:", error);
+      res.status(500).json({ message: "Failed to fetch manager chain" });
+    }
+  });
+
   // User Profile Management
   app.put('/api/users/:id/profile', isAuthenticated, async (req: any, res) => {
     try {
