@@ -4,6 +4,8 @@ Apex is a Performance & Development Platform designed for cleaning companies to 
 
 **Recent LMS Implementation (Sept 24, 2025)**: Successfully completed Phase 1 ApexLMS with comprehensive Learning Management System featuring advanced learning paths, training matrix integration, auto-certification system, real-time data sync, and closed-loop integration. All deliverables architect-approved and meet ISO 9001:2015 Clause 7.2 compliance requirements for competence management.
 
+**Job Role Normalization & Org Charts (Oct 1, 2025)**: Implemented normalized job role architecture with proper referential integrity, foreign key constraints, and dual organizational chart views. Completed full-stack implementation including backend validation, deletion safety checks, and comprehensive UI with both structural (job role hierarchy) and operational (manager chain) org chart views.
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -33,7 +35,9 @@ Preferred communication style: Simple, everyday language.
 - **LMS Schema**: 14 comprehensive tables for courses, modules, lessons, enrollments, progress tracking, quizzes, certificates, badges, training records, and PDP integration
 
 ## Core Data Models
-- **Users**: Role-based (operative, supervisor, leadership) with hierarchical relationships
+- **Users**: Role-based (operative, supervisor, leadership) with hierarchical relationships and job role assignments
+- **Job Roles**: Normalized table with hierarchical structure (level 1-5), department categorization, and reporting relationships
+- **Learning Path Job Roles**: Many-to-many junction table linking learning paths to job roles for targeted training
 - **Company Objectives**: Top-level strategic goals with key results
 - **Goals**: Individual and team goals linked to company objectives
 - **Weekly Check-ins**: Progress tracking with confidence levels and achievements
@@ -55,6 +59,77 @@ Preferred communication style: Simple, everyday language.
 - **Recognition System**: Peer recognition aligned with company values
 - **Meeting Management**: Structured 1-on-1 meetings with agenda and action items
 - **Dashboard Analytics**: Progress visualization and performance metrics
+- **Dual Org Charts**: View organization structure from both job role hierarchy (structural/ideal) and manager chain (actual reporting) perspectives
+
+## Organizational Structure
+
+### Job Role Hierarchy
+The platform implements a normalized job role architecture with proper relational database design:
+
+**Database Schema:**
+- `job_roles` table: Master data for organizational job roles with hierarchical structure
+  - Unique ID, name, and code for each role
+  - Hierarchical level (1-5): Entry level to Director
+  - Optional department categorization
+  - Self-referencing FK `reportsToJobRoleId` for structural hierarchy
+  - Foreign key constraints with ON DELETE SET NULL for data safety
+  - Performance indexes on FK columns and level field
+
+- `users.jobRoleId`: Foreign key to job_roles table
+  - Links each user to their assigned job role
+  - Replaces deprecated enum-based `job_role` field
+  - FK constraint ensures referential integrity
+
+- `learning_path_job_roles`: Many-to-many junction table
+  - Links learning paths to specific job roles
+  - Enables role-based training requirements
+  - Supports targeted competency development
+
+**Current Job Roles (8 roles across 5 levels):**
+- Level 5: Director (1 user)
+- Level 4: Manager (4 users)
+- Level 3: Supervisor (10 users)
+- Level 2: Team Leader (Contract), Team Leader (Specialised) (25 users total)
+- Level 1: Cleaner (Contract), Cleaner (Specialised), Mobile Cleaner (140 users total)
+
+**API Endpoints:**
+- `GET /api/job-roles` - List all active job roles
+- `GET /api/job-roles/:id` - Get specific job role details
+- `POST /api/job-roles` - Create new job role (leadership only, with Zod validation)
+- `PUT /api/job-roles/:id` - Update job role (leadership only, with self-reference prevention)
+- `DELETE /api/job-roles/:id` - Soft delete with safety checks (prevents deletion if role is in use or has child roles)
+- `GET /api/org-chart/job-roles` - Get job role organizational chart (supervisor/leadership)
+- `GET /api/org-chart/managers` - Get manager chain organizational chart (supervisor/leadership)
+
+**Safety Features:**
+- Zod validation on all create/update operations
+- Self-reference prevention (role cannot report to itself)
+- Deletion safety checks (prevents orphaned users and broken hierarchies)
+- Foreign key constraints with proper ON DELETE behavior
+- Performance indexes for efficient queries
+
+### Dual Organizational Charts
+
+**1. Job Role Hierarchy (Structural View)**
+- Shows the ideal organizational structure based on job roles
+- Groups roles by hierarchical level (5 to 1)
+- Displays employee counts and individual employees per role
+- Shows reporting relationships between job roles
+- Accessed via `/organization` page under People Management
+
+**2. Manager Chain (Operational View)**
+- Shows actual reporting relationships between people
+- Based on users.managerId field
+- Displays direct reports for each manager
+- Shows real manager names and contact information
+- Useful for understanding actual operational reporting structure
+
+**UI Components:**
+- `Organization.tsx`: Tabbed interface for viewing both org charts
+- Integrated into People Management dropdown in main navigation
+- Role-based access control (supervisor and leadership only)
+- Responsive card-based layout with employee details
+- Real-time data fetching via React Query
 
 # External Dependencies
 
