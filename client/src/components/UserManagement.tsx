@@ -19,10 +19,20 @@ interface User {
   lastName: string;
   role: "operative" | "supervisor" | "leadership";
   jobRole?: string;
+  jobRoleId?: string | null;
+  managerId?: string | null;
   employeeId?: string;
   teamName?: string;
   jobTitle?: string;
   startDate?: string;
+}
+
+interface JobRole {
+  id: string;
+  name: string;
+  code: string;
+  level: number;
+  department?: string | null;
 }
 
 const jobRoleOptions = [
@@ -55,7 +65,17 @@ export default function UserManagement() {
     queryKey: ['/api/users'],
   });
 
-  // Update user mutation
+  // Fetch job roles
+  const { data: jobRoles = [] } = useQuery<JobRole[]>({
+    queryKey: ['/api/job-roles'],
+  });
+
+  // Get potential managers (supervisors, managers, directors)
+  const potentialManagers = users.filter(u => 
+    u.role === 'supervisor' || u.role === 'leadership'
+  );
+
+  // Update user mutation (administrative fields like role, jobRole, employeeId)
   const updateUserMutation = useMutation({
     mutationFn: ({ userId, data }: { userId: string; data: Partial<User> }) =>
       apiRequest(`/api/users/${userId}`, {
@@ -72,6 +92,30 @@ export default function UserManagement() {
       toast({ 
         title: "Error", 
         description: error.message || "Failed to update user", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Update user assignments (jobRoleId, managerId)
+  const updateAssignmentsMutation = useMutation({
+    mutationFn: ({ userId, jobRoleId, managerId }: { 
+      userId: string; 
+      jobRoleId?: string | null; 
+      managerId?: string | null; 
+    }) =>
+      apiRequest(`/api/users/${userId}/assignments`, {
+        method: 'PATCH',
+        body: JSON.stringify({ jobRoleId, managerId }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      toast({ title: "Success", description: "User assignments updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to update assignments", 
         variant: "destructive" 
       });
     },
@@ -96,18 +140,33 @@ export default function UserManagement() {
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdateUser = () => {
+  const handleUpdateUser = async () => {
     if (!editingUser) return;
     
-    updateUserMutation.mutate({
-      userId: editingUser.id,
-      data: {
-        role: editingUser.role,
-        jobRole: editingUser.jobRole,
-        employeeId: editingUser.employeeId,
-        jobTitle: editingUser.jobTitle,
-      },
-    });
+    try {
+      // Update administrative fields (role, jobRole enum, employeeId, jobTitle)
+      await updateUserMutation.mutateAsync({
+        userId: editingUser.id,
+        data: {
+          role: editingUser.role,
+          jobRole: editingUser.jobRole,
+          employeeId: editingUser.employeeId,
+          jobTitle: editingUser.jobTitle,
+        },
+      });
+
+      // Update assignments (jobRoleId, managerId) separately
+      await updateAssignmentsMutation.mutateAsync({
+        userId: editingUser.id,
+        jobRoleId: editingUser.jobRoleId === 'none' ? null : editingUser.jobRoleId,
+        managerId: editingUser.managerId === 'none' ? null : editingUser.managerId,
+      });
+
+      setIsEditDialogOpen(false);
+      setEditingUser(null);
+    } catch (error) {
+      // Error handling is done in mutation callbacks
+    }
   };
 
   const getJobRoleLabel = (jobRole?: string) => {
@@ -379,6 +438,53 @@ export default function UserManagement() {
                   placeholder="Enter job title"
                   data-testid="input-job-title"
                 />
+              </div>
+
+              <div className="border-t pt-4 space-y-4">
+                <h4 className="font-medium text-sm">Organizational Assignments</h4>
+                
+                <div>
+                  <Label htmlFor="user-job-role-id">Assigned Job Role</Label>
+                  <Select 
+                    onValueChange={(value) => setEditingUser({...editingUser, jobRoleId: value})} 
+                    value={editingUser.jobRoleId || "none"}
+                  >
+                    <SelectTrigger data-testid="select-user-job-role-id">
+                      <SelectValue placeholder="Select job role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Not assigned</SelectItem>
+                      {jobRoles.map(role => (
+                        <SelectItem key={role.id} value={role.id}>
+                          {role.name} (Level {role.level})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="user-manager">Assigned Manager</Label>
+                  <Select 
+                    onValueChange={(value) => setEditingUser({...editingUser, managerId: value})} 
+                    value={editingUser.managerId || "none"}
+                  >
+                    <SelectTrigger data-testid="select-user-manager">
+                      <SelectValue placeholder="Select manager" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No manager</SelectItem>
+                      {potentialManagers
+                        .filter(m => m.id !== editingUser.id)
+                        .sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
+                        .map(manager => (
+                          <SelectItem key={manager.id} value={manager.id}>
+                            {manager.firstName} {manager.lastName} ({manager.role})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2 pt-4">

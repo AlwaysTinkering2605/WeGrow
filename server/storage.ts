@@ -2039,6 +2039,50 @@ export class DatabaseStorage implements IStorage {
       .orderBy(users.firstName, users.lastName);
   }
 
+  async getAllReportsRecursive(managerId: string): Promise<User[]> {
+    const allReports: User[] = [];
+    const visited = new Set<string>();
+    
+    const getReports = async (currentManagerId: string) => {
+      if (visited.has(currentManagerId)) return;
+      visited.add(currentManagerId);
+      
+      const directReports = await this.getUserDirectReports(currentManagerId);
+      for (const report of directReports) {
+        allReports.push(report);
+        await getReports(report.id);
+      }
+    };
+    
+    await getReports(managerId);
+    return allReports;
+  }
+
+  async updateUserAssignments(userId: string, updates: {
+    jobRoleId?: string | null;
+    managerId?: string | null;
+  }): Promise<User> {
+    const cleanUpdates: any = { updatedAt: new Date() };
+    
+    if (updates.jobRoleId !== undefined) {
+      cleanUpdates.jobRoleId = updates.jobRoleId;
+    }
+    if (updates.managerId !== undefined) {
+      if (updates.managerId === userId) {
+        throw new Error('User cannot be their own manager');
+      }
+      cleanUpdates.managerId = updates.managerId;
+    }
+
+    const [user] = await db
+      .update(users)
+      .set(cleanUpdates)
+      .where(eq(users.id, userId))
+      .returning();
+    
+    return user;
+  }
+
   // Learning Path Job Role Mappings
   async getLearningPathJobRoles(learningPathId: string): Promise<LearningPathJobRole[]> {
     return await db

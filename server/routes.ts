@@ -730,6 +730,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/users/:id/all-reports', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Only managers can view their reports, or leadership can view anyone's
+      if (id !== currentUserId && currentUser?.role !== 'leadership' && currentUser?.role !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const allReports = await storage.getAllReportsRecursive(id);
+      res.json(allReports);
+    } catch (error) {
+      console.error("Error fetching all reports:", error);
+      res.status(500).json({ message: "Failed to fetch all reports" });
+    }
+  });
+
+  app.patch('/api/users/:id/assignments', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Only leadership can update assignments
+      if (currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const updates: { jobRoleId?: string | null; managerId?: string | null } = {};
+      
+      if (req.body.jobRoleId !== undefined) {
+        updates.jobRoleId = req.body.jobRoleId;
+      }
+      if (req.body.managerId !== undefined) {
+        updates.managerId = req.body.managerId;
+      }
+
+      const updatedUser = await storage.updateUserAssignments(id, updates);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user assignments:", error);
+      if (error instanceof Error && error.message === 'User cannot be their own manager') {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to update user assignments" });
+    }
+  });
+
   // User Profile Management
   app.put('/api/users/:id/profile', isAuthenticated, async (req: any, res) => {
     try {
