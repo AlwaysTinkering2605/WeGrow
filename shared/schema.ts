@@ -112,6 +112,20 @@ export const teams = pgTable("teams", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Job Roles table - normalized job role master data with hierarchy
+export const jobRoles = pgTable("job_roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull().unique(), // "Cleaner (Contract)", "Supervisor", etc.
+  code: varchar("code").notNull().unique(), // "cleaner_contract", "supervisor", etc.
+  reportsToJobRoleId: varchar("reports_to_job_role_id"), // FK to job_roles.id for org chart
+  level: integer("level").notNull(), // Hierarchy level: 1=entry, 5=director
+  department: varchar("department"), // "Operations", "Quality Assurance", etc.
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Users table - required for Replit Auth
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -121,9 +135,10 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   mobilePhone: varchar("mobile_phone"),
   role: userRoleEnum("role").default("operative").notNull(),
-  jobRole: jobRoleEnum("job_role"), // New field for HR integration
+  jobRole: jobRoleEnum("job_role"), // DEPRECATED: Keep for migration, use jobRoleId instead
+  jobRoleId: varchar("job_role_id"), // FK to job_roles.id - normalized job role reference
   employeeId: varchar("employee_id").unique(), // New field for external HR software integration
-  managerId: varchar("manager_id"),
+  managerId: varchar("manager_id"), // FK to users.id - for real manager org chart
   teamId: varchar("team_id"), // Reference to teams table
   teamName: varchar("team_name"), // Keep for backward compatibility during transition
   jobTitle: varchar("job_title"),
@@ -546,6 +561,30 @@ export const learningPaths = pgTable("learning_paths", {
   createdByIdx: index("learning_paths_created_by_idx").on(table.createdBy),
 }));
 
+// Learning Path Job Roles - many-to-many relationship between learning paths and job roles
+export const learningPathJobRoles = pgTable("learning_path_job_roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  learningPathId: varchar("learning_path_id").notNull(),
+  jobRoleId: varchar("job_role_id").notNull(),
+  isMandatory: boolean("is_mandatory").default(true), // Required for this job role
+  relativeDueDays: integer("relative_due_days"), // Days to complete after role assignment
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.learningPathId],
+    foreignColumns: [learningPaths.id],
+    name: "learning_path_job_roles_path_fk"
+  }),
+  foreignKey({
+    columns: [table.jobRoleId],
+    foreignColumns: [jobRoles.id],
+    name: "learning_path_job_roles_job_role_fk"
+  }),
+  uniqueIndex("learning_path_job_roles_unique").on(table.learningPathId, table.jobRoleId),
+  index("learning_path_job_roles_path_idx").on(table.learningPathId),
+  index("learning_path_job_roles_job_role_idx").on(table.jobRoleId),
+]);
+
 // Learning Path Steps - individual activities within a path
 export const learningPathSteps = pgTable("learning_path_steps", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -694,7 +733,8 @@ export const competencyLibrary = pgTable("competency_library", {
 // Role Competency Mappings - define which competencies are required for which roles
 export const roleCompetencyMappings = pgTable("role_competency_mappings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  role: userRoleEnum("role").notNull(),
+  role: userRoleEnum("role"), // DEPRECATED: Keep for migration
+  jobRoleId: varchar("job_role_id"), // FK to job_roles.id - normalized job role reference
   competencyLibraryId: varchar("competency_library_id").notNull(),
   teamId: varchar("team_id"), // Team-specific requirements
   requiredProficiencyLevel: varchar("required_proficiency_level").default("basic"), // "basic", "intermediate", "advanced"
@@ -711,6 +751,11 @@ export const roleCompetencyMappings = pgTable("role_competency_mappings", {
     name: "role_competency_mappings_competency_fk"
   }),
   foreignKey({
+    columns: [table.jobRoleId],
+    foreignColumns: [jobRoles.id],
+    name: "role_competency_mappings_job_role_fk"
+  }),
+  foreignKey({
     columns: [table.teamId],
     foreignColumns: [teams.id],
     name: "role_competency_mappings_team_fk"
@@ -720,8 +765,8 @@ export const roleCompetencyMappings = pgTable("role_competency_mappings", {
     foreignColumns: [users.id],
     name: "role_competency_mappings_created_by_fk"
   }),
-  index("role_competency_mappings_role_idx").on(table.role, table.teamId),
-  unique("role_competency_mappings_unique").on(table.role, table.competencyLibraryId, table.teamId),
+  index("role_competency_mappings_job_role_idx").on(table.jobRoleId, table.teamId),
+  unique("role_competency_mappings_unique").on(table.jobRoleId, table.competencyLibraryId, table.teamId),
 ]);
 
 // Competency Status History - immutable audit trail for ISO 9001:2015 compliance
@@ -1469,6 +1514,17 @@ export const insertTeamSchema = createInsertSchema(teams).omit({
   updatedAt: true,
 });
 
+export const insertJobRoleSchema = createInsertSchema(jobRoles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLearningPathJobRoleSchema = createInsertSchema(learningPathJobRoles).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -1872,6 +1928,9 @@ export const insertUserAchievementSchema = createInsertSchema(userAchievements).
 
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
+export type Team = typeof teams.$inferSelect;
+export type JobRole = typeof jobRoles.$inferSelect;
+export type LearningPathJobRole = typeof learningPathJobRoles.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type CompanyObjective = typeof companyObjectives.$inferSelect;
 export type TeamObjective = typeof teamObjectives.$inferSelect;
@@ -1903,6 +1962,9 @@ export type UserBadge = typeof userBadges.$inferSelect;
 export type TrainingRequirement = typeof trainingRequirements.$inferSelect;
 export type PdpCourseLink = typeof pdpCourseLinks.$inferSelect;
 
+export type InsertTeam = z.infer<typeof insertTeamSchema>;
+export type InsertJobRole = z.infer<typeof insertJobRoleSchema>;
+export type InsertLearningPathJobRole = z.infer<typeof insertLearningPathJobRoleSchema>;
 export type InsertCompanyObjective = z.infer<typeof insertCompanyObjectiveSchema>;
 export type InsertTeamObjective = z.infer<typeof insertTeamObjectiveSchema>;
 export type InsertKeyResult = z.infer<typeof insertKeyResultSchema>;
