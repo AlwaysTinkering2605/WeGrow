@@ -4,7 +4,9 @@ Apex is a Performance & Development Platform designed for cleaning companies to 
 
 **Recent LMS Implementation (Sept 24, 2025)**: Successfully completed Phase 1 ApexLMS with comprehensive Learning Management System featuring advanced learning paths, training matrix integration, auto-certification system, real-time data sync, and closed-loop integration. All deliverables architect-approved and meet ISO 9001:2015 Clause 7.2 compliance requirements for competence management.
 
-**Job Role Normalization & Org Charts (Oct 1, 2025)**: Implemented normalized job role architecture with proper referential integrity, foreign key constraints, and dual organizational chart views. Completed full-stack implementation including backend validation, deletion safety checks, and comprehensive UI with both structural (job role hierarchy) and operational (manager chain) org chart views.
+**Job Role Normalization & Org Charts (Oct 1, 2025)**: Implemented normalized job role architecture with proper referential integrity, foreign key constraints, and dual organizational chart views. Completed full-stack implementation including backend validation, deletion safety checks, and comprehensive UI with both structural (job role hierarchy) and operational (manager chain) org chart views. Added nested tree view components for hierarchical org chart visualization with expand/collapse functionality.
+
+**Profile Edit Security Fix (Oct 1, 2025)**: Fixed critical bug where Profile edit dialog included "User Role" field that was clearing user's system role on save. Profile edit now only contains personal information fields (name, phone, title, image). Role assignment is exclusively in User Management for leadership users.
 
 # User Preferences
 
@@ -125,10 +127,14 @@ The platform implements a normalized job role architecture with proper relationa
 - Useful for understanding actual operational reporting structure
 
 **UI Components:**
-- `Organization.tsx`: Tabbed interface for viewing both org charts
+- `Organization.tsx`: Tabbed interface for viewing both org charts with hierarchical tree views
+- `TreeNode.tsx`: Reusable recursive tree component with expand/collapse (default: first 2 levels)
+  - Supports unlimited nesting, badges, subtitles, counts, and click handlers
+  - Level-based indentation and styling
+- `UserManagement.tsx`: Leadership interface for assigning job roles and managers to users
 - Integrated into People Management dropdown in main navigation
 - Role-based access control (supervisor and leadership only)
-- Responsive card-based layout with employee details
+- Responsive layout with employee details
 - Real-time data fetching via React Query
 
 # External Dependencies
