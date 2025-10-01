@@ -144,18 +144,8 @@ export default function UserManagement() {
     if (!editingUser) return;
     
     try {
-      // Update administrative fields (role, jobRole enum, employeeId, jobTitle)
-      await updateUserMutation.mutateAsync({
-        userId: editingUser.id,
-        data: {
-          role: editingUser.role,
-          jobRole: editingUser.jobRole,
-          employeeId: editingUser.employeeId,
-          jobTitle: editingUser.jobTitle,
-        },
-      });
-
-      // Update assignments (jobRoleId, managerId) separately
+      // Only update assignments (jobRoleId, managerId)
+      // System role, employee ID, job title, etc. are managed elsewhere or deprecated
       await updateAssignmentsMutation.mutateAsync({
         userId: editingUser.id,
         jobRoleId: editingUser.jobRoleId === 'none' ? null : editingUser.jobRoleId,
@@ -359,9 +349,9 @@ export default function UserManagement() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
+            <DialogTitle>Edit User Assignments</DialogTitle>
             <DialogDescription>
-              Update user role, job role, and employment information
+              Assign job role and manager for this user
             </DialogDescription>
           </DialogHeader>
           
@@ -370,77 +360,19 @@ export default function UserManagement() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Name</Label>
-                  <p className="text-sm font-medium">
+                  <p className="text-sm font-medium" data-testid="text-editing-user-name">
                     {editingUser.firstName} {editingUser.lastName}
                   </p>
                 </div>
                 <div>
                   <Label>Email</Label>
-                  <p className="text-sm text-muted-foreground">{editingUser.email}</p>
+                  <p className="text-sm text-muted-foreground" data-testid="text-editing-user-email">
+                    {editingUser.email}
+                  </p>
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="user-role">System Role</Label>
-                <Select 
-                  onValueChange={(value) => setEditingUser({...editingUser, role: value as any})} 
-                  value={editingUser.role}
-                >
-                  <SelectTrigger data-testid="select-user-role">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roleOptions.map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="user-job-role">Job Role</Label>
-                <Select 
-                  onValueChange={(value) => setEditingUser({...editingUser, jobRole: value})} 
-                  value={editingUser.jobRole || ""}
-                >
-                  <SelectTrigger data-testid="select-user-job-role">
-                    <SelectValue placeholder="Select job role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {jobRoleOptions.map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="employee-id">Employee ID</Label>
-                <Input
-                  id="employee-id"
-                  value={editingUser.employeeId || ""}
-                  onChange={(e) => setEditingUser({...editingUser, employeeId: e.target.value})}
-                  placeholder="Enter employee ID"
-                  data-testid="input-employee-id"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="job-title">Job Title</Label>
-                <Input
-                  id="job-title"
-                  value={editingUser.jobTitle || ""}
-                  onChange={(e) => setEditingUser({...editingUser, jobTitle: e.target.value})}
-                  placeholder="Enter job title"
-                  data-testid="input-job-title"
-                />
-              </div>
-
-              <div className="border-t pt-4 space-y-4">
+              <div className="space-y-4">
                 <h4 className="font-medium text-sm">Organizational Assignments</h4>
                 
                 <div>
