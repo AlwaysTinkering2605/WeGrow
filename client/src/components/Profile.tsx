@@ -116,7 +116,10 @@ export default function Profile() {
   const updateProfileMutation = useMutation({
     mutationFn: async (updates: UpdateProfileData) => {
       if (!user?.id) throw new Error("User ID not found");
-      return apiRequest("PUT", `/api/users/${user.id}/profile`, updates);
+      return apiRequest(`/api/users/${user.id}/profile`, {
+        method: "PUT",
+        body: JSON.stringify(updates),
+      });
     },
     onSuccess: () => {
       toast({
@@ -351,7 +354,9 @@ export default function Profile() {
                                   maxNumberOfFiles={1}
                                   maxFileSize={5 * 1024 * 1024} // 5MB
                                   onGetUploadParameters={async () => {
-                                    const response = await apiRequest('POST', '/api/objects/upload');
+                                    const response = await apiRequest('/api/objects/upload', {
+                                      method: 'POST',
+                                    });
                                     const { uploadURL } = await response.json();
                                     return { method: 'PUT' as const, url: uploadURL };
                                   }}
@@ -359,7 +364,10 @@ export default function Profile() {
                                     const uploaded = result.successful?.[0];
                                     if (!uploaded) return;
                                     const path = uploaded.uploadURL || uploaded.response?.uploadURL;
-                                    const response = await apiRequest('PUT', '/api/profile-images', { profileImageURL: path });
+                                    const response = await apiRequest('/api/profile-images', {
+                                      method: 'PUT',
+                                      body: JSON.stringify({ profileImageURL: path }),
+                                    });
                                     const { objectPath } = await response.json();
                                     profileForm.setValue('profileImageUrl', objectPath, { shouldValidate: true });
                                     toast({ title: 'Photo uploaded successfully' });
