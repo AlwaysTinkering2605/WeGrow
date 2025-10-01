@@ -35,17 +35,6 @@ interface JobRole {
   department?: string | null;
 }
 
-const jobRoleOptions = [
-  { value: "cleaner_contract", label: "Cleaner (Contract)" },
-  { value: "cleaner_specialised", label: "Cleaner (Specialised)" },
-  { value: "team_leader_contract", label: "Team Leader (Contract)" },
-  { value: "team_leader_specialised", label: "Team Leader (Specialised)" },
-  { value: "mobile_cleaner", label: "Mobile Cleaner" },
-  { value: "supervisor", label: "Supervisor" },
-  { value: "manager", label: "Manager" },
-  { value: "director", label: "Director" },
-];
-
 const roleOptions = [
   { value: "operative", label: "Operative" },
   { value: "supervisor", label: "Supervisor" },
@@ -130,7 +119,7 @@ export default function UserManagement() {
       (user.employeeId && user.employeeId.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesRole = filterRole === "all" || user.role === filterRole;
-    const matchesJobRole = filterJobRole === "all" || user.jobRole === filterJobRole;
+    const matchesJobRole = filterJobRole === "all" || user.jobRoleId === filterJobRole;
     
     return matchesSearch && matchesRole && matchesJobRole;
   });
@@ -157,11 +146,6 @@ export default function UserManagement() {
     } catch (error) {
       // Error handling is done in mutation callbacks
     }
-  };
-
-  const getJobRoleLabel = (jobRole?: string) => {
-    const option = jobRoleOptions.find(opt => opt.value === jobRole);
-    return option ? option.label : jobRole || 'Not assigned';
   };
 
   // Get job role name from normalized job_roles table
@@ -256,9 +240,9 @@ export default function UserManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Job Roles</SelectItem>
-                  {jobRoleOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                  {jobRoles.map(role => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.name} (Level {role.level})
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -210,11 +210,23 @@ export default function Profile() {
                   <Phone className="w-4 h-4 text-muted-foreground" />
                   <span data-testid="text-user-phone">{user?.mobilePhone || "Phone not provided"}</span>
                 </div>
+                {user?.jobTitle && (
+                  <div className="flex items-center space-x-2">
+                    <Briefcase className="w-4 h-4 text-muted-foreground" />
+                    <div>
+                      <span className="text-xs text-muted-foreground">Job Title: </span>
+                      <span data-testid="text-user-job-title">{user.jobTitle}</span>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center space-x-2">
                   <Briefcase className="w-4 h-4 text-muted-foreground" />
-                  <span data-testid="text-user-job-role">
-                    {userJobRole ? `${userJobRole.name} (Level ${userJobRole.level})` : "No job role assigned"}
-                  </span>
+                  <div>
+                    <span className="text-xs text-muted-foreground">Job Role: </span>
+                    <span data-testid="text-user-job-role">
+                      {userJobRole ? `${userJobRole.name} (Level ${userJobRole.level})` : "No job role assigned"}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
