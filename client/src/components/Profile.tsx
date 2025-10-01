@@ -13,7 +13,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Mail, Phone, User, Edit2, Upload, Shield } from "lucide-react";
+import { Mail, Phone, User, Edit2, Upload, Shield, Briefcase } from "lucide-react";
 import { updateUserProfileSchema, type User as UserType } from "@shared/schema";
 import type { Goal, DevelopmentPlan } from "@shared/schema";
 import type { z } from "zod";
@@ -21,6 +21,21 @@ import { ObjectUploader } from "@/components/ObjectUploader";
 // import ProgressRing from "./ProgressRing"; // TODO: Create or fix ProgressRing component
 
 type UpdateProfileData = z.infer<typeof updateUserProfileSchema>;
+
+interface JobRole {
+  id: string;
+  name: string;
+  code: string;
+  level: number;
+}
+
+interface Manager {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+}
 
 export default function Profile() {
   const { user } = useAuth();
@@ -62,6 +77,20 @@ export default function Profile() {
 
   const { data: recognitionStats } = useQuery({
     queryKey: ["/api/recognition-stats"],
+    retry: false,
+  });
+
+  // Fetch user's job role
+  const { data: userJobRole } = useQuery<JobRole>({
+    queryKey: [`/api/job-roles/${user?.jobRoleId}`],
+    enabled: !!user?.jobRoleId,
+    retry: false,
+  });
+
+  // Fetch user's manager
+  const { data: userManager } = useQuery<Manager>({
+    queryKey: [`/api/users/${user?.managerId}`],
+    enabled: !!user?.managerId,
     retry: false,
   });
 
@@ -180,20 +209,43 @@ export default function Profile() {
                   <Phone className="w-4 h-4 text-muted-foreground" />
                   <span data-testid="text-user-phone">{user?.mobilePhone || "Phone not provided"}</span>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <Briefcase className="w-4 h-4 text-muted-foreground" />
+                  <span data-testid="text-user-job-role">
+                    {userJobRole ? `${userJobRole.name} (Level ${userJobRole.level})` : "No job role assigned"}
+                  </span>
+                </div>
               </div>
             </div>
 
             <div>
               <h4 className="font-medium mb-3">Manager</h4>
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <User className="w-5 h-5 text-blue-600" />
+              {userManager ? (
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <User className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium" data-testid="text-manager-name">
+                      {userManager.firstName} {userManager.lastName}
+                    </p>
+                    <p className="text-sm text-muted-foreground" data-testid="text-manager-role">
+                      {userManager.role.charAt(0).toUpperCase() + userManager.role.slice(1)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium">Manager</p>
-                  <p className="text-sm text-muted-foreground">Supervisor</p>
+              ) : (
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                    <User className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground" data-testid="text-no-manager">
+                      No manager assigned
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 

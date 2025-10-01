@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GitBranch, Network } from "lucide-react";
+import { TreeView, type TreeNodeData } from "./TreeNode";
 
 type JobRoleOrgChartNode = {
   id: string;
@@ -28,127 +29,74 @@ type ManagerOrgChartNode = {
   jobRoleName: string | null;
   managerId: string | null;
   managerName: string | null;
-  directReports: Array<{
-    id: string;
-    name: string;
-    jobTitle: string | null;
-  }>;
+  directReports: ManagerOrgChartNode[];
+  directReportCount: number;
+};
+
+type JobRoleHierarchyNode = {
+  id: string;
+  name: string;
+  code: string;
+  level: number;
+  department: string | null;
+  reportsToJobRoleId: string | null;
+  children: JobRoleHierarchyNode[];
+};
+
+// Transform job role hierarchy to tree node data
+const transformJobRoleToTree = (node: JobRoleHierarchyNode, employeeCounts: Map<string, number>): TreeNodeData => {
+  const count = employeeCounts.get(node.id) || 0;
+  return {
+    id: node.id,
+    name: node.name,
+    subtitle: node.department ? `${node.department} • Level ${node.level}` : `Level ${node.level}`,
+    badge: node.code,
+    count,
+    children: node.children?.map(child => transformJobRoleToTree(child, employeeCounts)) || [],
+    metadata: { level: node.level, department: node.department }
+  };
+};
+
+// Transform manager hierarchy to tree node data
+const transformManagerToTree = (node: ManagerOrgChartNode): TreeNodeData => {
+  return {
+    id: node.id,
+    name: node.name,
+    subtitle: node.jobRoleName || node.jobTitle || node.email || undefined,
+    count: node.directReportCount,
+    children: node.directReports?.map(transformManagerToTree) || [],
+    metadata: { email: node.email, jobTitle: node.jobTitle }
+  };
 };
 
 export default function Organization() {
-  const { data: jobRoleOrgChart, isLoading: isLoadingJobRoles } = useQuery<JobRoleOrgChartNode[]>({
+  // Fetch hierarchical job role structure
+  const { data: jobRoleHierarchy, isLoading: isLoadingJobRoles } = useQuery<JobRoleHierarchyNode[]>({
+    queryKey: ['/api/org-chart/hierarchy/job-roles']
+  });
+
+  // Fetch flat job role org chart for employee counts
+  const { data: jobRoleOrgChart } = useQuery<JobRoleOrgChartNode[]>({
     queryKey: ['/api/org-chart/job-roles']
   });
 
+  // Fetch hierarchical manager structure
   const { data: managerOrgChart, isLoading: isLoadingManagers } = useQuery<ManagerOrgChartNode[]>({
     queryKey: ['/api/org-chart/managers']
   });
 
-  const renderJobRoleNode = (node: JobRoleOrgChartNode) => {
-    return (
-      <div key={node.id} className="mb-4" data-testid={`job-role-node-${node.id}`}>
-        <Card className="border-l-4 border-l-primary">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg" data-testid={`job-role-name-${node.id}`}>{node.name}</CardTitle>
-                <CardDescription data-testid={`job-role-level-${node.id}`}>
-                  Level {node.level} {node.department && `• ${node.department}`}
-                </CardDescription>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-primary" data-testid={`job-role-count-${node.id}`}>{node.employeeCount}</div>
-                <div className="text-sm text-muted-foreground">employees</div>
-              </div>
-            </div>
-          </CardHeader>
-          {node.employees.length > 0 && (
-            <CardContent>
-              <div className="space-y-1">
-                {node.employees.map((employee) => (
-                  <div
-                    key={employee.id}
-                    className="text-sm flex items-center justify-between py-1 px-2 rounded hover:bg-muted/50"
-                    data-testid={`employee-${employee.id}`}
-                  >
-                    <span data-testid={`employee-name-${employee.id}`}>{employee.name}</span>
-                    {employee.jobTitle && (
-                      <span className="text-muted-foreground text-xs" data-testid={`employee-title-${employee.id}`}>
-                        {employee.jobTitle}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          )}
-        </Card>
-        {node.reportsTo && (
-          <div className="text-xs text-muted-foreground ml-4 mt-1" data-testid={`reports-to-${node.id}`}>
-            Reports to: {node.reportsToName}
-          </div>
-        )}
-      </div>
-    );
-  };
+  // Create employee count map from flat org chart data
+  const employeeCounts = new Map<string, number>();
+  jobRoleOrgChart?.forEach(node => {
+    employeeCounts.set(node.id, node.employeeCount);
+  });
 
-  const renderManagerNode = (node: ManagerOrgChartNode) => {
-    return (
-      <div key={node.id} className="mb-4" data-testid={`manager-node-${node.id}`}>
-        <Card className="border-l-4 border-l-blue-500">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg" data-testid={`manager-name-${node.id}`}>{node.name}</CardTitle>
-                <CardDescription data-testid={`manager-details-${node.id}`}>
-                  {node.jobTitle || node.jobRoleName}
-                  {node.email && ` • ${node.email}`}
-                </CardDescription>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-blue-500" data-testid={`direct-reports-count-${node.id}`}>
-                  {node.directReports.length}
-                </div>
-                <div className="text-sm text-muted-foreground">direct reports</div>
-              </div>
-            </div>
-          </CardHeader>
-          {node.directReports.length > 0 && (
-            <CardContent>
-              <div className="space-y-1">
-                {node.directReports.map((report) => (
-                  <div
-                    key={report.id}
-                    className="text-sm flex items-center justify-between py-1 px-2 rounded hover:bg-muted/50"
-                    data-testid={`direct-report-${report.id}`}
-                  >
-                    <span data-testid={`direct-report-name-${report.id}`}>{report.name}</span>
-                    {report.jobTitle && (
-                      <span className="text-muted-foreground text-xs" data-testid={`direct-report-title-${report.id}`}>
-                        {report.jobTitle}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          )}
-        </Card>
-        {node.managerId && (
-          <div className="text-xs text-muted-foreground ml-4 mt-1" data-testid={`manager-reports-to-${node.id}`}>
-            Reports to: {node.managerName}
-          </div>
-        )}
-      </div>
-    );
-  };
+  // Transform hierarchical data to tree format
+  const jobRoleTreeData = jobRoleHierarchy?.map(node => 
+    transformJobRoleToTree(node, employeeCounts)
+  ) || [];
 
-  // Group job roles by level for better visualization
-  const jobRolesByLevel = jobRoleOrgChart?.reduce((acc, node) => {
-    if (!acc[node.level]) acc[node.level] = [];
-    acc[node.level].push(node);
-    return acc;
-  }, {} as Record<number, JobRoleOrgChartNode[]>) || {};
+  const managerTreeData = managerOrgChart?.map(transformManagerToTree) || [];
 
   return (
     <div className="p-6 space-y-6" data-testid="organization-page">
@@ -186,24 +134,13 @@ export default function Organization() {
                     <Skeleton key={i} className="h-32 w-full" />
                   ))}
                 </div>
-              ) : !jobRoleOrgChart || jobRoleOrgChart.length === 0 ? (
+              ) : !jobRoleHierarchy || jobRoleHierarchy.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground" data-testid="job-roles-empty">
                   No job roles found
                 </div>
               ) : (
-                <div className="space-y-6" data-testid="job-roles-list">
-                  {Object.keys(jobRolesByLevel)
-                    .sort((a, b) => Number(b) - Number(a)) // Sort descending (highest level first)
-                    .map((level) => (
-                      <div key={level} data-testid={`level-${level}`}>
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-3" data-testid={`level-header-${level}`}>
-                          Level {level}
-                        </h3>
-                        <div className="space-y-3">
-                          {jobRolesByLevel[Number(level)].map(renderJobRoleNode)}
-                        </div>
-                      </div>
-                    ))}
+                <div data-testid="job-roles-tree">
+                  <TreeView nodes={jobRoleTreeData} defaultExpanded={true} />
                 </div>
               )}
             </CardContent>
@@ -230,8 +167,8 @@ export default function Organization() {
                   No managers found
                 </div>
               ) : (
-                <div className="space-y-3" data-testid="managers-list">
-                  {managerOrgChart.map(renderManagerNode)}
+                <div data-testid="managers-tree">
+                  <TreeView nodes={managerTreeData} defaultExpanded={true} />
                 </div>
               )}
             </CardContent>
