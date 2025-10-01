@@ -13,7 +13,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Mail, Phone, User, Edit2, Upload, Shield, Briefcase } from "lucide-react";
+import { Mail, Phone, User, Edit2, Upload, Briefcase } from "lucide-react";
 import { updateUserProfileSchema, type User as UserType } from "@shared/schema";
 import type { Goal, DevelopmentPlan } from "@shared/schema";
 import type { z } from "zod";
@@ -44,14 +44,13 @@ export default function Profile() {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const { toast } = useToast();
 
-  // Profile editing form with proper type handling
+  // Profile editing form - only personal info (no role/job role/manager assignments)
   const profileForm = useForm<{
     firstName?: string;
     lastName?: string;
     mobilePhone?: string;
     jobTitle?: string;
     profileImageUrl?: string;
-    role?: "operative" | "supervisor" | "leadership";
   }>({
     resolver: zodResolver(updateUserProfileSchema),
     defaultValues: {
@@ -60,7 +59,6 @@ export default function Profile() {
       mobilePhone: "",
       jobTitle: "",
       profileImageUrl: "",
-      role: undefined,
     },
   });
 
@@ -393,51 +391,6 @@ export default function Profile() {
                         </FormItem>
                       )}
                     />
-
-                    {/* Role Assignment - Only for Supervisors/Leadership */}
-                    {user && (user.role === 'supervisor' || user.role === 'leadership') && (
-                      <FormField
-                        control={profileForm.control}
-                        name="role"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              <div className="flex items-center gap-2">
-                                <Shield className="h-4 w-4" />
-                                User Role
-                              </div>
-                            </FormLabel>
-                            <FormControl>
-                              <Select value={field.value || ""} onValueChange={field.onChange}>
-                                <SelectTrigger data-testid="select-user-role">
-                                  <SelectValue placeholder="Select role" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="operative" data-testid="option-operative">
-                                    Operative
-                                  </SelectItem>
-                                  <SelectItem value="supervisor" data-testid="option-supervisor">
-                                    Supervisor
-                                  </SelectItem>
-                                  {user.role === 'leadership' && (
-                                    <SelectItem value="leadership" data-testid="option-leadership">
-                                      Leadership
-                                    </SelectItem>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </FormControl>
-                            <FormDescription>
-                              {user.role === 'leadership' 
-                                ? 'Assign role to this user (Leadership can assign all roles)'
-                                : 'Assign role to this user (Supervisors can assign Operative/Supervisor roles)'
-                              }
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
 
                     <div className="flex justify-end space-x-2">
                       <Button type="button" variant="outline" onClick={() => setIsEditProfileOpen(false)}>
