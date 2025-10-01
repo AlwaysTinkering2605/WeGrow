@@ -164,6 +164,13 @@ export default function UserManagement() {
     return option ? option.label : jobRole || 'Not assigned';
   };
 
+  // Get job role name from normalized job_roles table
+  const getJobRoleName = (jobRoleId?: string | null) => {
+    if (!jobRoleId) return 'Not assigned';
+    const role = jobRoles.find(jr => jr.id === jobRoleId);
+    return role ? `${role.name} (Level ${role.level})` : 'Not assigned';
+  };
+
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'leadership': return 'default';
@@ -315,7 +322,9 @@ export default function UserManagement() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm">{getJobRoleLabel(user.jobRole)}</span>
+                    <span className="text-sm" data-testid={`text-job-role-${user.id}`}>
+                      {getJobRoleName(user.jobRoleId)}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <span className="text-sm">{user.jobTitle || 'Not assigned'}</span>
