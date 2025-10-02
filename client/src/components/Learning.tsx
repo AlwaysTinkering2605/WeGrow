@@ -64,6 +64,39 @@ import { insertLessonSchema, insertLearningPathSchema, insertLearningPathStepSch
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
+// Utility function to extract Vimeo video ID from various URL formats
+function extractVimeoVideoId(input: string): string {
+  if (!input) return '';
+  
+  const trimmed = input.trim();
+  
+  // If already a numeric ID, return it
+  if (/^\d+$/.test(trimmed)) {
+    return trimmed;
+  }
+  
+  // Patterns to match different Vimeo URL formats
+  const patterns = [
+    /vimeo\.com\/channels\/[^\/]+\/(\d+)/,  // Channels: vimeo.com/channels/staffpicks/123456789
+    /vimeo\.com\/groups\/[^\/]+\/videos\/(\d+)/,  // Groups: vimeo.com/groups/name/videos/123456789
+    /vimeo\.com\/album\/\d+\/video\/(\d+)/,  // Albums: vimeo.com/album/123/video/456
+    /vimeo\.com\/showcase\/\d+\/video\/(\d+)/,  // Showcases: vimeo.com/showcase/123/video/456
+    /player\.vimeo\.com\/video\/(\d+)/,  // Player embeds: player.vimeo.com/video/123456789
+    /vimeo\.com\/video\/(\d+)/,  // Direct video: vimeo.com/video/123456789
+    /vimeo\.com\/(\d+)(?:\/[a-zA-Z0-9]+)?(?:\?.*)?$/,  // Standard/Privacy: vimeo.com/123456789 or vimeo.com/123456789/abc123?share=copy
+  ];
+  
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  
+  // If no pattern matched, return empty string to avoid storing invalid data
+  return '';
+}
+
 // Form Schemas for Admin Interface
 const courseSchema = z.object({
   title: z.string().min(1, "Course title is required"),
@@ -4120,16 +4153,17 @@ export default function Learning() {
                         name="vimeoVideoId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Vimeo Video ID (Optional)</FormLabel>
+                            <FormLabel>Vimeo Video ID or URL (Optional)</FormLabel>
                             <FormControl>
                               <Input 
-                                placeholder="e.g., 123456789"
+                                placeholder="e.g., 123456789 or https://vimeo.com/123456789/abc123"
                                 {...field}
+                                onChange={(e) => field.onChange(extractVimeoVideoId(e.target.value))}
                                 data-testid="input-vimeo-id"
                               />
                             </FormControl>
                             <FormDescription>
-                              Enter the Vimeo video ID for the main course video. You can add more lessons later.
+                              Paste a Vimeo URL or enter the video ID. The ID will be extracted automatically.
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -4459,16 +4493,17 @@ export default function Learning() {
                       name="vimeoVideoId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Vimeo Video ID (Optional)</FormLabel>
+                          <FormLabel>Vimeo Video ID or URL (Optional)</FormLabel>
                           <FormControl>
                             <Input 
-                              placeholder="e.g., 123456789"
+                              placeholder="e.g., 123456789 or https://vimeo.com/123456789/abc123"
                               {...field}
+                              onChange={(e) => field.onChange(extractVimeoVideoId(e.target.value))}
                               data-testid="input-edit-vimeo-id"
                             />
                           </FormControl>
                           <FormDescription>
-                            Enter the Vimeo video ID for the main course video.
+                            Paste a Vimeo URL or enter the video ID. The ID will be extracted automatically.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -5166,10 +5201,18 @@ export default function Learning() {
                                 name="vimeoVideoId"
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel>Vimeo Video ID</FormLabel>
+                                    <FormLabel>Vimeo Video ID or URL</FormLabel>
                                     <FormControl>
-                                      <Input placeholder="123456789" {...field} data-testid="input-lesson-vimeo" />
+                                      <Input 
+                                        placeholder="e.g., 123456789 or https://vimeo.com/123456789/abc123" 
+                                        {...field} 
+                                        onChange={(e) => field.onChange(extractVimeoVideoId(e.target.value))}
+                                        data-testid="input-lesson-vimeo" 
+                                      />
                                     </FormControl>
+                                    <FormDescription>
+                                      Paste a Vimeo URL or enter the video ID. The ID will be extracted automatically.
+                                    </FormDescription>
                                     <FormMessage />
                                   </FormItem>
                                 )}
@@ -5639,17 +5682,18 @@ export default function Learning() {
                                 name="vimeoVideoId"
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel>Vimeo Video ID</FormLabel>
+                                    <FormLabel>Vimeo Video ID or URL</FormLabel>
                                     <FormControl>
                                       <Input 
-                                        placeholder="e.g., 123456789" 
+                                        placeholder="e.g., 123456789 or https://vimeo.com/123456789/abc123" 
                                         {...field} 
                                         value={field.value || ''}
+                                        onChange={(e) => field.onChange(extractVimeoVideoId(e.target.value))}
                                         data-testid="input-edit-lesson-vimeo-id"
                                       />
                                     </FormControl>
                                     <FormDescription>
-                                      Find the Video ID from your Vimeo URL: vimeo.com/[VIDEO_ID]
+                                      Paste a Vimeo URL or enter the video ID. The ID will be extracted automatically.
                                     </FormDescription>
                                     <FormMessage />
                                   </FormItem>

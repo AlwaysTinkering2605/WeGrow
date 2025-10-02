@@ -3588,6 +3588,7 @@ export class DatabaseStorage implements IStorage {
       estimatedDuration: courses.estimatedDuration,
       tags: courses.tags,
       thumbnailUrl: courses.thumbnailUrl,
+      vimeoVideoId: courses.vimeoVideoId,
       currentVersionId: courses.currentVersionId,
       isPublished: courses.isPublished,
       createdBy: courses.createdBy,

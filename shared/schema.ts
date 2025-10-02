@@ -347,6 +347,7 @@ export const courses = pgTable("courses", {
   estimatedDuration: integer("estimated_duration"), // minutes
   tags: text("tags").array(),
   thumbnailUrl: varchar("thumbnail_url"),
+  vimeoVideoId: varchar("vimeo_video_id"), // Optional intro/overview video for the course
   currentVersionId: varchar("current_version_id"),
   isPublished: boolean("is_published").default(false),
   createdBy: varchar("created_by").notNull(),

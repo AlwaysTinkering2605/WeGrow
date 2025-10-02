@@ -7,21 +7,43 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// Overloaded signatures for apiRequest
 export async function apiRequest(
-  url: string,
-  options?: {
+  methodOrUrl: string,
+  urlOrOptions?: string | {
     method?: string;
     body?: string;
     headers?: Record<string, string>;
-  }
+  },
+  data?: any
 ): Promise<Response> {
+  let url: string;
+  let method: string;
+  let body: string | undefined;
+  let headers: Record<string, string> | undefined;
+
+  // Check if first parameter is a method (POST, GET, etc.)
+  if (methodOrUrl.match(/^(GET|POST|PUT|PATCH|DELETE)$/i) && typeof urlOrOptions === 'string') {
+    // New style: apiRequest("POST", "/api/...", data)
+    method = methodOrUrl;
+    url = urlOrOptions;
+    body = data !== undefined ? JSON.stringify(data) : undefined;
+  } else {
+    // Old style: apiRequest("/api/...", { method, body, headers })
+    url = methodOrUrl;
+    const options = urlOrOptions as { method?: string; body?: string; headers?: Record<string, string>; } | undefined;
+    method = options?.method || 'GET';
+    body = options?.body;
+    headers = options?.headers;
+  }
+
   const res = await fetch(url, {
-    method: options?.method || 'GET',
+    method,
     headers: {
       'Content-Type': 'application/json',
-      ...options?.headers,
+      ...headers,
     },
-    body: options?.body,
+    body,
     credentials: "include",
   });
 
