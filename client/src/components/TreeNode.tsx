@@ -48,8 +48,9 @@ export function TreeNode({
       <Card
         className={cn(
           "mb-2 transition-all hover:shadow-md cursor-pointer",
-          level > 0 && "ml-6 border-l-4 border-l-primary/20"
+          level > 0 && "border-l-4 border-l-primary/20"
         )}
+        style={{ marginLeft: level > 0 ? `${level * 24}px` : '0' }}
         onClick={handleNodeClick}
         data-testid={`tree-node-${node.id}`}
       >
