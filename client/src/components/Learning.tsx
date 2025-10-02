@@ -103,7 +103,7 @@ const courseSchema = z.object({
   description: z.string().min(10, "Description must be at least 10 characters"),
   category: z.string().min(1, "Category is required"),
   targetRole: z.string().optional(),
-  estimatedHours: z.coerce.number().min(0.5).max(100),
+  estimatedDuration: z.coerce.number().min(30).max(6000), // minutes (30 min to 100 hours)
   difficulty: z.enum(["Beginner", "Intermediate", "Advanced"]),
   // Course type field
   courseType: z.enum(["internal", "external"]).default("internal"),
@@ -1179,7 +1179,7 @@ export default function Learning() {
       description: "",
       category: "",
       targetRole: "",
-      estimatedHours: 1,
+      estimatedDuration: 60, // 1 hour in minutes
       difficulty: "Beginner",
       courseType: "internal",
       // Internal course fields
@@ -1202,7 +1202,7 @@ export default function Learning() {
       description: "",
       category: "",
       targetRole: "",
-      estimatedHours: 1,
+      estimatedDuration: 60, // 1 hour in minutes
       difficulty: "Beginner" as const,
       vimeoVideoId: "",
       isPublished: false,
@@ -1217,7 +1217,7 @@ export default function Learning() {
         description: selectedCourseForEdit.description || "",
         category: selectedCourseForEdit.category || "",
         targetRole: selectedCourseForEdit.targetRole || "",
-        estimatedHours: selectedCourseForEdit.estimatedHours || 1,
+        estimatedDuration: selectedCourseForEdit.estimatedDuration || 60,
         difficulty: selectedCourseForEdit.difficulty || "Beginner",
         vimeoVideoId: selectedCourseForEdit.vimeoVideoId || "",
         isPublished: selectedCourseForEdit.isPublished || false,
@@ -1681,7 +1681,9 @@ export default function Learning() {
         description: "Course has been updated successfully.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/lms/courses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lms/admin/courses"] });
       setSelectedCourseForEdit(null);
+      updateCourseForm.reset();
     },
     onError: (error: any) => {
       toast({
@@ -4102,16 +4104,16 @@ export default function Learning() {
                       />
                       <FormField
                         control={createCourseForm.control}
-                        name="estimatedHours"
+                        name="estimatedDuration"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Estimated Hours</FormLabel>
+                            <FormLabel>Estimated Duration (minutes)</FormLabel>
                             <FormControl>
                               <Input 
                                 type="number" 
-                                min="0.5" 
-                                max="100" 
-                                step="0.5"
+                                min="30" 
+                                max="6000" 
+                                step="30"
                                 placeholder="2.5"
                                 {...field}
                                 onChange={(e) => field.onChange(parseFloat(e.target.value))}
@@ -4446,16 +4448,16 @@ export default function Learning() {
                       />
                       <FormField
                         control={updateCourseForm.control}
-                        name="estimatedHours"
+                        name="estimatedDuration"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Estimated Hours</FormLabel>
+                            <FormLabel>Estimated Duration (minutes)</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
-                                step="0.5"
-                                min="0.5"
-                                max="100"
+                                step="30"
+                                min="30"
+                                max="6000"
                                 {...field}
                                 onChange={(e) => field.onChange(parseFloat(e.target.value))}
                                 data-testid="input-edit-estimated-hours"
