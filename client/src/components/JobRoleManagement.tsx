@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { insertJobRoleSchema, type JobRole, type InsertJobRole } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import {
@@ -26,6 +27,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+// Extended schema for form validation that accepts 'none' for reportsToJobRoleId
+const jobRoleFormSchema = insertJobRoleSchema.extend({
+  reportsToJobRoleId: z.union([z.string().uuid(), z.literal('none')]).optional(),
+});
+
+type JobRoleFormValues = z.infer<typeof jobRoleFormSchema>;
 
 export default function JobRoleManagement() {
   const { toast } = useToast();
@@ -104,29 +112,29 @@ export default function JobRoleManagement() {
   });
 
   // Create form
-  const createForm = useForm<InsertJobRole>({
-    resolver: zodResolver(insertJobRoleSchema),
+  const createForm = useForm<JobRoleFormValues>({
+    resolver: zodResolver(jobRoleFormSchema),
     defaultValues: {
       name: "",
       code: "",
       level: 1,
       department: "",
       description: "",
-      reportsToJobRoleId: undefined,
+      reportsToJobRoleId: 'none',
       isActive: true,
     },
   });
 
   // Edit form
-  const editForm = useForm<InsertJobRole>({
-    resolver: zodResolver(insertJobRoleSchema),
+  const editForm = useForm<JobRoleFormValues>({
+    resolver: zodResolver(jobRoleFormSchema),
     defaultValues: {
       name: "",
       code: "",
       level: 1,
       department: "",
       description: "",
-      reportsToJobRoleId: undefined,
+      reportsToJobRoleId: 'none',
       isActive: true,
     },
   });
@@ -140,31 +148,32 @@ export default function JobRoleManagement() {
       level: jobRole.level,
       department: jobRole.department || "",
       description: jobRole.description || "",
-      reportsToJobRoleId: jobRole.reportsToJobRoleId || undefined,
+      reportsToJobRoleId: jobRole.reportsToJobRoleId || 'none',
       isActive: jobRole.isActive ?? true,
     });
   };
 
   // Handle create submit
-  const handleCreateSubmit = (data: InsertJobRole) => {
-    // Clean up empty strings
-    const cleanedData = {
+  const handleCreateSubmit = (data: JobRoleFormValues) => {
+    // Convert form values to InsertJobRole format
+    const cleanedData: InsertJobRole = {
       ...data,
       department: data.department?.trim() || null,
       description: data.description?.trim() || null,
-      reportsToJobRoleId: data.reportsToJobRoleId === 'none' ? null : data.reportsToJobRoleId,
+      reportsToJobRoleId: data.reportsToJobRoleId === 'none' || !data.reportsToJobRoleId ? null : data.reportsToJobRoleId,
     };
     createJobRoleMutation.mutate(cleanedData);
   };
 
   // Handle edit submit
-  const handleEditSubmit = (data: InsertJobRole) => {
+  const handleEditSubmit = (data: JobRoleFormValues) => {
     if (!editingJobRole) return;
-    const cleanedData = {
+    // Convert form values to InsertJobRole format
+    const cleanedData: InsertJobRole = {
       ...data,
       department: data.department?.trim() || null,
       description: data.description?.trim() || null,
-      reportsToJobRoleId: data.reportsToJobRoleId === 'none' ? null : data.reportsToJobRoleId,
+      reportsToJobRoleId: data.reportsToJobRoleId === 'none' || !data.reportsToJobRoleId ? null : data.reportsToJobRoleId,
     };
     updateJobRoleMutation.mutate({ id: editingJobRole.id, data: cleanedData });
   };
@@ -429,7 +438,7 @@ export default function JobRoleManagement() {
                   <FormItem>
                     <FormLabel>Reports To</FormLabel>
                     <Select
-                      value={field.value || 'none'}
+                      value={field.value}
                       onValueChange={field.onChange}
                     >
                       <FormControl>
@@ -595,7 +604,7 @@ export default function JobRoleManagement() {
                   <FormItem>
                     <FormLabel>Reports To</FormLabel>
                     <Select
-                      value={field.value || 'none'}
+                      value={field.value}
                       onValueChange={field.onChange}
                     >
                       <FormControl>

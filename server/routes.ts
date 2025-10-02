@@ -14,6 +14,7 @@ import {
   insertMeetingSchema,
   insertRecognitionSchema,
   insertTeamSchema,
+  insertJobRoleSchema,
   updateUserProfileSchema,
   // LMS schemas
   insertCourseSchema,
