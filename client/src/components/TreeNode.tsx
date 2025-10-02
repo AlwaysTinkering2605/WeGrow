@@ -43,14 +43,19 @@ export function TreeNode({
     }
   };
 
+  // Calculate indentation based on job role level (not tree depth)
+  // Level 5 (Director) = 0px, Level 4 = 24px, Level 3 = 48px, Level 2 = 72px, Level 1 = 96px
+  const jobRoleLevel = node.metadata?.level || 5; // Default to highest level if not specified
+  const indentation = (5 - jobRoleLevel) * 24;
+
   return (
     <div className="w-full">
       <Card
         className={cn(
           "mb-2 transition-all hover:shadow-md cursor-pointer",
-          level > 0 && "border-l-4 border-l-primary/20"
+          indentation > 0 && "border-l-4 border-l-primary/20"
         )}
-        style={{ marginLeft: level > 0 ? `${level * 24}px` : '0' }}
+        style={{ marginLeft: indentation > 0 ? `${indentation}px` : '0' }}
         onClick={handleNodeClick}
         data-testid={`tree-node-${node.id}`}
       >

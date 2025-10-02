@@ -10,6 +10,8 @@ Apex is a Performance & Development Platform designed for cleaning companies to 
 
 **Job Role Management UI (Oct 2, 2025)**: Implemented comprehensive Job Role Management interface for leadership users with full CRUD functionality. Features include searchable table view, create/edit dialogs with type-safe form validation, delete confirmation with safety checks, and seamless integration with User Management filters. Supports hierarchical role structure with parent role selection and proper validation of organizational reporting relationships.
 
+**Org Chart Visual Enhancement (Oct 2, 2025)**: Updated job role hierarchy visualization to use level-based indentation instead of tree-depth indentation. All roles with the same organizational level (1-5) now align vertically regardless of parent-child relationships, making the hierarchy clearer and more consistent.
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
