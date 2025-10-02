@@ -8,6 +8,8 @@ Apex is a Performance & Development Platform designed for cleaning companies to 
 
 **Profile Edit Security Fix (Oct 1, 2025)**: Fixed critical bug where Profile edit dialog included "User Role" field that was clearing user's system role on save. Profile edit now only contains personal information fields (name, phone, title, image). Role assignment is exclusively in User Management for leadership users.
 
+**Job Role Management UI (Oct 2, 2025)**: Implemented comprehensive Job Role Management interface for leadership users with full CRUD functionality. Features include searchable table view, create/edit dialogs with type-safe form validation, delete confirmation with safety checks, and seamless integration with User Management filters. Supports hierarchical role structure with parent role selection and proper validation of organizational reporting relationships.
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -131,6 +133,11 @@ The platform implements a normalized job role architecture with proper relationa
 - `TreeNode.tsx`: Reusable recursive tree component with expand/collapse (default: first 2 levels)
   - Supports unlimited nesting, badges, subtitles, counts, and click handlers
   - Level-based indentation and styling
+- `JobRoleManagement.tsx`: Leadership interface for managing job roles (create, edit, delete)
+  - Type-safe form handling with extended schema supporting 'none' sentinel for optional parent roles
+  - Search/filter functionality across name, code, and department
+  - Deletion safety checks prevent removing roles with assigned users or child roles
+  - All interactive elements include data-testid attributes for testing
 - `UserManagement.tsx`: Leadership interface for assigning job roles and managers to users
 - Integrated into People Management dropdown in main navigation
 - Role-based access control (supervisor and leadership only)
