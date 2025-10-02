@@ -12,7 +12,7 @@ Apex is a Performance & Development Platform designed for cleaning companies to 
 
 **Org Chart Visual Enhancement (Oct 2, 2025)**: Updated job role hierarchy visualization to use level-based indentation instead of tree-depth indentation. All roles with the same organizational level (1-5) now align vertically regardless of parent-child relationships, making the hierarchy clearer and more consistent.
 
-**Vimeo Integration & API Fix (Oct 2, 2025)**: Implemented Vimeo URL extraction utility to support new privacy-enabled sharing links (vimeo.com/ID/HASH?share=copy). The `extractVimeoVideoId()` function normalizes various Vimeo URL formats to extract just the numeric video ID, applied to all course/lesson/quiz form fields. Fixed critical bug in `apiRequest()` function where incorrect calling pattern caused HTML error pages - now supports both legacy and modern API calling patterns with proper JSON serialization.
+**Vimeo Integration & API Fix (Oct 2, 2025)**: Implemented comprehensive Vimeo URL extraction utility with support for 8 URL patterns including privacy-enabled sharing links (vimeo.com/ID/HASH?share=copy), channels, groups, albums, showcases, player embeds, and direct video links. The `extractVimeoVideoId()` function normalizes all Vimeo URL formats to extract just the numeric video ID, applied to all course/lesson/quiz form fields. Returns empty string for unrecognized patterns to prevent invalid data storage. Fixed critical bug in `apiRequest()` function where incorrect calling pattern caused HTML error pages - now supports both legacy and modern API calling patterns with proper JSON serialization. Added vimeo_video_id column to courses table with full backend persistence support.
 
 # User Preferences
 
