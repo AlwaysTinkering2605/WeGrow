@@ -28,6 +28,7 @@ import {
   TrendingUp,
   UserPlus,
   GitBranch,
+  Briefcase,
 } from "lucide-react";
 import { NotificationBadge } from "./NotificationCenter";
 import Dashboard from "./Dashboard";
@@ -40,6 +41,7 @@ import Learning from "./Learning";
 
 // Role-based components
 import UserManagement from "./UserManagement";
+import JobRoleManagement from "./JobRoleManagement";
 import TeamManagement from "./TeamManagement";
 import CompanyObjectives from "./CompanyObjectives";
 import TeamObjectives from "./TeamObjectives";
@@ -53,7 +55,7 @@ import AdvancedAnalyticsDashboard from "./AdvancedAnalyticsDashboard";
 import WebhookConfiguration from "../pages/WebhookConfiguration";
 import Organization from "./Organization";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks" | "organization";
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "job-roles" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks" | "organization";
 
 export default function Layout() {
   const [location] = useLocation();
@@ -82,6 +84,7 @@ export default function Layout() {
     if (location === "/meetings") return "meetings";
     if (location === "/profile") return "profile";
     if (location === "/user-management") return "user-management";
+    if (location === "/job-roles") return "job-roles";
     if (location === "/team") return "team";
     if (location === "/organization") return "organization";
     if (location === "/company-objectives") return "company-objectives";
@@ -127,6 +130,7 @@ export default function Layout() {
       icon: UsersRound,
       items: [
         { id: "user-management", label: "User Management", icon: UserPlus, component: UserManagement },
+        { id: "job-roles", label: "Job Role Management", icon: Briefcase, component: JobRoleManagement },
         { id: "team", label: "Team Management", icon: UsersRound, component: TeamManagement },
         { id: "organization", label: "Organization Chart", icon: GitBranch, component: Organization },
         { id: "team-objectives", label: "Team Objectives", icon: Target, component: TeamObjectives },
