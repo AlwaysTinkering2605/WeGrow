@@ -343,7 +343,15 @@ export interface IStorage {
   updateTeam(teamId: string, updates: Partial<InsertTeam>): Promise<typeof teams.$inferSelect>;
   deleteTeam(teamId: string): Promise<void>;
   getTeamHierarchy(): Promise<TeamHierarchyNode[]>;
-  assignUserToTeam(userId: string, teamId: string): Promise<User>;
+  assignUserToTeam(userId: string, teamId: string): Promise<User>; // DEPRECATED: Use team membership methods instead
+
+  // Team Membership Management (many-to-many)
+  getUserTeamMemberships(userId: string): Promise<TeamMember[]>;
+  getTeamMembersList(teamId: string): Promise<TeamMember[]>;
+  addTeamMember(membership: InsertTeamMember): Promise<TeamMember>;
+  removeTeamMember(userId: string, teamId: string): Promise<void>;
+  updateTeamMemberRole(userId: string, teamId: string, role: string): Promise<TeamMember>;
+  setPrimaryTeam(userId: string, teamId: string): Promise<void>;
 
   // Departments Management
   getAllDepartments(): Promise<Department[]>;
