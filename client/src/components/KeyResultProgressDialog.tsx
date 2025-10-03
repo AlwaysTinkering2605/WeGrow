@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,17 +66,28 @@ export function KeyResultProgressDialog({
   const [newValue, setNewValue] = useState<string>("");
   const [confidenceScore, setConfidenceScore] = useState<number>(5);
   const [notes, setNotes] = useState("");
-  const { toast } = useToast();
+  const { toast} = useToast();
   const queryClient = useQueryClient();
+  const previousKeyResultId = useRef<string | null>(null);
+  const previousIsOpen = useRef(false);
 
-  // Reset form when dialog opens with new key result
+  // Reset form only when dialog first opens OR when switching to a different key result
   useEffect(() => {
-    if (keyResult) {
-      setNewValue(keyResult.currentValue.toString());
-      setConfidenceScore(keyResult.confidenceScore || 5);
-      setNotes("");
+    if (isOpen && keyResult) {
+      // Only reset if dialog was previously closed OR if we're viewing a different key result
+      const dialogJustOpened = !previousIsOpen.current && isOpen;
+      const keyResultChanged = previousKeyResultId.current !== keyResult.id;
+      
+      if (dialogJustOpened || keyResultChanged) {
+        setNewValue(keyResult.currentValue.toString());
+        setConfidenceScore(keyResult.confidenceScore || 5);
+        setNotes("");
+        previousKeyResultId.current = keyResult.id;
+      }
     }
-  }, [keyResult]);
+    
+    previousIsOpen.current = isOpen;
+  }, [isOpen, keyResult]);
 
   // Fetch progress history
   const { data: progressHistory } = useQuery<ProgressUpdate[]>({
@@ -94,40 +105,34 @@ export function KeyResultProgressDialog({
       confidenceScore: number;
       notes: string;
     }) => {
-      await apiRequest("POST", "/api/key-results/progress", data);
-      
-      // Also update the key result's current value
-      const endpoint = keyResultType === "company" 
-        ? `/api/key-results/${keyResult?.id}`
-        : `/api/team-key-results/${keyResult?.id}`;
-      
-      await apiRequest("PATCH", endpoint, {
-        currentValue: data.newValue,
+      // Post to the correct endpoint with ID in the URL path
+      await apiRequest("POST", `/api/key-results/${data.keyResultId}/progress`, {
+        newValue: data.newValue,
         confidenceScore: data.confidenceScore,
-        lastConfidenceUpdate: new Date().toISOString(),
+        notes: data.notes
       });
     },
-    onSuccess: () => {
-      // Invalidate all relevant queries for immediate UI refresh
+    onSuccess: async () => {
+      // Refetch all relevant queries for immediate UI refresh
       if (keyResultType === "company") {
-        queryClient.invalidateQueries({ queryKey: ["/api/objectives"] });
-        // Invalidate the specific objective's key results
+        await queryClient.refetchQueries({ queryKey: ["/api/objectives"] });
+        // Refetch the specific objective's key results
         if (keyResult?.objectiveId) {
-          queryClient.invalidateQueries({ 
+          await queryClient.refetchQueries({ 
             queryKey: ["/api/objectives", keyResult.objectiveId, "key-results"] 
           });
         }
       } else {
-        queryClient.invalidateQueries({ queryKey: ["/api/team-objectives"] });
-        // Invalidate the specific team objective's key results
+        await queryClient.refetchQueries({ queryKey: ["/api/team-objectives"] });
+        // Refetch the specific team objective's key results
         if (keyResult?.teamObjectiveId) {
-          queryClient.invalidateQueries({ 
+          await queryClient.refetchQueries({ 
             queryKey: ["/api/team-objectives", keyResult.teamObjectiveId, "key-results"] 
           });
         }
       }
-      // Invalidate progress history
-      queryClient.invalidateQueries({ 
+      // Refetch progress history
+      await queryClient.refetchQueries({ 
         queryKey: ["/api/key-results", keyResult?.id, "progress-history"] 
       });
       

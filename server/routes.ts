@@ -639,9 +639,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const numericConfidence = Number(confidenceScore);
         if (!isNaN(numericConfidence) && numericConfidence >= 1 && numericConfidence <= 10) {
           parsedConfidence = numericConfidence;
-          console.log(`[DEBUG] Confidence score updated: ${keyResult.confidenceScore} -> ${parsedConfidence}`);
-        } else {
-          console.log(`[DEBUG] Invalid confidence score: ${confidenceScore}, keeping existing: ${keyResult.confidenceScore}`);
         }
       }
 
