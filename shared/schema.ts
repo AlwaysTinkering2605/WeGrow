@@ -51,6 +51,9 @@ export const companyValueEnum = pgEnum("company_value", ["excellence", "teamwork
 // OKR metric type enum for key results
 export const metricTypeEnum = pgEnum("metric_type", ["percentage", "numeric", "currency", "boolean"]);
 
+// Objective type enum for strategic classification
+export const objectiveTypeEnum = pgEnum("objective_type", ["committed", "aspirational"]);
+
 // LMS-specific enums
 export const lessonTypeEnum = pgEnum("lesson_type", ["video", "quiz", "document", "link"]);
 export const contentTypeEnum = pgEnum("content_type", [
@@ -264,6 +267,11 @@ export const companyObjectives = pgTable("company_objectives", {
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
   createdBy: varchar("created_by").notNull(),
+  ownerId: varchar("owner_id"), // Individual accountable leader (ISO 9001:2015 requirement)
+  objectiveType: objectiveTypeEnum("objective_type").default("committed"), // Committed vs Aspirational
+  qualityPolicyLinks: text("quality_policy_links").array(), // Array of quality policy references
+  resourceRequirements: jsonb("resource_requirements"), // Structured resource planning (ISO 6.2)
+  evaluationMethod: text("evaluation_method"), // How results will be measured (ISO 6.2)
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -292,8 +300,13 @@ export const teamObjectives = pgTable("team_objectives", {
   parentCompanyObjectiveId: varchar("parent_company_objective_id").notNull(),
   teamId: varchar("team_id").notNull(), // FK to teams.id - normalized team reference
   supervisorId: varchar("supervisor_id").notNull(),
+  ownerId: varchar("owner_id"), // Individual owner in addition to team assignment (ISO 9001:2015)
   title: text("title").notNull(),
   description: text("description"),
+  objectiveType: objectiveTypeEnum("objective_type").default("committed"), // Committed vs Aspirational
+  qualityPolicyLinks: text("quality_policy_links").array(), // Array of quality policy references
+  resourceRequirements: jsonb("resource_requirements"), // Structured resource planning (ISO 6.2)
+  evaluationMethod: text("evaluation_method"), // How results will be measured (ISO 6.2)
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
   isActive: boolean("is_active").default(true),
