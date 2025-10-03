@@ -692,11 +692,33 @@ export default function TeamObjectives() {
                 <div key={objective.id} className="border rounded-lg p-4" data-testid={`team-objective-${objective.id}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <Badge variant="outline" className="text-xs">
                           <Building className="w-3 h-3 mr-1" />
                           {(teams as any[])?.find((t: any) => t.id === objective.teamId)?.name || 'Unknown Team'}
                         </Badge>
+                        
+                        {/* Phase 2: Objective Type Badge */}
+                        {objective.objectiveType && (
+                          <Badge 
+                            variant={objective.objectiveType === 'committed' ? 'default' : 'secondary'}
+                            className="text-xs"
+                            data-testid={`badge-team-objective-type-${objective.id}`}
+                          >
+                            {objective.objectiveType === 'committed' ? '✓ Committed' : '🎯 Aspirational'}
+                          </Badge>
+                        )}
+                        
+                        {/* Phase 2: Owner Badge */}
+                        {objective.ownerId && (
+                          <Badge variant="outline" className="text-xs" data-testid={`badge-team-objective-owner-${objective.id}`}>
+                            <User2 className="w-3 h-3 mr-1" />
+                            {(() => {
+                              const owner = (users as any[])?.find((u: any) => u.id === objective.ownerId);
+                              return owner ? `${owner.firstName} ${owner.lastName}` : 'Unknown';
+                            })()}
+                          </Badge>
+                        )}
                       </div>
                       <h4 className="font-semibold text-lg" data-testid={`text-team-objective-title-${objective.id}`}>
                         {objective.title}
