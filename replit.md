@@ -53,6 +53,45 @@ Preferred communication style: Simple, everyday language.
 - **Meeting Management**: Structured 1-on-1 meetings.
 - **Dashboard Analytics**: Progress visualization and performance metrics.
 - **Dual Org Charts**: View organization structure from both job role hierarchy (structural) and manager chain (actual reporting) perspectives.
+- **Enhanced Key Results System**: ISO 9001:2015-compliant OKR tracking with metric types (percentage, numeric, currency, boolean), confidence scoring, and immutable progress audit trails.
+
+## ISO 9001:2015 Compliance Features (Phase 1 - October 2025)
+
+### Enhanced Key Results Tracking
+The platform now includes comprehensive key results management aligned with ISO 9001:2015 requirements for quality objectives and performance monitoring:
+
+**Metric Types**: Support for four measurement types:
+- **Percentage**: Progress tracked as percentages (e.g., market share growth from 15% to 25%)
+- **Numeric**: Count-based metrics (e.g., customer acquisitions, project completions)
+- **Currency**: Financial targets (e.g., revenue goals, cost reductions)
+- **Boolean**: Binary completion status (e.g., certification achieved, system deployed)
+
+**Confidence Scoring**: Three-tier confidence assessment updated during weekly check-ins:
+- **Low (0-39%)**: At-risk objectives requiring immediate attention
+- **Medium (40-79%)**: On-track with some concerns
+- **High (80-100%)**: Strong confidence in achieving target
+
+**Immutable Progress Audit Trail**: The `krProgressUpdates` table provides complete historical tracking:
+- Time-stamped progress entries (previousValue, newValue, updatedAt, updatedBy)
+- Confidence level changes with timestamps
+- Contextual notes for each update
+- Permanent record supporting ISO 9001 Clause 7.5 (documented information) and 9.1 (monitoring requirements)
+
+**Technical Implementation**:
+- **Database Schema**: Enhanced `keyResults` and `teamKeyResults` tables with metricType enum, startValue, targetValue, confidenceScore, lastConfidenceUpdate fields
+- **Storage Layer**: Six new storage methods for KR CRUD operations and progress tracking
+- **REST API**: Comprehensive endpoints for key results management, progress updates, and history retrieval
+- **Frontend Components**: 
+  - `KeyResultCard`: Visual progress display with metric type badges, progress bars, and confidence indicators
+  - `KeyResultProgressDialog`: Weekly check-in interface with progress history timeline
+  - Integrated into `CompanyObjectives` and `TeamObjectives` with expand/collapse functionality
+- **Cache Strategy**: React Query invalidation across multiple query keys ensures immediate UI refresh after progress updates
+
+**Compliance Alignment**:
+- ISO 9001 Clause 6.2: Quality objectives planning and tracking
+- ISO 9001 Clause 9.1: Performance monitoring and measurement
+- ISO 9001 Clause 9.3: Management review data requirements
+- ISO 9001 Clause 7.5: Documented information retention
 
 ## Organizational Structure
 The platform implements a normalized job role architecture with a `job_roles` table for hierarchical structure (levels 1-5), department categorization, and reporting relationships.
