@@ -118,6 +118,9 @@ export const departments = pgTable("departments", {
   index("departments_sort_order_idx").on(table.sortOrder),
 ]);
 
+// Team member role enum - defines roles within a team
+export const teamMemberRoleEnum = pgEnum("team_member_role", ["Lead", "Member", "Viewer"]);
+
 // Teams table - formal team structure
 export const teams = pgTable("teams", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -137,6 +140,33 @@ export const teams = pgTable("teams", {
     name: "teams_department_fk"
   }).onDelete("set null"),
   index("teams_department_idx").on(table.departmentId),
+]);
+
+// Team Members junction table - many-to-many relationship between users and teams
+export const teamMembers = pgTable("team_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  teamId: varchar("team_id").notNull(),
+  role: teamMemberRoleEnum("role").default("Member").notNull(),
+  isPrimary: boolean("is_primary").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.userId],
+    foreignColumns: [users.id],
+    name: "team_members_user_fk"
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.teamId],
+    foreignColumns: [teams.id],
+    name: "team_members_team_fk"
+  }).onDelete("cascade"),
+  index("team_members_user_idx").on(table.userId),
+  index("team_members_team_idx").on(table.teamId),
+  index("team_members_is_primary_idx").on(table.isPrimary),
+  // Unique constraint: user can only be in a team once
+  unique("team_members_user_team_unique").on(table.userId, table.teamId),
 ]);
 
 // Skill Categories table - normalized taxonomy for competencies, courses, and learning paths
@@ -1612,6 +1642,12 @@ export const insertTeamSchema = createInsertSchema(teams).omit({
   updatedAt: true,
 });
 
+export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertDepartmentSchema = createInsertSchema(departments).omit({
   id: true,
   createdAt: true,
@@ -2074,7 +2110,10 @@ export type UserBadge = typeof userBadges.$inferSelect;
 export type TrainingRequirement = typeof trainingRequirements.$inferSelect;
 export type PdpCourseLink = typeof pdpCourseLinks.$inferSelect;
 
+export type TeamMember = typeof teamMembers.$inferSelect;
+
 export type InsertTeam = z.infer<typeof insertTeamSchema>;
+export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
 export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
 export type InsertSkillCategory = z.infer<typeof insertSkillCategorySchema>;
 export type InsertJobRole = z.infer<typeof insertJobRoleSchema>;
