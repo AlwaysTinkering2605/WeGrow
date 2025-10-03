@@ -27,7 +27,11 @@ import {
   TrendingUp,
   Network,
   UserPlus,
-  Settings
+  Settings,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown
 } from "lucide-react";
 import { 
   insertTeamSchema,
@@ -60,6 +64,8 @@ export default function TeamManagement() {
   const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
   const [isEditTeamOpen, setIsEditTeamOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(new Set());
+  const [isAllCollapsed, setIsAllCollapsed] = useState(false);
 
   // Fetch all departments
   const { data: departments = [] } = useQuery<Department[]>({
@@ -289,52 +295,118 @@ export default function TeamManagement() {
     assignUserMutation.mutate({ userId, teamId });
   };
 
+  // Toggle individual team collapse state
+  const toggleTeamCollapse = (teamId: string) => {
+    setCollapsedTeams(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(teamId)) {
+        newSet.delete(teamId);
+      } else {
+        newSet.add(teamId);
+      }
+      return newSet;
+    });
+  };
+
+  // Get all team IDs recursively
+  const getAllTeamIds = (teams: Team[]): string[] => {
+    const ids: string[] = [];
+    teams.forEach(team => {
+      ids.push(team.id);
+      if (team.children && team.children.length > 0) {
+        ids.push(...getAllTeamIds(team.children));
+      }
+    });
+    return ids;
+  };
+
+  // Toggle collapse all teams
+  const toggleCollapseAll = () => {
+    if (isAllCollapsed) {
+      // Expand all - clear the set
+      setCollapsedTeams(new Set());
+      setIsAllCollapsed(false);
+    } else {
+      // Collapse all - add all team IDs to the set
+      const allIds = getAllTeamIds(teamHierarchy);
+      setCollapsedTeams(new Set(allIds));
+      setIsAllCollapsed(true);
+    }
+  };
+
   const renderTeamHierarchy = (teams: Team[], level = 0) => {
-    return teams.map((team) => (
-      <div key={team.id} className={`${level > 0 ? 'ml-6 border-l pl-4' : ''} mb-4`}>
-        <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <h3 className="font-semibold" data-testid={`text-team-name-${team.id}`}>{team.name}</h3>
-              <p className="text-sm text-muted-foreground capitalize">{getDepartmentName(team.departmentId) || "No Department"}</p>
-              {team.description && (
-                <p className="text-sm text-muted-foreground mt-1">{team.description}</p>
+    return teams.map((team) => {
+      const isCollapsed = collapsedTeams.has(team.id);
+      const hasChildren = team.children && team.children.length > 0;
+
+      return (
+        <div key={team.id} className={`${level > 0 ? 'ml-6 border-l pl-4' : ''} mb-4`}>
+          <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
+            <div className="flex items-center space-x-3 flex-1">
+              {hasChildren && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => toggleTeamCollapse(team.id)}
+                  data-testid={`button-toggle-${team.id}`}
+                >
+                  {isCollapsed ? (
+                    <ChevronRight className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </Button>
               )}
+              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold" data-testid={`text-team-name-${team.id}`}>
+                  {team.name}
+                  {hasChildren && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      ({team.children!.length} {team.children!.length === 1 ? 'sub-team' : 'sub-teams'})
+                    </span>
+                  )}
+                </h3>
+                <p className="text-sm text-muted-foreground capitalize">{getDepartmentName(team.departmentId) || "No Department"}</p>
+                {team.description && (
+                  <p className="text-sm text-muted-foreground mt-1">{team.description}</p>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleEditTeam(team)}
-              data-testid={`button-edit-team-${team.id}`}
-            >
-              <Edit className="w-4 h-4 mr-1" />
-              Edit
-            </Button>
-            {user?.role === 'leadership' && (
+            <div className="flex items-center space-x-2">
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleDeleteTeam(team.id)}
-                data-testid={`button-delete-team-${team.id}`}
+                onClick={() => handleEditTeam(team)}
+                data-testid={`button-edit-team-${team.id}`}
               >
-                <Trash2 className="w-4 h-4 mr-1" />
-                Delete
+                <Edit className="w-4 h-4 mr-1" />
+                Edit
               </Button>
-            )}
+              {user?.role === 'leadership' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleDeleteTeam(team.id)}
+                  data-testid={`button-delete-team-${team.id}`}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Delete
+                </Button>
+              )}
+            </div>
           </div>
+          {hasChildren && !isCollapsed && (
+            <div className="mt-2">
+              {renderTeamHierarchy(team.children, level + 1)}
+            </div>
+          )}
         </div>
-        {team.children && team.children.length > 0 && (
-          <div className="mt-2">
-            {renderTeamHierarchy(team.children, level + 1)}
-          </div>
-        )}
-      </div>
-    ));
+      );
+    });
   };
 
   return (
@@ -669,7 +741,29 @@ export default function TeamManagement() {
         <TabsContent value="hierarchy" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Team Hierarchy</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Team Hierarchy</CardTitle>
+                {teamHierarchy.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleCollapseAll}
+                    data-testid="button-toggle-collapse-all"
+                  >
+                    {isAllCollapsed ? (
+                      <>
+                        <ChevronsDownUp className="w-4 h-4 mr-2" />
+                        Expand All
+                      </>
+                    ) : (
+                      <>
+                        <ChevronsUpDown className="w-4 h-4 mr-2" />
+                        Collapse All
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {hierarchyLoading ? (
