@@ -33,6 +33,7 @@ Preferred communication style: Simple, everyday language.
 - **Users**: Role-based (operative, supervisor, leadership) with hierarchical relationships and job role assignments.
 - **Job Roles**: Normalized table with hierarchical structure (level 1-5), department categorization, and reporting relationships.
 - **Team Membership**: Many-to-many relationship via `team_members` junction table. Users can belong to multiple teams with different roles (Lead/Member/Viewer) and one designated primary team. System enforces: minimum 1 team per user, exactly 1 primary team, no duplicates. All operations are transactional to maintain invariants.
+- **Team Objectives**: Fully normalized with `teamId` foreign key to teams table. Forms use dropdown selection instead of free-text entry. Team names displayed via lookup/join. Deprecated `teamName` column removed (Oct 2025).
 - **Company Objectives**: Top-level strategic goals with key results.
 - **Goals**: Individual and team goals linked to company objectives.
 - **Development Plans**: Personal development tracking with competencies.
