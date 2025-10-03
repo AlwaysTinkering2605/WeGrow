@@ -65,7 +65,6 @@ export default function TeamManagement() {
   const [isEditTeamOpen, setIsEditTeamOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(new Set());
-  const [isAllCollapsed, setIsAllCollapsed] = useState(false);
 
   // Fetch all departments
   const { data: departments = [] } = useQuery<Department[]>({
@@ -320,17 +319,18 @@ export default function TeamManagement() {
     return ids;
   };
 
+  // Compute whether all teams with children are collapsed
+  const allTeamIds = getAllTeamIds(teamHierarchy);
+  const isAllCollapsed = allTeamIds.length > 0 && collapsedTeams.size === allTeamIds.length;
+
   // Toggle collapse all teams
   const toggleCollapseAll = () => {
     if (isAllCollapsed) {
       // Expand all - clear the set
       setCollapsedTeams(new Set());
-      setIsAllCollapsed(false);
     } else {
       // Collapse all - add all team IDs to the set
-      const allIds = getAllTeamIds(teamHierarchy);
-      setCollapsedTeams(new Set(allIds));
-      setIsAllCollapsed(true);
+      setCollapsedTeams(new Set(allTeamIds));
     }
   };
 
