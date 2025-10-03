@@ -1,6 +1,7 @@
 import {
   users,
   teams,
+  teamMembers,
   departments,
   skillCategories,
   jobRoles,
@@ -205,6 +206,8 @@ import {
   type EnhancedAuditTrailFilter,
   type QuizAnswers,
   type InsertTeam,
+  type TeamMember,
+  type InsertTeamMember,
   type CompetencyEvidenceData,
   type AutomationTriggerData,
 } from "@shared/schema";
@@ -1835,6 +1838,69 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return user;
+  }
+
+  // Team Membership Management (many-to-many)
+  async getUserTeamMemberships(userId: string): Promise<TeamMember[]> {
+    return await db
+      .select()
+      .from(teamMembers)
+      .where(eq(teamMembers.userId, userId))
+      .orderBy(desc(teamMembers.isPrimary), teamMembers.createdAt);
+  }
+
+  async getTeamMembersList(teamId: string): Promise<TeamMember[]> {
+    return await db
+      .select()
+      .from(teamMembers)
+      .where(eq(teamMembers.teamId, teamId))
+      .orderBy(teamMembers.role, teamMembers.createdAt);
+  }
+
+  async addTeamMember(membership: InsertTeamMember): Promise<TeamMember> {
+    const [teamMember] = await db
+      .insert(teamMembers)
+      .values(membership)
+      .returning();
+    return teamMember;
+  }
+
+  async removeTeamMember(userId: string, teamId: string): Promise<void> {
+    await db
+      .delete(teamMembers)
+      .where(and(
+        eq(teamMembers.userId, userId),
+        eq(teamMembers.teamId, teamId)
+      ));
+  }
+
+  async updateTeamMemberRole(userId: string, teamId: string, role: string): Promise<TeamMember> {
+    const [member] = await db
+      .update(teamMembers)
+      .set({ role: role as any, updatedAt: new Date() })
+      .where(and(
+        eq(teamMembers.userId, userId),
+        eq(teamMembers.teamId, teamId)
+      ))
+      .returning();
+    return member;
+  }
+
+  async setPrimaryTeam(userId: string, teamId: string): Promise<void> {
+    // First, unset all primary flags for this user
+    await db
+      .update(teamMembers)
+      .set({ isPrimary: false, updatedAt: new Date() })
+      .where(eq(teamMembers.userId, userId));
+    
+    // Then set the specified team as primary
+    await db
+      .update(teamMembers)
+      .set({ isPrimary: true, updatedAt: new Date() })
+      .where(and(
+        eq(teamMembers.userId, userId),
+        eq(teamMembers.teamId, teamId)
+      ));
   }
 
   // Departments Management
