@@ -70,20 +70,45 @@ function extractVimeoVideoId(input: string): string {
   
   const trimmed = input.trim();
   
-  // If already a numeric ID, return it
-  if (/^\d+$/.test(trimmed)) {
+  // If already in the format "123456789" or "123456789/hash", return as-is
+  if (/^\d+(?:\/[a-zA-Z0-9]+)?$/.test(trimmed)) {
     return trimmed;
   }
   
-  // Patterns to match different Vimeo URL formats
+  // Check for player embed URLs with hash in query parameter first
+  // Format: player.vimeo.com/video/123456789?h=abc123def456
+  const playerQueryMatch = trimmed.match(/player\.vimeo\.com\/video\/(\d+)(?:\?.*?h=([a-zA-Z0-9]+))?/);
+  if (playerQueryMatch && playerQueryMatch[1]) {
+    if (playerQueryMatch[2]) {
+      // Has hash parameter
+      return `${playerQueryMatch[1]}/${playerQueryMatch[2]}`;
+    }
+    // No hash parameter, return just ID
+    return playerQueryMatch[1];
+  }
+  
+  // Check for privacy-enabled URLs with hash in path
+  // Format: vimeo.com/123456789/abc123def456 or vimeo.com/123456789/abc123def456?share=copy
+  const privacyMatch = trimmed.match(/vimeo\.com\/(\d+)\/([a-zA-Z0-9]+)(?:\?.*)?$/);
+  if (privacyMatch && privacyMatch[1] && privacyMatch[2]) {
+    return `${privacyMatch[1]}/${privacyMatch[2]}`; // Return "123456789/hash"
+  }
+  
+  // Check for standard URLs with hash in query parameter
+  // Format: vimeo.com/123456789?h=abc123def456
+  const queryHashMatch = trimmed.match(/vimeo\.com\/(\d+)(?:\?.*?h=([a-zA-Z0-9]+))?/);
+  if (queryHashMatch && queryHashMatch[1] && queryHashMatch[2]) {
+    return `${queryHashMatch[1]}/${queryHashMatch[2]}`;
+  }
+  
+  // Patterns to match other Vimeo URL formats (non-privacy)
   const patterns = [
     /vimeo\.com\/channels\/[^\/]+\/(\d+)/,  // Channels: vimeo.com/channels/staffpicks/123456789
     /vimeo\.com\/groups\/[^\/]+\/videos\/(\d+)/,  // Groups: vimeo.com/groups/name/videos/123456789
     /vimeo\.com\/album\/\d+\/video\/(\d+)/,  // Albums: vimeo.com/album/123/video/456
     /vimeo\.com\/showcase\/\d+\/video\/(\d+)/,  // Showcases: vimeo.com/showcase/123/video/456
-    /player\.vimeo\.com\/video\/(\d+)/,  // Player embeds: player.vimeo.com/video/123456789
     /vimeo\.com\/video\/(\d+)/,  // Direct video: vimeo.com/video/123456789
-    /vimeo\.com\/(\d+)(?:\/[a-zA-Z0-9]+)?(?:\?.*)?$/,  // Standard/Privacy: vimeo.com/123456789 or vimeo.com/123456789/abc123?share=copy
+    /vimeo\.com\/(\d+)(?:\?.*)?$/,  // Standard: vimeo.com/123456789 or vimeo.com/123456789?params
   ];
   
   for (const pattern of patterns) {
@@ -674,12 +699,20 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
       // If we have a videoId on mount, initialize with it
       if (videoId) {
         console.log('Initializing Vimeo player with video ID:', videoId);
-        const videoIdNumber = parseInt(videoId);
-        if (!isNaN(videoIdNumber)) {
-          (playerOptions as any).id = videoIdNumber;
-          console.log('Parsed video ID number:', videoIdNumber);
+        // Check if it's a privacy video (format: "123456789/hash")
+        if (videoId.includes('/')) {
+          // Privacy video - use the full string "id/hash"
+          (playerOptions as any).url = `https://vimeo.com/${videoId}`;
+          console.log('Privacy video detected, using URL:', `https://vimeo.com/${videoId}`);
         } else {
-          console.error('Invalid video ID format:', videoId);
+          // Public video - use numeric ID
+          const videoIdNumber = parseInt(videoId);
+          if (!isNaN(videoIdNumber)) {
+            (playerOptions as any).id = videoIdNumber;
+            console.log('Public video detected, using ID:', videoIdNumber);
+          } else {
+            console.error('Invalid video ID format:', videoId);
+          }
         }
       }
 
@@ -897,7 +930,7 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   }, []); // Only run once on mount
 
   // Retry logic with exponential backoff
-  const loadVideoWithRetry = useCallback(async (videoIdNumber: number) => {
+  const loadVideoWithRetry = useCallback(async (videoIdOrUrl: string | number) => {
     if (!vimeoPlayer.current || isLoadingVideoRef.current) return;
     
     isLoadingVideoRef.current = true;
@@ -912,10 +945,10 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
       // Wait a bit after unload to prevent race conditions
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Load the new video
-      await vimeoPlayer.current.loadVideo(videoIdNumber);
+      // Load the new video (handle both privacy and public videos)
+      await vimeoPlayer.current.loadVideo(videoIdOrUrl);
       
-      console.log(`Successfully loaded video ${videoIdNumber}`);
+      console.log(`Successfully loaded video ${videoIdOrUrl}`);
       retryCountRef.current = 0; // Reset retry counter on success
       setError(null);
       
@@ -929,7 +962,7 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
         console.log(`Retrying in ${delay}ms... (attempt ${currentRetry + 2}/${maxRetries + 1})`);
         setTimeout(() => {
           isLoadingVideoRef.current = false;
-          loadVideoWithRetry(videoIdNumber);
+          loadVideoWithRetry(videoIdOrUrl);
         }, delay);
       } else {
         setError(`Failed to load video after ${maxRetries + 1} attempts: ${err.message || 'Video may be private or not found'}`);
@@ -950,12 +983,22 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
   useEffect(() => {
     if (!videoId) return;
 
-    // Validate video ID first
-    const videoIdNumber = parseInt(videoId);
-    if (isNaN(videoIdNumber) || videoIdNumber <= 0) {
-      setError(`Invalid video ID: ${videoId}`);
-      setIsLoading(false);
-      return;
+    // Determine video ID format (privacy or public)
+    let videoIdOrUrl: string | number;
+    if (videoId.includes('/')) {
+      // Privacy video - use full URL
+      videoIdOrUrl = `https://vimeo.com/${videoId}`;
+      console.log('Privacy video format detected:', videoIdOrUrl);
+    } else {
+      // Public video - use numeric ID
+      const videoIdNumber = parseInt(videoId);
+      if (isNaN(videoIdNumber) || videoIdNumber <= 0) {
+        setError(`Invalid video ID: ${videoId}`);
+        setIsLoading(false);
+        return;
+      }
+      videoIdOrUrl = videoIdNumber;
+      console.log('Public video format detected:', videoIdOrUrl);
     }
 
     // Reset state when switching videos
@@ -981,19 +1024,19 @@ function VimeoPlayer({ videoId, enrollmentId, lessonId, onProgressUpdate, onComp
     // Wait a bit if player not ready yet, then try loading
     const tryLoadVideo = () => {
       if (vimeoPlayer.current) {
-        loadVideoWithRetry(videoIdNumber);
+        loadVideoWithRetry(videoIdOrUrl);
       } else {
         // If player not ready, try again after a short delay
         setTimeout(() => {
           if (vimeoPlayer.current) {
-            loadVideoWithRetry(videoIdNumber);
+            loadVideoWithRetry(videoIdOrUrl);
           }
         }, 500);
       }
     };
     
     tryLoadVideo();
-  }, [videoId]); // Only depend on videoId
+  }, [videoId, loadVideoWithRetry]); // Depend on videoId and loadVideoWithRetry
 
   if (error && !testMode) {
     return (
@@ -2831,7 +2874,7 @@ export default function Learning() {
                       <div className="aspect-video bg-black rounded-lg overflow-hidden relative">
                         <VimeoPlayer
                           key={`${currentLesson.id}-${currentLesson.vimeoVideoId}`}
-                          videoId={currentLesson.vimeoVideoId}
+                          videoId={String(currentLesson.vimeoVideoId)}
                           enrollmentId={courseDetails?.enrollment?.id || ''}
                           lessonId={currentLesson.id}
                           onProgressUpdate={(progress, timePosition, duration, timeSpent) => {
@@ -3991,7 +4034,12 @@ export default function Learning() {
                 <Form {...createCourseForm}>
                   <form 
                     onSubmit={createCourseForm.handleSubmit((data) => {
-                      createCourseMutation.mutate(data);
+                      // Extract Vimeo video ID before submission
+                      const processedData = {
+                        ...data,
+                        vimeoVideoId: data.vimeoVideoId ? extractVimeoVideoId(data.vimeoVideoId) : data.vimeoVideoId,
+                      };
+                      createCourseMutation.mutate(processedData);
                     })}
                     className="space-y-6"
                   >
@@ -4356,9 +4404,14 @@ export default function Learning() {
                   <form 
                     onSubmit={updateCourseForm.handleSubmit((data) => {
                       if (selectedCourseForEdit) {
+                        // Extract Vimeo video ID before submission
+                        const processedData = {
+                          ...data,
+                          vimeoVideoId: data.vimeoVideoId ? extractVimeoVideoId(data.vimeoVideoId) : data.vimeoVideoId,
+                        };
                         updateCourseMutation.mutate({ 
                           id: selectedCourseForEdit.id, 
-                          data 
+                          data: processedData 
                         });
                       }
                     })}
@@ -5136,7 +5189,12 @@ export default function Learning() {
                               });
                               return;
                             }
-                            createLessonMutation.mutate({ courseId: selectedCourseForContent, lessonData: data });
+                            // Extract Vimeo video ID before submission
+                            const processedData = {
+                              ...data,
+                              vimeoVideoId: data.vimeoVideoId ? extractVimeoVideoId(data.vimeoVideoId) : data.vimeoVideoId,
+                            };
+                            createLessonMutation.mutate({ courseId: selectedCourseForContent, lessonData: processedData });
                           })} className="space-y-4">
                             <div className="space-y-2">
                               <label className="text-sm font-medium">Select Course</label>
@@ -5636,7 +5694,12 @@ export default function Learning() {
                               });
                               return;
                             }
-                            updateLessonMutation.mutate({ lessonId: editingLesson.id, lessonData: data });
+                            // Extract Vimeo video ID before submission
+                            const processedData = {
+                              ...data,
+                              vimeoVideoId: data.vimeoVideoId ? extractVimeoVideoId(data.vimeoVideoId) : data.vimeoVideoId,
+                            };
+                            updateLessonMutation.mutate({ lessonId: editingLesson.id, lessonData: processedData });
                           })} className="space-y-4">
                             
                             {/* Content Type Selector */}
