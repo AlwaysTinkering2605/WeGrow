@@ -43,6 +43,7 @@ import Learning from "./Learning";
 import UserManagement from "./UserManagement";
 import JobRoleManagement from "./JobRoleManagement";
 import TeamManagement from "./TeamManagement";
+import DepartmentManagement from "./DepartmentManagement";
 import CompanyObjectives from "./CompanyObjectives";
 import TeamObjectives from "./TeamObjectives";
 import Reports from "./Reports";
@@ -55,7 +56,7 @@ import AdvancedAnalyticsDashboard from "./AdvancedAnalyticsDashboard";
 import WebhookConfiguration from "../pages/WebhookConfiguration";
 import Organization from "./Organization";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "job-roles" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks" | "organization";
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "job-roles" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks" | "organization" | "departments";
 
 export default function Layout() {
   const [location] = useLocation();
@@ -85,6 +86,7 @@ export default function Layout() {
     if (location === "/profile") return "profile";
     if (location === "/user-management") return "user-management";
     if (location === "/job-roles") return "job-roles";
+    if (location === "/departments") return "departments";
     if (location === "/team") return "team";
     if (location === "/organization") return "organization";
     if (location === "/company-objectives") return "company-objectives";
@@ -131,6 +133,7 @@ export default function Layout() {
       items: [
         { id: "user-management", label: "User Management", icon: UserPlus, component: UserManagement },
         { id: "job-roles", label: "Job Role Management", icon: Briefcase, component: JobRoleManagement },
+        { id: "departments", label: "Department Management", icon: Building2, component: DepartmentManagement },
         { id: "team", label: "Team Management", icon: UsersRound, component: TeamManagement },
         { id: "organization", label: "Organization Chart", icon: GitBranch, component: Organization },
         { id: "team-objectives", label: "Team Objectives", icon: Target, component: TeamObjectives },
