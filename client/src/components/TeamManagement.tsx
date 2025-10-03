@@ -31,12 +31,15 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
-  ChevronsUpDown
+  ChevronsUpDown,
+  Star,
+  X
 } from "lucide-react";
 import { 
   insertTeamSchema,
   type User,
-  type Department
+  type Department,
+  type TeamMember
 } from "@shared/schema";
 import type { z } from "zod";
 
@@ -65,6 +68,10 @@ export default function TeamManagement() {
   const [isEditTeamOpen, setIsEditTeamOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(new Set());
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [isAddTeamMembershipOpen, setIsAddTeamMembershipOpen] = useState(false);
+  const [newMembershipTeamId, setNewMembershipTeamId] = useState<string>("");
+  const [newMembershipRole, setNewMembershipRole] = useState<string>("Member");
 
   // Fetch all departments
   const { data: departments = [] } = useQuery<Department[]>({
@@ -187,7 +194,7 @@ export default function TeamManagement() {
     },
   });
 
-  // Assign user to team mutation
+  // Assign user to team mutation (DEPRECATED - kept for backward compatibility)
   const assignUserMutation = useMutation({
     mutationFn: ({ userId, teamId }: { userId: string; teamId: string }) => 
       apiRequest("PUT", `/api/users/${userId}/team`, { teamId }),
@@ -203,6 +210,92 @@ export default function TeamManagement() {
       toast({
         title: "Error",
         description: error.message || "Failed to assign user to team.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Add team membership mutation
+  const addTeamMembershipMutation = useMutation({
+    mutationFn: ({ userId, teamId, role, isPrimary }: { userId: string; teamId: string; role: string; isPrimary: boolean }) =>
+      apiRequest(`/api/users/${userId}/teams`, { method: "POST", body: JSON.stringify({ teamId, role, isPrimary }) }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", variables.userId, "teams"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setIsAddTeamMembershipOpen(false);
+      setNewMembershipTeamId("");
+      setNewMembershipRole("Member");
+      setSelectedUserId(null);
+      toast({
+        title: "Team Membership Added",
+        description: "User has been added to the team successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add team membership.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Remove team membership mutation
+  const removeTeamMembershipMutation = useMutation({
+    mutationFn: ({ userId, teamId }: { userId: string; teamId: string }) =>
+      apiRequest(`/api/users/${userId}/teams/${teamId}`, { method: "DELETE" }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", variables.userId, "teams"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: "Team Membership Removed",
+        description: "User has been removed from the team successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove team membership.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update team member role mutation
+  const updateTeamMemberRoleMutation = useMutation({
+    mutationFn: ({ userId, teamId, role }: { userId: string; teamId: string; role: string }) =>
+      apiRequest(`/api/users/${userId}/teams/${teamId}/role`, { method: "PUT", body: JSON.stringify({ role }) }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", variables.userId, "teams"] });
+      toast({
+        title: "Role Updated",
+        description: "Team member role has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update role.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Set primary team mutation
+  const setPrimaryTeamMutation = useMutation({
+    mutationFn: ({ userId, teamId }: { userId: string; teamId: string }) =>
+      apiRequest(`/api/users/${userId}/teams/${teamId}/primary`, { method: "PUT" }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", variables.userId, "teams"] });
+      toast({
+        title: "Primary Team Set",
+        description: "Primary team has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to set primary team.",
         variant: "destructive",
       });
     },
@@ -292,6 +385,37 @@ export default function TeamManagement() {
 
   const handleAssignUserToTeam = (userId: string, teamId: string) => {
     assignUserMutation.mutate({ userId, teamId });
+  };
+
+  const handleAddTeamMembership = () => {
+    if (!selectedUserId || !newMembershipTeamId) {
+      toast({
+        title: "Error",
+        description: "Please select a team and role.",
+        variant: "destructive",
+      });
+      return;
+    }
+    addTeamMembershipMutation.mutate({
+      userId: selectedUserId,
+      teamId: newMembershipTeamId,
+      role: newMembershipRole,
+      isPrimary: false,
+    });
+  };
+
+  const handleRemoveTeamMembership = (userId: string, teamId: string) => {
+    if (confirm("Are you sure you want to remove this team membership?")) {
+      removeTeamMembershipMutation.mutate({ userId, teamId });
+    }
+  };
+
+  const handleUpdateTeamMemberRole = (userId: string, teamId: string, role: string) => {
+    updateTeamMemberRoleMutation.mutate({ userId, teamId, role });
+  };
+
+  const handleSetPrimaryTeam = (userId: string, teamId: string) => {
+    setPrimaryTeamMutation.mutate({ userId, teamId });
   };
 
   // Toggle individual team collapse state
@@ -813,7 +937,7 @@ export default function TeamManagement() {
                     <div key={i} className="p-4 border rounded-lg animate-pulse">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-muted rounded-full"></div>
-                        <div>
+                        <div className="flex-1">
                           <div className="w-32 h-4 bg-muted rounded mb-2"></div>
                           <div className="w-24 h-3 bg-muted rounded"></div>
                         </div>
@@ -823,51 +947,134 @@ export default function TeamManagement() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {allUsers.map((user: User) => (
-                    <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <Avatar>
-                          <AvatarFallback>
-                            {user.firstName && user.lastName 
-                              ? `${user.firstName[0]}${user.lastName[0]}` 
-                              : user.email[0].toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium">
-                            {user.firstName && user.lastName 
-                              ? `${user.firstName} ${user.lastName}` 
-                              : user.email}
+                  {allUsers.map((user: User) => {
+                    const UserTeamMemberships = () => {
+                      const { data: memberships = [], isLoading } = useQuery<TeamMember[]>({
+                        queryKey: ["/api/users", user.id, "teams"],
+                      });
+
+                      return (
+                        <div key={user.id} className="p-4 border rounded-lg" data-testid={`user-assignments-${user.id}`}>
+                          <div className="flex items-start space-x-3 mb-3">
+                            <Avatar>
+                              <AvatarFallback>
+                                {user.firstName && user.lastName 
+                                  ? `${user.firstName[0]}${user.lastName[0]}` 
+                                  : user.email?.[0]?.toUpperCase() || "U"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="font-medium" data-testid={`text-user-name-${user.id}`}>
+                                {user.firstName && user.lastName 
+                                  ? `${user.firstName} ${user.lastName}` 
+                                  : user.email}
+                              </div>
+                              <div className="text-sm text-muted-foreground capitalize">
+                                {user.role}
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-sm text-muted-foreground capitalize">{user.role}</div>
+
+                          {isLoading ? (
+                            <div className="ml-14 space-y-2">
+                              <div className="w-32 h-6 bg-muted rounded animate-pulse"></div>
+                            </div>
+                          ) : (
+                            <div className="ml-14 space-y-3">
+                              <div className="flex flex-wrap gap-2">
+                                {memberships.length === 0 ? (
+                                  <span className="text-sm text-muted-foreground" data-testid={`text-no-teams-${user.id}`}>
+                                    No team memberships
+                                  </span>
+                                ) : (
+                                  memberships.map((membership) => {
+                                    const team = teams.find((t: Team) => t.id === membership.teamId);
+                                    return (
+                                      <div
+                                        key={membership.id}
+                                        className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md"
+                                        data-testid={`badge-team-${user.id}-${membership.teamId}`}
+                                      >
+                                        <span className="text-sm font-medium" data-testid={`text-team-name-${user.id}-${membership.teamId}`}>
+                                          {team?.name || "Unknown"}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground mx-1">•</span>
+                                        <Select
+                                          value={membership.role}
+                                          onValueChange={(role) => handleUpdateTeamMemberRole(user.id, membership.teamId, role)}
+                                        >
+                                          <SelectTrigger 
+                                            className="h-6 text-xs border-0 bg-transparent hover:bg-blue-100 dark:hover:bg-blue-900 p-0 px-2"
+                                            data-testid={`select-role-${user.id}-${membership.teamId}`}
+                                          >
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="Lead">Lead</SelectItem>
+                                            <SelectItem value="Member">Member</SelectItem>
+                                            <SelectItem value="Viewer">Viewer</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                        {membership.isPrimary ? (
+                                          <Badge 
+                                            variant="secondary" 
+                                            className="h-5 text-xs ml-1"
+                                            data-testid={`badge-primary-${user.id}-${membership.teamId}`}
+                                          >
+                                            <Star className="w-3 h-3 fill-current mr-1" />
+                                            Primary
+                                          </Badge>
+                                        ) : (
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 w-6 p-0 ml-1 hover:bg-blue-100 dark:hover:bg-blue-900"
+                                            onClick={() => handleSetPrimaryTeam(user.id, membership.teamId)}
+                                            title="Set as primary team"
+                                            data-testid={`button-set-primary-${user.id}-${membership.teamId}`}
+                                          >
+                                            <Star className="w-3 h-3" />
+                                          </Button>
+                                        )}
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0 ml-1 hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-600"
+                                          onClick={() => handleRemoveTeamMembership(user.id, membership.teamId)}
+                                          disabled={memberships.length === 1}
+                                          title={memberships.length === 1 ? "User must have at least one team" : "Remove team membership"}
+                                          data-testid={`button-remove-${user.id}-${membership.teamId}`}
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedUserId(user.id);
+                                  setIsAddTeamMembershipOpen(true);
+                                }}
+                                data-testid={`button-add-team-${user.id}`}
+                              >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add Team
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <div className="text-sm">
-                          Current Team: {user.teamId ? 
-                            teams.find((t: Team) => t.id === user.teamId)?.name || "Unknown" : 
-                            "None"
-                          }
-                        </div>
-                        <Select
-                          value={user.teamId || "none"}
-                          onValueChange={(value) => handleAssignUserToTeam(user.id, value === "none" ? "" : value)}
-                        >
-                          <SelectTrigger className="w-48" data-testid={`select-user-team-${user.id}`}>
-                            <SelectValue placeholder="Assign to team" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">No Team</SelectItem>
-                            {teams.map((team: Team) => (
-                              <SelectItem key={team.id} value={team.id}>
-                                {team.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    };
+
+                    return <UserTeamMemberships key={user.id} />;
+                  })}
                 </div>
               )}
             </CardContent>
@@ -910,6 +1117,7 @@ export default function TeamManagement() {
                     <FormControl>
                       <Textarea
                         {...field}
+                        value={field.value || ""}
                         placeholder="Enter team description"
                         data-testid="input-edit-team-description"
                       />
@@ -1014,6 +1222,74 @@ export default function TeamManagement() {
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Team Membership Dialog */}
+      <Dialog open={isAddTeamMembershipOpen} onOpenChange={setIsAddTeamMembershipOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add Team Membership</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="team-select">Team</Label>
+              <Select
+                value={newMembershipTeamId}
+                onValueChange={setNewMembershipTeamId}
+              >
+                <SelectTrigger id="team-select" data-testid="select-add-team">
+                  <SelectValue placeholder="Select a team" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teams.map((team: Team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role-select">Role</Label>
+              <Select
+                value={newMembershipRole}
+                onValueChange={setNewMembershipRole}
+              >
+                <SelectTrigger id="role-select" data-testid="select-add-role">
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Lead">Lead</SelectItem>
+                  <SelectItem value="Member">Member</SelectItem>
+                  <SelectItem value="Viewer">Viewer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => {
+                setIsAddTeamMembershipOpen(false);
+                setNewMembershipTeamId("");
+                setNewMembershipRole("Member");
+                setSelectedUserId(null);
+              }}
+              data-testid="button-cancel-add-team"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleAddTeamMembership}
+              disabled={addTeamMembershipMutation.isPending || !newMembershipTeamId}
+              data-testid="button-submit-add-team"
+            >
+              {addTeamMembershipMutation.isPending ? "Adding..." : "Add Team"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
