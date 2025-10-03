@@ -54,6 +54,18 @@ export const metricTypeEnum = pgEnum("metric_type", ["percentage", "numeric", "c
 // Objective type enum for strategic classification
 export const objectiveTypeEnum = pgEnum("objective_type", ["committed", "aspirational"]);
 
+// Strategic theme enum for Phase 3 classification
+export const strategicThemeEnum = pgEnum("strategic_theme", [
+  "quality",
+  "customer_satisfaction", 
+  "operational_excellence",
+  "innovation",
+  "financial_performance"
+]);
+
+// Risk level enum for Phase 3 risk assessment
+export const riskLevelEnum = pgEnum("risk_level", ["low", "medium", "high", "critical"]);
+
 // LMS-specific enums
 export const lessonTypeEnum = pgEnum("lesson_type", ["video", "quiz", "document", "link"]);
 export const contentTypeEnum = pgEnum("content_type", [
@@ -272,6 +284,11 @@ export const companyObjectives = pgTable("company_objectives", {
   qualityPolicyLinks: text("quality_policy_links").array(), // Array of quality policy references
   resourceRequirements: jsonb("resource_requirements"), // Structured resource planning (ISO 6.2)
   evaluationMethod: text("evaluation_method"), // How results will be measured (ISO 6.2)
+  // Phase 3: Strategic Classification & Risk Management
+  strategicTheme: strategicThemeEnum("strategic_theme"), // Business area alignment (ISO 6.2)
+  riskLevel: riskLevelEnum("risk_level"), // Risk assessment (ISO 6.1)
+  riskMitigation: text("risk_mitigation"), // Mitigation strategies (ISO 6.1)
+  dependencies: text("dependencies").array(), // Array of objective IDs this depends on
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -307,6 +324,11 @@ export const teamObjectives = pgTable("team_objectives", {
   qualityPolicyLinks: text("quality_policy_links").array(), // Array of quality policy references
   resourceRequirements: jsonb("resource_requirements"), // Structured resource planning (ISO 6.2)
   evaluationMethod: text("evaluation_method"), // How results will be measured (ISO 6.2)
+  // Phase 3: Strategic Classification & Risk Management
+  strategicTheme: strategicThemeEnum("strategic_theme"), // Business area alignment (ISO 6.2)
+  riskLevel: riskLevelEnum("risk_level"), // Risk assessment (ISO 6.1)
+  riskMitigation: text("risk_mitigation"), // Mitigation strategies (ISO 6.1)
+  dependencies: text("dependencies").array(), // Array of objective IDs this depends on
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
   isActive: boolean("is_active").default(true),

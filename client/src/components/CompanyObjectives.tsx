@@ -108,6 +108,9 @@ export default function CompanyObjectives() {
       ownerId: "",
       objectiveType: "committed",
       evaluationMethod: "",
+      strategicTheme: undefined,
+      riskLevel: undefined,
+      riskMitigation: "",
     },
   });
 
@@ -122,6 +125,9 @@ export default function CompanyObjectives() {
       ownerId: "",
       objectiveType: "committed",
       evaluationMethod: "",
+      strategicTheme: undefined,
+      riskLevel: undefined,
+      riskMitigation: "",
     },
   });
 
@@ -266,12 +272,15 @@ export default function CompanyObjectives() {
     setEditingObjective(objective);
     editObjectiveForm.reset({
       title: objective.title,
-      description: objective.description || "",
+      description: objective.description ?? "",
       startDate: new Date(objective.startDate).toISOString().split('T')[0],
       endDate: new Date(objective.endDate).toISOString().split('T')[0],
-      ownerId: objective.ownerId || "",
-      objectiveType: objective.objectiveType || "committed",
-      evaluationMethod: objective.evaluationMethod || "",
+      ownerId: objective.ownerId ?? "",
+      objectiveType: objective.objectiveType ?? "committed",
+      evaluationMethod: objective.evaluationMethod ?? "",
+      strategicTheme: objective.strategicTheme ?? undefined,
+      riskLevel: objective.riskLevel ?? undefined,
+      riskMitigation: objective.riskMitigation ?? "",
     });
     setIsEditDialogOpen(true);
   };
@@ -636,6 +645,78 @@ export default function CompanyObjectives() {
                         )}
                       />
 
+                      {/* Phase 3: Strategic Theme */}
+                      <FormField
+                        control={objectiveForm.control}
+                        name="strategicTheme"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Strategic Theme (Optional)</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-strategic-theme">
+                                  <SelectValue placeholder="Select business area..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="quality">Quality Excellence</SelectItem>
+                                <SelectItem value="customer_satisfaction">Customer Satisfaction</SelectItem>
+                                <SelectItem value="operational_excellence">Operational Excellence</SelectItem>
+                                <SelectItem value="innovation">Innovation & Growth</SelectItem>
+                                <SelectItem value="financial_performance">Financial Performance</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Phase 3: Risk Level */}
+                      <FormField
+                        control={objectiveForm.control}
+                        name="riskLevel"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Risk Assessment (Optional)</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-risk-level">
+                                  <SelectValue placeholder="Select risk level..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="low">Low - Minor challenges expected</SelectItem>
+                                <SelectItem value="medium">Medium - Some obstacles likely</SelectItem>
+                                <SelectItem value="high">High - Significant barriers present</SelectItem>
+                                <SelectItem value="critical">Critical - Major risks identified</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Phase 3: Risk Mitigation */}
+                      <FormField
+                        control={objectiveForm.control}
+                        name="riskMitigation"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Risk Mitigation Strategies (Optional)</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Describe strategies to address identified risks..." 
+                                rows={3}
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="textarea-risk-mitigation"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
                       <div className="flex justify-end space-x-2 pt-4">
                         <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                           Cancel
@@ -814,6 +895,78 @@ export default function CompanyObjectives() {
                 )}
               />
 
+              {/* Phase 3: Strategic Theme */}
+              <FormField
+                control={editObjectiveForm.control}
+                name="strategicTheme"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Strategic Theme (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-strategic-theme">
+                          <SelectValue placeholder="Select business area..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="quality">Quality Excellence</SelectItem>
+                        <SelectItem value="customer_satisfaction">Customer Satisfaction</SelectItem>
+                        <SelectItem value="operational_excellence">Operational Excellence</SelectItem>
+                        <SelectItem value="innovation">Innovation & Growth</SelectItem>
+                        <SelectItem value="financial_performance">Financial Performance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Phase 3: Risk Level */}
+              <FormField
+                control={editObjectiveForm.control}
+                name="riskLevel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Risk Assessment (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-risk-level">
+                          <SelectValue placeholder="Select risk level..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="low">Low - Minor challenges expected</SelectItem>
+                        <SelectItem value="medium">Medium - Some obstacles likely</SelectItem>
+                        <SelectItem value="high">High - Significant barriers present</SelectItem>
+                        <SelectItem value="critical">Critical - Major risks identified</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Phase 3: Risk Mitigation */}
+              <FormField
+                control={editObjectiveForm.control}
+                name="riskMitigation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Risk Mitigation Strategies (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Describe strategies to address identified risks..." 
+                        rows={3}
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="textarea-edit-risk-mitigation"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="flex justify-end space-x-2 pt-4">
                 <Button 
                   type="button" 
@@ -956,7 +1109,7 @@ export default function CompanyObjectives() {
                   <div key={objective.id} className="border rounded-lg p-4" data-testid={`objective-${objective.id}`}>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-2">
+                        <div className="flex items-center flex-wrap gap-2 mb-2">
                           <StatusIcon className={`w-4 h-4 ${color}`} />
                           <span className={`text-xs font-medium uppercase tracking-wide ${color}`}>
                             {status}
@@ -969,6 +1122,40 @@ export default function CompanyObjectives() {
                           >
                             {objective.objectiveType === 'aspirational' ? '🎯 Aspirational' : '✓ Committed'}
                           </Badge>
+                          
+                          {/* Phase 3: Risk Level Badge */}
+                          {objective.riskLevel && (
+                            <Badge 
+                              variant="outline"
+                              className={`text-xs ${
+                                objective.riskLevel === 'critical' ? 'border-red-500 text-red-700 dark:text-red-400' :
+                                objective.riskLevel === 'high' ? 'border-orange-500 text-orange-700 dark:text-orange-400' :
+                                objective.riskLevel === 'medium' ? 'border-yellow-500 text-yellow-700 dark:text-yellow-400' :
+                                'border-green-500 text-green-700 dark:text-green-400'
+                              }`}
+                              data-testid={`badge-risk-level-${objective.id}`}
+                            >
+                              {objective.riskLevel === 'critical' && '🔴 Critical Risk'}
+                              {objective.riskLevel === 'high' && '🟠 High Risk'}
+                              {objective.riskLevel === 'medium' && '🟡 Medium Risk'}
+                              {objective.riskLevel === 'low' && '🟢 Low Risk'}
+                            </Badge>
+                          )}
+                          
+                          {/* Phase 3: Strategic Theme Badge */}
+                          {objective.strategicTheme && (
+                            <Badge 
+                              variant="secondary"
+                              className="text-xs"
+                              data-testid={`badge-strategic-theme-${objective.id}`}
+                            >
+                              {objective.strategicTheme === 'quality' && '⭐ Quality'}
+                              {objective.strategicTheme === 'customer_satisfaction' && '😊 Customer'}
+                              {objective.strategicTheme === 'operational_excellence' && '⚙️ Operations'}
+                              {objective.strategicTheme === 'innovation' && '💡 Innovation'}
+                              {objective.strategicTheme === 'financial_performance' && '💰 Financial'}
+                            </Badge>
+                          )}
                         </div>
                         <h4 className="font-semibold text-lg" data-testid={`text-objective-title-${objective.id}`}>
                           {objective.title}

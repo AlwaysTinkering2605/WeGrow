@@ -313,7 +313,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { id } = req.params;
-      const updateData = req.body;
+      const updateData = {
+        ...req.body,
+        // Convert ISO string dates to Date objects for Drizzle
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+      };
       const objective = await storage.updateCompanyObjective(id, updateData);
       res.json(objective);
     } catch (error) {
@@ -409,7 +414,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Validate the update data
       const updateSchema = insertTeamObjectiveSchema.partial().omit({ supervisorId: true });
-      const updateData = updateSchema.parse(req.body);
+      const validatedData = updateSchema.parse(req.body);
+      
+      // Convert ISO string dates to Date objects for Drizzle
+      const updateData = {
+        ...validatedData,
+        startDate: validatedData.startDate ? new Date(validatedData.startDate) : undefined,
+        endDate: validatedData.endDate ? new Date(validatedData.endDate) : undefined,
+      };
       
       const objective = await storage.updateTeamObjective(id, updateData);
       res.json(objective);
