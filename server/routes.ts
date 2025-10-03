@@ -1263,7 +1263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
       }
 
-      const members = await storage.getUsersInTeam(id);
+      const members = await storage.getTeamMembersWithUsers(id);
       res.json(members);
     } catch (error) {
       console.error("Error fetching team members:", error);

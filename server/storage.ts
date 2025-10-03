@@ -1857,6 +1857,24 @@ export class DatabaseStorage implements IStorage {
       .orderBy(teamMembers.role, teamMembers.createdAt);
   }
 
+  async getTeamMembersWithUsers(teamId: string): Promise<any[]> {
+    const memberships = await db
+      .select({
+        membership: teamMembers,
+        user: users
+      })
+      .from(teamMembers)
+      .innerJoin(users, eq(teamMembers.userId, users.id))
+      .where(eq(teamMembers.teamId, teamId))
+      .orderBy(teamMembers.role, users.firstName, users.lastName);
+    
+    return memberships.map(m => ({
+      ...m.user,
+      teamRole: m.membership.role,
+      isPrimaryTeam: m.membership.isPrimary
+    }));
+  }
+
   async addTeamMember(membership: InsertTeamMember): Promise<TeamMember> {
     const [teamMember] = await db
       .insert(teamMembers)
