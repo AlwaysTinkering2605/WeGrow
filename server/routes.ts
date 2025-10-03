@@ -14,6 +14,7 @@ import {
   insertMeetingSchema,
   insertRecognitionSchema,
   insertTeamSchema,
+  insertSkillCategorySchema,
   insertJobRoleSchema,
   updateUserProfileSchema,
   // LMS schemas
@@ -644,6 +645,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting job role:", error);
       res.status(500).json({ message: "Failed to delete job role" });
+    }
+  });
+
+  // Skill Categories Routes
+  app.get('/api/skill-categories', isAuthenticated, async (req: any, res) => {
+    try {
+      const categories = await storage.getAllSkillCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching skill categories:", error);
+      res.status(500).json({ message: "Failed to fetch skill categories" });
+    }
+  });
+
+  app.get('/api/skill-categories/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const category = await storage.getSkillCategory(id);
+      if (!category) {
+        return res.status(404).json({ message: "Skill category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      console.error("Error fetching skill category:", error);
+      res.status(500).json({ message: "Failed to fetch skill category" });
+    }
+  });
+
+  app.post('/api/skill-categories', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const categoryData = insertSkillCategorySchema.parse(req.body);
+      const category = await storage.createSkillCategory(categoryData);
+      res.json(category);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating skill category:", error);
+      res.status(500).json({ message: "Failed to create skill category" });
+    }
+  });
+
+  app.put('/api/skill-categories/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const categoryData = insertSkillCategorySchema.partial().parse(req.body);
+      const category = await storage.updateSkillCategory(id, categoryData);
+      if (!category) {
+        return res.status(404).json({ message: "Skill category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating skill category:", error);
+      res.status(500).json({ message: "Failed to update skill category" });
+    }
+  });
+
+  app.delete('/api/skill-categories/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      
+      // Check if category is in use
+      const competenciesCount = await storage.getCompetenciesByCategoryId(id);
+      const coursesCount = await storage.getCoursesByCategoryId(id);
+      const pathsCount = await storage.getLearningPathsByCategoryId(id);
+      
+      const totalUsage = competenciesCount.length + coursesCount.length + pathsCount.length;
+      if (totalUsage > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete skill category that is in use",
+          usage: {
+            competencies: competenciesCount.length,
+            courses: coursesCount.length,
+            learningPaths: pathsCount.length
+          }
+        });
+      }
+
+      await storage.deleteSkillCategory(id);
+      res.json({ message: "Skill category deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting skill category:", error);
+      res.status(500).json({ message: "Failed to delete skill category" });
     }
   });
 

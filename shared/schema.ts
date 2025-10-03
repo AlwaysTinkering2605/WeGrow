@@ -92,6 +92,11 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "competency_achieved", "badge_awarded", "enrollment_reminder", "meeting_reminder",
   "goal_deadline", "development_plan_update", "recognition_received", "system_alert"
 ]);
+
+// Skill Category Type enum
+export const skillCategoryTypeEnum = pgEnum("skill_category_type", [
+  "technical", "behavioral", "safety", "compliance", "leadership", "operational"
+]);
 export const notificationPriorityEnum = pgEnum("notification_priority", ["low", "medium", "high", "urgent"]);
 export const notificationChannelEnum = pgEnum("notification_channel", ["in_app", "n8n_webhook", "system"]);
 export const webhookEventTypeEnum = pgEnum("webhook_event_type", [
@@ -111,6 +116,21 @@ export const teams = pgTable("teams", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Skill Categories table - normalized taxonomy for competencies, courses, and learning paths
+export const skillCategories = pgTable("skill_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull().unique(),
+  description: text("description"),
+  type: skillCategoryTypeEnum("type").default("technical").notNull(),
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("skill_categories_type_idx").on(table.type),
+  index("skill_categories_sort_order_idx").on(table.sortOrder),
+]);
 
 // Job Roles table - normalized job role master data with hierarchy
 export const jobRoles = pgTable("job_roles", {
@@ -265,10 +285,18 @@ export const competencies = pgTable("competencies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
   description: text("description"),
-  category: varchar("category"),
+  category: varchar("category"), // DEPRECATED: Keep for migration, use categoryId instead
+  categoryId: varchar("category_id"), // FK to skill_categories.id - normalized category reference
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  foreignKey({
+    columns: [table.categoryId],
+    foreignColumns: [skillCategories.id],
+    name: "competencies_category_fk"
+  }).onDelete("set null"),
+  index("competencies_category_idx").on(table.categoryId),
+]);
 
 // User competency assessments
 export const userCompetencies = pgTable("user_competencies", {
@@ -342,7 +370,8 @@ export const courses = pgTable("courses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: varchar("title").notNull(),
   description: text("description"),
-  category: varchar("category"),
+  category: varchar("category"), // DEPRECATED: Keep for migration, use categoryId instead
+  categoryId: varchar("category_id"), // FK to skill_categories.id - normalized category reference
   level: varchar("level"), // Beginner, Intermediate, Advanced
   estimatedDuration: integer("estimated_duration"), // minutes
   tags: text("tags").array(),
@@ -369,7 +398,14 @@ export const courses = pgTable("courses", {
   
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  foreignKey({
+    columns: [table.categoryId],
+    foreignColumns: [skillCategories.id],
+    name: "courses_category_fk"
+  }).onDelete("set null"),
+  index("courses_category_idx").on(table.categoryId),
+]);
 
 // Course versions - for ISO compliance
 export const courseVersions = pgTable("course_versions", {
@@ -570,7 +606,8 @@ export const learningPaths = pgTable("learning_paths", {
   title: varchar("title").notNull(),
   description: text("description"),
   pathType: varchar("path_type").notNull(), // "linear", "non_linear", "adaptive"
-  category: varchar("category"), // e.g., "onboarding", "compliance", "professional_development"
+  category: varchar("category"), // DEPRECATED: Keep for migration, use categoryId instead
+  categoryId: varchar("category_id"), // FK to skill_categories.id - normalized category reference
   estimatedDuration: integer("estimated_duration"), // Minutes
   relativeDueDays: integer("relative_due_days"), // Days from enrollment to completion (e.g., 30 = due 30 days after enrollment)
   isActive: boolean("is_active").default(true),
@@ -581,13 +618,17 @@ export const learningPaths = pgTable("learning_paths", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete support
-}, (table) => ({
-  // Indices for performance
-  titleIdx: index("learning_paths_title_idx").on(table.title),
-  categoryIdx: index("learning_paths_category_idx").on(table.category),
-  isPublishedIdx: index("learning_paths_published_idx").on(table.isPublished),
-  createdByIdx: index("learning_paths_created_by_idx").on(table.createdBy),
-}));
+}, (table) => [
+  foreignKey({
+    columns: [table.categoryId],
+    foreignColumns: [skillCategories.id],
+    name: "learning_paths_category_fk"
+  }).onDelete("set null"),
+  index("learning_paths_title_idx").on(table.title),
+  index("learning_paths_category_idx").on(table.categoryId),
+  index("learning_paths_published_idx").on(table.isPublished),
+  index("learning_paths_created_by_idx").on(table.createdBy),
+]);
 
 // Learning Path Job Roles - many-to-many relationship between learning paths and job roles
 export const learningPathJobRoles = pgTable("learning_path_job_roles", {
@@ -1548,6 +1589,12 @@ export const insertJobRoleSchema = createInsertSchema(jobRoles).omit({
   updatedAt: true,
 });
 
+export const insertSkillCategorySchema = createInsertSchema(skillCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertLearningPathJobRoleSchema = createInsertSchema(learningPathJobRoles).omit({
   id: true,
   createdAt: true,
@@ -1957,6 +2004,7 @@ export const insertUserAchievementSchema = createInsertSchema(userAchievements).
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type Team = typeof teams.$inferSelect;
+export type SkillCategory = typeof skillCategories.$inferSelect;
 export type JobRole = typeof jobRoles.$inferSelect;
 export type LearningPathJobRole = typeof learningPathJobRoles.$inferSelect;
 export type User = typeof users.$inferSelect;
@@ -1991,6 +2039,7 @@ export type TrainingRequirement = typeof trainingRequirements.$inferSelect;
 export type PdpCourseLink = typeof pdpCourseLinks.$inferSelect;
 
 export type InsertTeam = z.infer<typeof insertTeamSchema>;
+export type InsertSkillCategory = z.infer<typeof insertSkillCategorySchema>;
 export type InsertJobRole = z.infer<typeof insertJobRoleSchema>;
 export type InsertLearningPathJobRole = z.infer<typeof insertLearningPathJobRoleSchema>;
 export type InsertCompanyObjective = z.infer<typeof insertCompanyObjectiveSchema>;
@@ -2629,7 +2678,6 @@ export type LearningInsight = typeof learningInsights.$inferSelect;
 export type InsertLearningInsight = z.infer<typeof insertLearningInsightSchema>;
 
 // Re-export types for storage interface to avoid z import
-export type InsertTeam = z.infer<typeof insertTeamSchema>;
 export type CompetencyEvidenceData = z.infer<typeof competencyEvidenceDataSchema>;
 export type AutomationTriggerData = z.infer<typeof automationTriggerDataSchema>;
 

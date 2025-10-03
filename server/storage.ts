@@ -1,6 +1,7 @@
 import {
   users,
   teams,
+  skillCategories,
   jobRoles,
   learningPathJobRoles,
   companyObjectives,
@@ -61,6 +62,8 @@ import {
   notificationTemplates,
   type User,
   type UpsertUser,
+  type SkillCategory,
+  type InsertSkillCategory,
   type JobRole,
   type LearningPathJobRole,
   type InsertJobRole,
@@ -338,6 +341,16 @@ export interface IStorage {
   deleteTeam(teamId: string): Promise<void>;
   getTeamHierarchy(): Promise<TeamHierarchyNode[]>;
   assignUserToTeam(userId: string, teamId: string): Promise<User>;
+
+  // Skill Categories Management
+  getAllSkillCategories(): Promise<SkillCategory[]>;
+  getSkillCategory(categoryId: string): Promise<SkillCategory | undefined>;
+  createSkillCategory(category: InsertSkillCategory): Promise<SkillCategory>;
+  updateSkillCategory(categoryId: string, updates: Partial<InsertSkillCategory>): Promise<SkillCategory>;
+  deleteSkillCategory(categoryId: string): Promise<void>;
+  getCompetenciesByCategoryId(categoryId: string): Promise<Competency[]>;
+  getCoursesByCategoryId(categoryId: string): Promise<Course[]>;
+  getLearningPathsByCategoryId(categoryId: string): Promise<LearningPath[]>;
 
   // Job Roles Management
   getAllJobRoles(): Promise<JobRole[]>;
@@ -1802,6 +1815,65 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return user;
+  }
+
+  // Skill Categories Management
+  async getAllSkillCategories(): Promise<SkillCategory[]> {
+    return await db
+      .select()
+      .from(skillCategories)
+      .where(eq(skillCategories.isActive, true))
+      .orderBy(skillCategories.sortOrder, skillCategories.name);
+  }
+
+  async getSkillCategory(categoryId: string): Promise<SkillCategory | undefined> {
+    const [category] = await db.select().from(skillCategories).where(eq(skillCategories.id, categoryId));
+    return category;
+  }
+
+  async createSkillCategory(categoryData: InsertSkillCategory): Promise<SkillCategory> {
+    const [category] = await db
+      .insert(skillCategories)
+      .values(categoryData)
+      .returning();
+    return category;
+  }
+
+  async updateSkillCategory(categoryId: string, updates: Partial<InsertSkillCategory>): Promise<SkillCategory> {
+    const [category] = await db
+      .update(skillCategories)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(skillCategories.id, categoryId))
+      .returning();
+    return category;
+  }
+
+  async deleteSkillCategory(categoryId: string): Promise<void> {
+    await db
+      .update(skillCategories)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(skillCategories.id, categoryId));
+  }
+
+  async getCompetenciesByCategoryId(categoryId: string): Promise<Competency[]> {
+    return await db
+      .select()
+      .from(competencies)
+      .where(eq(competencies.categoryId, categoryId));
+  }
+
+  async getCoursesByCategoryId(categoryId: string): Promise<Course[]> {
+    return await db
+      .select()
+      .from(courses)
+      .where(eq(courses.categoryId, categoryId));
+  }
+
+  async getLearningPathsByCategoryId(categoryId: string): Promise<LearningPath[]> {
+    return await db
+      .select()
+      .from(learningPaths)
+      .where(eq(learningPaths.categoryId, categoryId));
   }
 
   // Job Roles Management
