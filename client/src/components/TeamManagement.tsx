@@ -31,7 +31,8 @@ import {
 } from "lucide-react";
 import { 
   insertTeamSchema,
-  type User
+  type User,
+  type Department
 } from "@shared/schema";
 import type { z } from "zod";
 
@@ -41,6 +42,7 @@ type Team = {
   name: string;
   description?: string | null;
   department?: string | null;
+  departmentId?: string | null;
   teamLeadId: string;
   parentTeamId?: string | null;
   isActive?: boolean | null;
@@ -59,13 +61,18 @@ export default function TeamManagement() {
   const [isEditTeamOpen, setIsEditTeamOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
 
+  // Fetch all departments
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ['/api/departments'],
+  });
+
   // Create team form with proper validation
   const createForm = useForm<InsertTeamData>({
     resolver: zodResolver(insertTeamSchema),
     defaultValues: {
       name: "",
       description: "",
-      department: "operations",
+      departmentId: undefined,
       teamLeadId: "",
       parentTeamId: undefined,
       isActive: true,
@@ -78,7 +85,7 @@ export default function TeamManagement() {
     defaultValues: {
       name: "",
       description: "",
-      department: "operations", 
+      departmentId: undefined, 
       teamLeadId: "",
       parentTeamId: undefined,
       isActive: true,
@@ -212,10 +219,18 @@ export default function TeamManagement() {
     // Normalize empty strings to undefined for optional fields
     const normalizedData = {
       ...data,
+      departmentId: data.departmentId === 'none' || !data.departmentId ? undefined : data.departmentId,
       parentTeamId: data.parentTeamId === "" ? undefined : data.parentTeamId,
       description: data.description === "" ? undefined : data.description,
     };
     createTeamMutation.mutate(normalizedData);
+  };
+
+  // Get department name for display
+  const getDepartmentName = (departmentId?: string | null) => {
+    if (!departmentId) return null;
+    const department = departments.find(d => d.id === departmentId);
+    return department?.name || null;
   };
 
   const handleEditTeam = (team: Team) => {
@@ -223,7 +238,7 @@ export default function TeamManagement() {
     editForm.reset({
       name: team.name,
       description: team.description || "",
-      department: team.department || "operations",
+      departmentId: team.departmentId || undefined,
       teamLeadId: team.teamLeadId,
       parentTeamId: team.parentTeamId ?? undefined,
       isActive: team.isActive ?? true,
@@ -244,6 +259,7 @@ export default function TeamManagement() {
     // Normalize empty strings to undefined for optional fields
     const normalizedData = {
       ...data,
+      departmentId: data.departmentId === 'none' || !data.departmentId ? undefined : data.departmentId,
       parentTeamId: data.parentTeamId === "" ? undefined : data.parentTeamId,
       description: data.description === "" ? undefined : data.description,
     };
@@ -283,7 +299,7 @@ export default function TeamManagement() {
             </div>
             <div>
               <h3 className="font-semibold" data-testid={`text-team-name-${team.id}`}>{team.name}</h3>
-              <p className="text-sm text-muted-foreground capitalize">{team.department}</p>
+              <p className="text-sm text-muted-foreground capitalize">{getDepartmentName(team.departmentId) || "No Department"}</p>
               {team.description && (
                 <p className="text-sm text-muted-foreground mt-1">{team.description}</p>
               )}
@@ -380,21 +396,23 @@ export default function TeamManagement() {
 
                 <FormField
                   control={createForm.control}
-                  name="department"
+                  name="departmentId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Department</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger data-testid="select-department">
-                            <SelectValue placeholder="Select department" />
+                            <SelectValue placeholder="Select department (optional)" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="operations">Operations</SelectItem>
-                          <SelectItem value="commercial">Commercial</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="leadership">Leadership</SelectItem>
+                          <SelectItem value="none">No Department</SelectItem>
+                          {departments.map((dept) => (
+                            <SelectItem key={dept.id} value={dept.id}>
+                              {dept.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -608,7 +626,7 @@ export default function TeamManagement() {
                           </div>
                           <div>
                             <h3 className="font-semibold" data-testid={`text-team-list-name-${team.id}`}>{team.name}</h3>
-                            <p className="text-sm text-muted-foreground capitalize">{team.department}</p>
+                            <p className="text-sm text-muted-foreground capitalize">{getDepartmentName(team.departmentId) || "No Department"}</p>
                             {team.description && (
                               <p className="text-sm text-muted-foreground mt-1">{team.description}</p>
                             )}
@@ -805,21 +823,23 @@ export default function TeamManagement() {
 
               <FormField
                 control={editForm.control}
-                name="department"
+                name="departmentId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Department</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger data-testid="select-edit-department">
-                          <SelectValue placeholder="Select department" />
+                          <SelectValue placeholder="Select department (optional)" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="operations">Operations</SelectItem>
-                        <SelectItem value="commercial">Commercial</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="leadership">Leadership</SelectItem>
+                        <SelectItem value="none">No Department</SelectItem>
+                        {departments.map((dept) => (
+                          <SelectItem key={dept.id} value={dept.id}>
+                            {dept.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />

@@ -15,7 +15,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { insertJobRoleSchema, type JobRole, type InsertJobRole } from "@shared/schema";
+import { insertJobRoleSchema, type JobRole, type InsertJobRole, type Department } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import {
   AlertDialog,
@@ -28,9 +28,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// Extended schema for form validation that accepts 'none' for reportsToJobRoleId
+// Extended schema for form validation that accepts 'none' for reportsToJobRoleId and departmentId
 const jobRoleFormSchema = insertJobRoleSchema.extend({
   reportsToJobRoleId: z.union([z.string().uuid(), z.literal('none')]).optional(),
+  departmentId: z.union([z.string().uuid(), z.literal('none')]).optional(),
 });
 
 type JobRoleFormValues = z.infer<typeof jobRoleFormSchema>;
@@ -45,6 +46,11 @@ export default function JobRoleManagement() {
   // Fetch all job roles
   const { data: jobRoles = [], isLoading } = useQuery<JobRole[]>({
     queryKey: ['/api/job-roles'],
+  });
+
+  // Fetch all departments
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ['/api/departments'],
   });
 
   // Create job role mutation
@@ -118,7 +124,7 @@ export default function JobRoleManagement() {
       name: "",
       code: "",
       level: 1,
-      department: "",
+      departmentId: 'none',
       description: "",
       reportsToJobRoleId: 'none',
       isActive: true,
@@ -132,7 +138,7 @@ export default function JobRoleManagement() {
       name: "",
       code: "",
       level: 1,
-      department: "",
+      departmentId: 'none',
       description: "",
       reportsToJobRoleId: 'none',
       isActive: true,
@@ -146,7 +152,7 @@ export default function JobRoleManagement() {
       name: jobRole.name,
       code: jobRole.code,
       level: jobRole.level,
-      department: jobRole.department || "",
+      departmentId: jobRole.departmentId || 'none',
       description: jobRole.description || "",
       reportsToJobRoleId: jobRole.reportsToJobRoleId || 'none',
       isActive: jobRole.isActive ?? true,
@@ -158,7 +164,7 @@ export default function JobRoleManagement() {
     // Convert form values to InsertJobRole format
     const cleanedData: InsertJobRole = {
       ...data,
-      department: data.department?.trim() || null,
+      departmentId: data.departmentId === 'none' || !data.departmentId ? null : data.departmentId,
       description: data.description?.trim() || null,
       reportsToJobRoleId: data.reportsToJobRoleId === 'none' || !data.reportsToJobRoleId ? null : data.reportsToJobRoleId,
     };
@@ -171,7 +177,7 @@ export default function JobRoleManagement() {
     // Convert form values to InsertJobRole format
     const cleanedData: InsertJobRole = {
       ...data,
-      department: data.department?.trim() || null,
+      departmentId: data.departmentId === 'none' || !data.departmentId ? null : data.departmentId,
       description: data.description?.trim() || null,
       reportsToJobRoleId: data.reportsToJobRoleId === 'none' || !data.reportsToJobRoleId ? null : data.reportsToJobRoleId,
     };
@@ -185,6 +191,13 @@ export default function JobRoleManagement() {
     return role ? `${role.name} (Level ${role.level})` : "Unknown";
   };
 
+  // Get department name for display
+  const getDepartmentName = (departmentId?: string | null) => {
+    if (!departmentId) return null;
+    const department = departments.find(d => d.id === departmentId);
+    return department?.name || null;
+  };
+
   // Get level badge color
   const getLevelBadgeVariant = (level: number) => {
     if (level >= 4) return "default";
@@ -194,10 +207,11 @@ export default function JobRoleManagement() {
 
   // Filter job roles based on search
   const filteredJobRoles = jobRoles.filter(role => {
+    const departmentName = getDepartmentName(role.departmentId);
     const matchesSearch = 
       role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       role.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (role.department && role.department.toLowerCase().includes(searchTerm.toLowerCase()));
+      (departmentName && departmentName.toLowerCase().includes(searchTerm.toLowerCase()));
     
     return matchesSearch;
   });
@@ -293,7 +307,7 @@ export default function JobRoleManagement() {
                       </Badge>
                     </TableCell>
                     <TableCell data-testid={`text-department-${role.id}`}>
-                      {role.department || <span className="text-muted-foreground">—</span>}
+                      {getDepartmentName(role.departmentId) || <span className="text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell data-testid={`text-reports-to-${role.id}`}>
                       {role.reportsToJobRoleId ? (
@@ -413,18 +427,25 @@ export default function JobRoleManagement() {
 
                 <FormField
                   control={createForm.control}
-                  name="department"
+                  name="departmentId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Department</FormLabel>
-                      <FormControl>
-                        <Input 
-                          data-testid="input-create-department"
-                          placeholder="e.g., Operations, Quality" 
-                          {...field}
-                          value={field.value || ""}
-                        />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-create-department">
+                            <SelectValue placeholder="Select department (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No Department</SelectItem>
+                          {departments.map((dept) => (
+                            <SelectItem key={dept.id} value={dept.id}>
+                              {dept.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -579,18 +600,25 @@ export default function JobRoleManagement() {
 
                 <FormField
                   control={editForm.control}
-                  name="department"
+                  name="departmentId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Department</FormLabel>
-                      <FormControl>
-                        <Input 
-                          data-testid="input-edit-department"
-                          placeholder="e.g., Operations, Quality" 
-                          {...field}
-                          value={field.value || ""}
-                        />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-department">
+                            <SelectValue placeholder="Select department (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No Department</SelectItem>
+                          {departments.map((dept) => (
+                            <SelectItem key={dept.id} value={dept.id}>
+                              {dept.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
