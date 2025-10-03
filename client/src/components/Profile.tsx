@@ -92,6 +92,15 @@ export default function Profile() {
     retry: false,
   });
 
+  // Fetch user's team memberships to get primary team
+  const { data: userTeams } = useQuery<any[]>({
+    queryKey: [`/api/users/${user?.id}/teams`],
+    enabled: !!user?.id,
+    retry: false,
+  });
+
+  const primaryTeam = userTeams?.find((t: any) => t.isPrimaryTeam);
+
   // Calculate real performance metrics
   const calculateGoalCompletion = () => {
     if (!goals.length) return 0;
@@ -193,7 +202,7 @@ export default function Profile() {
                 {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "Team Member"}
               </p>
               <p className="text-sm text-muted-foreground" data-testid="text-user-team">
-                {user?.teamName ? `${user.teamName} •` : ""} Started {user?.startDate ? new Date(user.startDate).toLocaleDateString() : "Recently"}
+                {primaryTeam?.teamName ? `${primaryTeam.teamName} •` : ""} Started {user?.startDate ? new Date(user.startDate).toLocaleDateString() : "Recently"}
               </p>
             </div>
           </div>

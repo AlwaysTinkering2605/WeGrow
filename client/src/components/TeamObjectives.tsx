@@ -71,12 +71,17 @@ export default function TeamObjectives() {
     retry: false,
   });
 
+  const { data: teams, isLoading: teamsLoading } = useQuery({
+    queryKey: ["/api/teams"],
+    retry: false,
+  });
+
   // Form setup for creating objectives
   const teamObjectiveForm = useForm<TeamObjectiveForm>({
     resolver: zodResolver(teamObjectiveSchema),
     defaultValues: {
       parentCompanyObjectiveId: "",
-      teamName: user?.teamName || "",
+      teamId: "",
       title: "",
       description: "",
       startDate: "",
@@ -89,7 +94,7 @@ export default function TeamObjectives() {
     resolver: zodResolver(teamObjectiveSchema),
     defaultValues: {
       parentCompanyObjectiveId: "",
-      teamName: user?.teamName || "",
+      teamId: "",
       title: "",
       description: "",
       startDate: "",
@@ -182,7 +187,7 @@ export default function TeamObjectives() {
     
     editTeamObjectiveForm.reset({
       parentCompanyObjectiveId: objective.parentCompanyObjectiveId || "",
-      teamName: objective.teamName || "",
+      teamId: objective.teamId || "",
       title: objective.title || "",
       description: objective.description || "",
       startDate: objective.startDate ? new Date(objective.startDate).toISOString().split('T')[0] : "",
@@ -238,13 +243,24 @@ export default function TeamObjectives() {
                 />
                 <FormField
                   control={teamObjectiveForm.control}
-                  name="teamName"
+                  name="teamId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Team Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., David's North Glasgow Team" {...field} data-testid="input-team-name" />
-                      </FormControl>
+                      <FormLabel>Team</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-team">
+                            <SelectValue placeholder="Select a team" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {(teams as any[])?.map((team: any) => (
+                            <SelectItem key={team.id} value={team.id}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -365,13 +381,24 @@ export default function TeamObjectives() {
               />
               <FormField
                 control={editTeamObjectiveForm.control}
-                name="teamName"
+                name="teamId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Team Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., David's North Glasgow Team" {...field} data-testid="input-edit-team-name" />
-                    </FormControl>
+                    <FormLabel>Team</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-team">
+                          <SelectValue placeholder="Select a team" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {(teams as any[])?.map((team: any) => (
+                          <SelectItem key={team.id} value={team.id}>
+                            {team.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -484,7 +511,7 @@ export default function TeamObjectives() {
                       <div className="flex items-center space-x-2 mb-2">
                         <Badge variant="outline" className="text-xs">
                           <Building className="w-3 h-3 mr-1" />
-                          {objective.teamName}
+                          {(teams as any[])?.find((t: any) => t.id === objective.teamId)?.name || 'Unknown Team'}
                         </Badge>
                       </div>
                       <h4 className="font-semibold text-lg" data-testid={`text-team-objective-title-${objective.id}`}>

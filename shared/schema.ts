@@ -282,7 +282,7 @@ export const keyResults = pgTable("key_results", {
 export const teamObjectives = pgTable("team_objectives", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   parentCompanyObjectiveId: varchar("parent_company_objective_id").notNull(),
-  teamName: varchar("team_name").notNull(),
+  teamId: varchar("team_id").notNull(), // FK to teams.id - normalized team reference
   supervisorId: varchar("supervisor_id").notNull(),
   title: text("title").notNull(),
   description: text("description"),
@@ -291,7 +291,14 @@ export const teamObjectives = pgTable("team_objectives", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  foreignKey({
+    columns: [table.teamId],
+    foreignColumns: [teams.id],
+    name: "team_objectives_team_fk"
+  }).onDelete("cascade"),
+  index("team_objectives_team_idx").on(table.teamId),
+]);
 
 // Key results for team objectives
 export const teamKeyResults = pgTable("team_key_results", {

@@ -351,8 +351,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Supervisors can see objectives for their teams
         teamObjectives = await storage.getTeamObjectives(undefined, req.user.claims.sub);
       } else {
-        // Operatives can see objectives for their team
-        teamObjectives = await storage.getTeamObjectives(user?.teamName || undefined);
+        // Operatives can see objectives for their primary team
+        const userTeams = await storage.getUserTeamMemberships(user!.id);
+        const primaryTeam = userTeams.find(t => t.isPrimary);
+        teamObjectives = await storage.getTeamObjectives(primaryTeam?.teamId || undefined);
       }
       
       res.json(teamObjectives);

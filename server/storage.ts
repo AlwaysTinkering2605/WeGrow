@@ -267,7 +267,7 @@ export interface IStorage {
   deleteCompanyObjective(id: string): Promise<void>;
   
   // Team objectives
-  getTeamObjectives(teamName?: string, supervisorId?: string): Promise<TeamObjective[]>;
+  getTeamObjectives(teamId?: string, supervisorId?: string): Promise<TeamObjective[]>;
   getTeamObjectiveById(id: string): Promise<TeamObjective | null>;
   createTeamObjective(objective: InsertTeamObjective): Promise<TeamObjective>;
   updateTeamObjective(id: string, objective: Partial<InsertTeamObjective>): Promise<TeamObjective>;
@@ -1070,9 +1070,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Team objectives
-  async getTeamObjectives(teamName?: string, supervisorId?: string): Promise<TeamObjective[]> {
+  async getTeamObjectives(teamId?: string, supervisorId?: string): Promise<TeamObjective[]> {
     const conditions = [];
-    if (teamName) conditions.push(eq(teamObjectives.teamName, teamName));
+    if (teamId) conditions.push(eq(teamObjectives.teamId, teamId));
     if (supervisorId) conditions.push(eq(teamObjectives.supervisorId, supervisorId));
     
     return await db
