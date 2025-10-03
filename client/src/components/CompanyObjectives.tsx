@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { KeyResultCard } from "@/components/KeyResultCard";
+import { KeyResultProgressDialog } from "@/components/KeyResultProgressDialog";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -24,7 +26,8 @@ import {
   Filter,
   Calendar,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  ListTodo
 } from "lucide-react";
 
 // Enhanced form schema with date validation
@@ -49,6 +52,9 @@ export default function CompanyObjectives() {
   const [searchFilter, setSearchFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
+  const [selectedKeyResult, setSelectedKeyResult] = useState<any>(null);
+  const [isProgressDialogOpen, setIsProgressDialogOpen] = useState(false);
+  const [expandedObjectives, setExpandedObjectives] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -170,6 +176,25 @@ export default function CompanyObjectives() {
     },
   });
 
+  // Handle progress update
+  const handleUpdateProgress = (keyResult: any) => {
+    setSelectedKeyResult(keyResult);
+    setIsProgressDialogOpen(true);
+  };
+
+  // Toggle objective expansion
+  const toggleObjectiveExpansion = (objectiveId: string) => {
+    setExpandedObjectives(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(objectiveId)) {
+        newSet.delete(objectiveId);
+      } else {
+        newSet.add(objectiveId);
+      }
+      return newSet;
+    });
+  };
+
   // Handle edit objective
   const handleEditObjective = (objective: any) => {
     setEditingObjective(objective);
@@ -181,6 +206,65 @@ export default function CompanyObjectives() {
     });
     setIsEditDialogOpen(true);
   };
+
+  // Objective Key Results Component
+  function ObjectiveKeyResults({ objectiveId }: { objectiveId: string }) {
+    const { data: keyResults, isLoading } = useQuery<any[]>({
+      queryKey: ["/api/objectives", objectiveId, "key-results"],
+      enabled: expandedObjectives.has(objectiveId),
+    });
+
+    const { data: users } = useQuery<any[]>({
+      queryKey: ["/api/users"],
+      enabled: expandedObjectives.has(objectiveId) && !!keyResults && keyResults.length > 0,
+    });
+
+    if (!expandedObjectives.has(objectiveId)) return null;
+
+    if (isLoading) {
+      return (
+        <div className="mt-4 pt-4 border-t space-y-2">
+          <div className="flex items-center gap-2 mb-3">
+            <ListTodo className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Loading key results...</span>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-4 pt-4 border-t">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <ListTodo className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium">
+              Key Results ({keyResults?.length || 0})
+            </span>
+          </div>
+        </div>
+        {keyResults && keyResults.length > 0 ? (
+          <div className="grid gap-3">
+            {keyResults.map((kr: any) => {
+              const owner = users?.find((u: any) => u.id === kr.ownerId);
+              return (
+                <KeyResultCard
+                  key={kr.id}
+                  keyResult={kr}
+                  ownerName={owner ? `${owner.firstName} ${owner.lastName}` : undefined}
+                  onUpdateProgress={handleUpdateProgress}
+                  isCompanyLevel={true}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-6 text-sm text-muted-foreground">
+            No key results yet. Add key results to track progress.
+          </div>
+        )}
+      </div>
+    );
+  }
 
   // Filter objectives based on current filters
   const filteredObjectives = useMemo(() => {
@@ -556,6 +640,18 @@ export default function CompanyObjectives() {
                             End: {new Date(objective.endDate).toLocaleDateString()}
                           </span>
                         </div>
+                        <div className="mt-3">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleObjectiveExpansion(objective.id)}
+                            className="text-xs"
+                            data-testid={`button-toggle-kr-${objective.id}`}
+                          >
+                            <ListTodo className="w-3.5 h-3.5 mr-1.5" />
+                            {expandedObjectives.has(objective.id) ? "Hide" : "View"} Key Results
+                          </Button>
+                        </div>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Button
@@ -577,6 +673,9 @@ export default function CompanyObjectives() {
                         </Button>
                       </div>
                     </div>
+                    
+                    {/* Key Results Section */}
+                    <ObjectiveKeyResults objectiveId={objective.id} />
                   </div>
                 );
               })}
@@ -606,6 +705,17 @@ export default function CompanyObjectives() {
           )}
         </CardContent>
       </Card>
+
+      {/* Key Result Progress Dialog */}
+      <KeyResultProgressDialog
+        keyResult={selectedKeyResult}
+        isOpen={isProgressDialogOpen}
+        onClose={() => {
+          setIsProgressDialogOpen(false);
+          setSelectedKeyResult(null);
+        }}
+        keyResultType="company"
+      />
     </div>
   );
 }
