@@ -93,6 +93,45 @@ The platform now includes comprehensive key results management aligned with ISO 
 - ISO 9001 Clause 9.3: Management review data requirements
 - ISO 9001 Clause 7.5: Documented information retention
 
+### Strategic Classification & Risk Management (Phase 3 - October 2025)
+
+Phase 3 enhances objectives with strategic planning and risk-based thinking capabilities aligned with ISO 9001:2015 requirements:
+
+**Strategic Themes**: Five-category classification system for strategic alignment:
+- **Quality Excellence**: Quality improvement and customer satisfaction initiatives
+- **Operational Excellence**: Process efficiency and operational improvement
+- **Customer Satisfaction**: Customer-focused objectives and service delivery
+- **Innovation & Growth**: Innovation, new capabilities, and market expansion
+- **Financial Performance**: Revenue growth, cost optimization, and financial targets
+
+**Risk Management**: Four-tier risk assessment with visual indicators:
+- **🟢 Low Risk**: Minimal obstacles, high probability of success
+- **🟡 Medium Risk**: Some obstacles likely, standard monitoring needed
+- **🟠 High Risk**: Significant barriers present, mitigation required
+- **🔴 Critical Risk**: Severe impediments, intensive management needed
+
+**Risk Mitigation Planning**: Free-text field for documenting risk mitigation strategies and contingency plans.
+
+**Dependencies Tracking**: Array field for recording objective dependencies (visualization deferred to future phase).
+
+**Technical Implementation**:
+- **Database Schema**: Added `strategicTheme` and `riskLevel` enum columns to `companyObjectives` and `teamObjectives` tables with optional (nullable) constraints
+- **Form Components**: Integrated Select dropdowns with proper undefined/null handling using `?? undefined` pattern to prevent controlled component warnings
+- **Visual Indicators**: Color-coded badges display strategic themes and risk levels on objective cards
+- **Edit Workflows**: Fixed form reset logic to preserve null/undefined enum values and server-side date conversion for ISO string compatibility
+- **Data Persistence**: Server PUT routes properly convert ISO date strings to Date objects before Drizzle persistence
+
+**Compliance Alignment**:
+- ISO 9001 Clause 6.1: Risk-based thinking and opportunity identification
+- ISO 9001 Clause 6.2.1: Strategic direction and context of organization
+- ISO 9001 Clause 4.1: Understanding organizational context
+- ISO 9001 Clause 10.2: Nonconformity and corrective action planning
+
+**Known Considerations**:
+- Optional enum fields properly handle undefined/null states throughout create/edit workflows
+- Dependencies array field exists in schema but visualization component deferred to future enhancement
+- Stale form state under rapid edits identified as non-blocking edge case for monitoring
+
 ## Organizational Structure
 The platform implements a normalized job role architecture with a `job_roles` table for hierarchical structure (levels 1-5), department categorization, and reporting relationships.
 - **Job Role Hierarchy (Structural View)**: Shows the ideal organizational structure based on job roles, grouped by hierarchical level.
