@@ -15,6 +15,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertTeamObjectiveSchema } from "@shared/schema";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { 
   Target, 
   Plus, 
@@ -23,13 +25,17 @@ import {
   Building,
   Calendar,
   AlertCircle,
-  Edit 
+  Edit,
+  User2
 } from "lucide-react";
 
-// Enhanced form schema with date validation
+// Enhanced form schema with date validation and Phase 2 fields
 const teamObjectiveSchema = insertTeamObjectiveSchema.omit({ supervisorId: true }).extend({
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
+  ownerId: z.string().optional(),
+  objectiveType: z.enum(["committed", "aspirational"]).optional(),
+  evaluationMethod: z.string().optional(),
 }).refine(
   (data) => new Date(data.endDate) >= new Date(data.startDate),
   {
@@ -76,6 +82,14 @@ export default function TeamObjectives() {
     retry: false,
   });
 
+  // Query for users (leadership/supervisor) for owner dropdown
+  const { data: users } = useQuery<any[]>({
+    queryKey: ["/api/users"],
+  });
+
+  // Filter users to only leadership and supervisors for owner selection
+  const ownerOptions = (users || []).filter(u => u.role === 'leadership' || u.role === 'supervisor');
+
   // Form setup for creating objectives
   const teamObjectiveForm = useForm<TeamObjectiveForm>({
     resolver: zodResolver(teamObjectiveSchema),
@@ -86,6 +100,9 @@ export default function TeamObjectives() {
       description: "",
       startDate: "",
       endDate: "",
+      ownerId: "",
+      objectiveType: "committed",
+      evaluationMethod: "",
     },
   });
 
@@ -99,6 +116,9 @@ export default function TeamObjectives() {
       description: "",
       startDate: "",
       endDate: "",
+      ownerId: "",
+      objectiveType: "committed",
+      evaluationMethod: "",
     },
   });
 
@@ -333,6 +353,88 @@ export default function TeamObjectives() {
                     )}
                   />
                 </div>
+                
+                {/* Phase 2: Owner Selection */}
+                <FormField
+                  control={teamObjectiveForm.control}
+                  name="ownerId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Owner (Optional)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-team-objective-owner">
+                            <SelectValue placeholder="Select an owner..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">No Owner</SelectItem>
+                          {ownerOptions.map((owner) => (
+                            <SelectItem key={owner.id} value={owner.id}>
+                              {owner.firstName} {owner.lastName} ({owner.role})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Phase 2: Objective Type */}
+                <FormField
+                  control={teamObjectiveForm.control}
+                  name="objectiveType"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Objective Type</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          className="flex flex-col space-y-1"
+                          data-testid="radio-team-objective-type"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="committed" id="team-committed" />
+                            <Label htmlFor="team-committed" className="font-normal cursor-pointer">
+                              Committed - Must achieve target
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="aspirational" id="team-aspirational" />
+                            <Label htmlFor="team-aspirational" className="font-normal cursor-pointer">
+                              Aspirational - Stretch goal
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Phase 2: Evaluation Method */}
+                <FormField
+                  control={teamObjectiveForm.control}
+                  name="evaluationMethod"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Evaluation Method (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Describe how results will be measured..." 
+                          rows={3}
+                          {...field}
+                          value={field.value || ""}
+                          data-testid="textarea-team-objective-evaluation"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <div className="flex justify-end space-x-2 pt-4">
                   <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                     Cancel

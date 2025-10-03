@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Badge } from "@/components/ui/badge";
 import { KeyResultCard } from "@/components/KeyResultCard";
 import { KeyResultProgressDialog } from "@/components/KeyResultProgressDialog";
 import { useState, useMemo } from "react";
@@ -27,13 +28,20 @@ import {
   Calendar,
   CheckCircle,
   AlertCircle,
-  ListTodo
+  ListTodo,
+  User2
 } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
-// Enhanced form schema with date validation
+// Enhanced form schema with date validation and Phase 2 fields
 const objectiveSchema = insertCompanyObjectiveSchema.omit({ createdBy: true }).extend({
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
+  ownerId: z.string().optional(),
+  objectiveType: z.enum(["committed", "aspirational"]).optional(),
+  qualityPolicyLinks: z.array(z.string()).optional(),
+  resourceRequirements: z.any().optional(),
+  evaluationMethod: z.string().optional(),
 }).refine(
   (data) => new Date(data.endDate) >= new Date(data.startDate),
   {
@@ -76,6 +84,17 @@ export default function CompanyObjectives() {
     retry: false,
   });
 
+  // Query for users (leadership/supervisor) for owner dropdown
+  const { data: users } = useQuery<any[]>({
+    queryKey: ["/api/users"],
+  });
+
+  // Filter users to only leadership and supervisors for owner selection
+  const ownerOptions = useMemo(() => {
+    if (!users) return [];
+    return users.filter(u => u.role === 'leadership' || u.role === 'supervisor');
+  }, [users]);
+
   // Form setup for creating objectives
   const objectiveForm = useForm<ObjectiveForm>({
     resolver: zodResolver(objectiveSchema),
@@ -84,6 +103,9 @@ export default function CompanyObjectives() {
       description: "",
       startDate: "",
       endDate: "",
+      ownerId: "",
+      objectiveType: "committed",
+      evaluationMethod: "",
     },
   });
 
@@ -95,6 +117,9 @@ export default function CompanyObjectives() {
       description: "",
       startDate: "",
       endDate: "",
+      ownerId: "",
+      objectiveType: "committed",
+      evaluationMethod: "",
     },
   });
 
@@ -203,6 +228,9 @@ export default function CompanyObjectives() {
       description: objective.description || "",
       startDate: new Date(objective.startDate).toISOString().split('T')[0],
       endDate: new Date(objective.endDate).toISOString().split('T')[0],
+      ownerId: objective.ownerId || "",
+      objectiveType: objective.objectiveType || "committed",
+      evaluationMethod: objective.evaluationMethod || "",
     });
     setIsEditDialogOpen(true);
   };
@@ -474,6 +502,88 @@ export default function CompanyObjectives() {
                           )}
                         />
                       </div>
+                      
+                      {/* Phase 2: Owner Selection */}
+                      <FormField
+                        control={objectiveForm.control}
+                        name="ownerId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Owner (Optional)</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-objective-owner">
+                                  <SelectValue placeholder="Select an owner..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="">No Owner</SelectItem>
+                                {ownerOptions.map((owner) => (
+                                  <SelectItem key={owner.id} value={owner.id}>
+                                    {owner.firstName} {owner.lastName} ({owner.role})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Phase 2: Objective Type */}
+                      <FormField
+                        control={objectiveForm.control}
+                        name="objectiveType"
+                        render={({ field }) => (
+                          <FormItem className="space-y-3">
+                            <FormLabel>Objective Type</FormLabel>
+                            <FormControl>
+                              <RadioGroup
+                                onValueChange={field.onChange}
+                                value={field.value}
+                                className="flex flex-col space-y-1"
+                                data-testid="radio-objective-type"
+                              >
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="committed" id="committed" />
+                                  <Label htmlFor="committed" className="font-normal cursor-pointer">
+                                    Committed - Must achieve target
+                                  </Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="aspirational" id="aspirational" />
+                                  <Label htmlFor="aspirational" className="font-normal cursor-pointer">
+                                    Aspirational - Stretch goal
+                                  </Label>
+                                </div>
+                              </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Phase 2: Evaluation Method */}
+                      <FormField
+                        control={objectiveForm.control}
+                        name="evaluationMethod"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Evaluation Method (Optional)</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Describe how results will be measured..." 
+                                rows={3}
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="textarea-objective-evaluation"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
                       <div className="flex justify-end space-x-2 pt-4">
                         <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                           Cancel
@@ -571,6 +681,88 @@ export default function CompanyObjectives() {
                   )}
                 />
               </div>
+
+              {/* Phase 2: Owner Selection */}
+              <FormField
+                control={editObjectiveForm.control}
+                name="ownerId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Owner (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-objective-owner">
+                          <SelectValue placeholder="Select an owner..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">No Owner</SelectItem>
+                        {ownerOptions.map((owner) => (
+                          <SelectItem key={owner.id} value={owner.id}>
+                            {owner.firstName} {owner.lastName} ({owner.role})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Phase 2: Objective Type */}
+              <FormField
+                control={editObjectiveForm.control}
+                name="objectiveType"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>Objective Type</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        className="flex flex-col space-y-1"
+                        data-testid="radio-edit-objective-type"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="committed" id="edit-committed" />
+                          <Label htmlFor="edit-committed" className="font-normal cursor-pointer">
+                            Committed - Must achieve target
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="aspirational" id="edit-aspirational" />
+                          <Label htmlFor="edit-aspirational" className="font-normal cursor-pointer">
+                            Aspirational - Stretch goal
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Phase 2: Evaluation Method */}
+              <FormField
+                control={editObjectiveForm.control}
+                name="evaluationMethod"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Evaluation Method (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Describe how results will be measured..." 
+                        rows={3}
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="textarea-edit-objective-evaluation"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="flex justify-end space-x-2 pt-4">
                 <Button 
                   type="button" 
@@ -623,6 +815,14 @@ export default function CompanyObjectives() {
                           <span className={`text-xs font-medium uppercase tracking-wide ${color}`}>
                             {status}
                           </span>
+                          {/* Phase 2: Objective Type Badge */}
+                          <Badge 
+                            variant={objective.objectiveType === 'aspirational' ? 'outline' : 'default'}
+                            className="text-xs"
+                            data-testid={`badge-objective-type-${objective.id}`}
+                          >
+                            {objective.objectiveType === 'aspirational' ? '🎯 Aspirational' : '✓ Committed'}
+                          </Badge>
                         </div>
                         <h4 className="font-semibold text-lg" data-testid={`text-objective-title-${objective.id}`}>
                           {objective.title}
@@ -632,13 +832,23 @@ export default function CompanyObjectives() {
                             {objective.description}
                           </p>
                         )}
-                        <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
+                        <div className="flex items-center flex-wrap gap-4 mt-2 text-xs text-muted-foreground">
                           <span data-testid={`text-objective-start-${objective.id}`}>
                             Start: {new Date(objective.startDate).toLocaleDateString()}
                           </span>
                           <span data-testid={`text-objective-end-${objective.id}`}>
                             End: {new Date(objective.endDate).toLocaleDateString()}
                           </span>
+                          {/* Phase 2: Owner Display */}
+                          {objective.ownerId && (() => {
+                            const owner = users?.find(u => u.id === objective.ownerId);
+                            return owner && (
+                              <span className="flex items-center gap-1" data-testid={`text-objective-owner-${objective.id}`}>
+                                <User2 className="w-3 h-3" />
+                                Owner: {owner.firstName} {owner.lastName}
+                              </span>
+                            );
+                          })()}
                         </div>
                         <div className="mt-3">
                           <Button
