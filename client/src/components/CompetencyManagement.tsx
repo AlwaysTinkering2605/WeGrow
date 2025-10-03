@@ -123,8 +123,8 @@ interface EvidenceRecord {
 // Enhanced Competency Management Dashboard
 function CompetencyManagementDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("");
-  const [skillTypeFilter, setSkillTypeFilter] = useState<string>("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [skillTypeFilter, setSkillTypeFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("library");
   const { user } = useAuth();
 
@@ -142,8 +142,8 @@ function CompetencyManagementDashboard() {
     const matchesSearch = !searchTerm || 
       comp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       comp.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !categoryFilter || comp.category === categoryFilter;
-    const matchesSkillType = !skillTypeFilter || comp.skillType === skillTypeFilter;
+    const matchesCategory = !categoryFilter || categoryFilter === "all" || comp.category === categoryFilter;
+    const matchesSkillType = !skillTypeFilter || skillTypeFilter === "all" || comp.skillType === skillTypeFilter;
     return matchesSearch && matchesCategory && matchesSkillType;
   });
 
@@ -244,7 +244,7 @@ function CompetencyManagementDashboard() {
             <SelectValue placeholder="Filter by category" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Categories</SelectItem>
+            <SelectItem value="all">All Categories</SelectItem>
             <SelectItem value="Cleaning Operations">Cleaning Operations</SelectItem>
             <SelectItem value="Safety & Health">Safety & Health</SelectItem>
             <SelectItem value="Customer Service">Customer Service</SelectItem>
@@ -258,7 +258,7 @@ function CompetencyManagementDashboard() {
             <SelectValue placeholder="Filter by skill type" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Types</SelectItem>
+            <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="technical">Technical</SelectItem>
             <SelectItem value="safety">Safety</SelectItem>
             <SelectItem value="compliance">Compliance</SelectItem>
@@ -354,7 +354,11 @@ function CompetencyLibraryView({ competencies, isLoading }: {
   });
 
   const handleCreate = (data: CompetencyFormType) => {
-    createCompetencyMutation.mutate(data);
+    const cleanedData = {
+      ...data,
+      parentId: data.parentId === "none" ? undefined : data.parentId
+    };
+    createCompetencyMutation.mutate(cleanedData);
   };
 
   const handleEdit = (competency: Competency) => {
@@ -474,7 +478,13 @@ function CompetencyLibraryView({ competencies, isLoading }: {
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(editingCompetency ? 
-                (data) => updateCompetencyMutation.mutate({ id: editingCompetency.id, data }) : 
+                (data) => {
+                  const cleanedData = {
+                    ...data,
+                    parentId: data.parentId === "none" ? undefined : data.parentId
+                  };
+                  updateCompetencyMutation.mutate({ id: editingCompetency.id, data: cleanedData });
+                } : 
                 handleCreate
               )} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -1121,7 +1131,7 @@ function RoleCompetencyMapping() {
 // Audit Trail Viewing Interface
 function AuditTrailViewer() {
   const [selectedUserId, setSelectedUserId] = useState<string>("");
-  const [selectedCompetencyId, setSelectedCompetencyId] = useState<string>("");
+  const [selectedCompetencyId, setSelectedCompetencyId] = useState<string>("all");
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -1156,7 +1166,7 @@ function AuditTrailViewer() {
   });
 
   const filteredEvidence = evidenceRecords?.filter((record: EvidenceRecord) => 
-    !selectedCompetencyId || record.competencyId === selectedCompetencyId
+    !selectedCompetencyId || selectedCompetencyId === "all" || record.competencyId === selectedCompetencyId
   );
 
   return (
@@ -1190,7 +1200,7 @@ function AuditTrailViewer() {
               <SelectValue placeholder="Filter by competency" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All competencies</SelectItem>
+              <SelectItem value="all">All competencies</SelectItem>
               {competencies?.map((comp: Competency) => (
                 <SelectItem key={comp.id} value={comp.id}>
                   {comp.title}
@@ -1582,14 +1592,14 @@ export default function CompetencyManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Parent Competency</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <Select onValueChange={field.onChange} value={field.value || "none"}>
                         <FormControl>
                           <SelectTrigger data-testid="select-parent-competency">
                             <SelectValue placeholder="None (root level)" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">None (root level)</SelectItem>
+                          <SelectItem value="none">None (root level)</SelectItem>
                           {competencies?.map((comp: Competency) => (
                             <SelectItem key={comp.id} value={comp.id}>
                               {comp.title}
