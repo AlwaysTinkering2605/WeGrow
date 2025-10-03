@@ -1098,6 +1098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DEPRECATED: Legacy route for backward compatibility - delegates to team_members junction table
   app.put('/api/users/:id/team', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
@@ -1110,10 +1111,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
       }
 
+      // Get current memberships
+      const memberships = await storage.getUserTeamMemberships(id);
+      const isAlreadyMember = memberships.some(m => m.teamId === teamId);
+
+      if (!isAlreadyMember) {
+        // Add as new membership and set as primary
+        await storage.addTeamMember({
+          userId: id,
+          teamId,
+          role: 'Member',
+          isPrimary: true
+        });
+      } else {
+        // Already a member, just set as primary
+        await storage.setPrimaryTeam(id, teamId);
+      }
+
+      // Also update legacy users.teamId field for backward compatibility
       const updatedUser = await storage.assignUserToTeam(id, teamId);
       res.json(updatedUser);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error assigning user to team:", error);
+      if (error.message?.includes('VALIDATION_ERROR:')) {
+        return res.status(422).json({ message: error.message.replace('VALIDATION_ERROR: ', '') });
+      }
       res.status(500).json({ message: "Failed to assign user to team" });
     }
   });
@@ -1158,8 +1180,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(membership);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding team membership:", error);
+      if (error.message?.includes('VALIDATION_ERROR:')) {
+        return res.status(422).json({ message: error.message.replace('VALIDATION_ERROR: ', '') });
+      }
       res.status(500).json({ message: "Failed to add team membership" });
     }
   });
@@ -1175,16 +1200,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
       }
 
-      // Check that user has at least 2 teams before removing
-      const memberships = await storage.getUserTeamMemberships(userId);
-      if (memberships.length <= 1) {
-        return res.status(400).json({ message: "User must belong to at least one team" });
-      }
-
       await storage.removeTeamMember(userId, teamId);
       res.json({ message: "Team membership removed" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error removing team membership:", error);
+      if (error.message?.includes('VALIDATION_ERROR:')) {
+        return res.status(422).json({ message: error.message.replace('VALIDATION_ERROR: ', '') });
+      }
       res.status(500).json({ message: "Failed to remove team membership" });
     }
   });
@@ -1227,8 +1249,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.setPrimaryTeam(userId, teamId);
       res.json({ message: "Primary team updated" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error setting primary team:", error);
+      if (error.message?.includes('VALIDATION_ERROR:')) {
+        return res.status(422).json({ message: error.message.replace('VALIDATION_ERROR: ', '') });
+      }
       res.status(500).json({ message: "Failed to set primary team" });
     }
   });

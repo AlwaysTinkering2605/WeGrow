@@ -1876,20 +1876,76 @@ export class DatabaseStorage implements IStorage {
   }
 
   async addTeamMember(membership: InsertTeamMember): Promise<TeamMember> {
-    const [teamMember] = await db
-      .insert(teamMembers)
-      .values(membership)
-      .returning();
-    return teamMember;
+    // Check for duplicate membership
+    const existingMemberships = await this.getUserTeamMemberships(membership.userId);
+    const duplicate = existingMemberships.find(m => m.teamId === membership.teamId);
+    if (duplicate) {
+      throw new Error("VALIDATION_ERROR: User is already a member of this team");
+    }
+
+    // If user has no teams, this MUST be primary
+    if (existingMemberships.length === 0) {
+      membership.isPrimary = true;
+    }
+
+    // Use transaction to atomically handle primary reassignment and insertion
+    const result = await db.transaction(async (tx) => {
+      // If this is being set as primary, unset other primaries first
+      if (membership.isPrimary) {
+        await tx
+          .update(teamMembers)
+          .set({ isPrimary: false, updatedAt: new Date() })
+          .where(eq(teamMembers.userId, membership.userId));
+      }
+
+      const [teamMember] = await tx
+        .insert(teamMembers)
+        .values(membership)
+        .returning();
+      return teamMember;
+    });
+    
+    return result;
   }
 
   async removeTeamMember(userId: string, teamId: string): Promise<void> {
-    await db
-      .delete(teamMembers)
-      .where(and(
-        eq(teamMembers.userId, userId),
-        eq(teamMembers.teamId, teamId)
-      ));
+    // Check that user has at least 2 teams before removing
+    const memberships = await this.getUserTeamMemberships(userId);
+    if (memberships.length <= 1) {
+      throw new Error("VALIDATION_ERROR: User must belong to at least one team");
+    }
+
+    const membershipToRemove = memberships.find(m => m.teamId === teamId);
+    if (!membershipToRemove) {
+      throw new Error("VALIDATION_ERROR: Team membership not found");
+    }
+
+    // Use transaction to atomically handle primary team reassignment and deletion
+    await db.transaction(async (tx) => {
+      // If removing primary team, set another team as primary FIRST
+      if (membershipToRemove.isPrimary) {
+        const newPrimaryTeam = memberships.find(m => m.teamId !== teamId);
+        if (!newPrimaryTeam) {
+          throw new Error("VALIDATION_ERROR: Cannot remove primary team without another team to set as primary");
+        }
+        // Set new primary first within transaction
+        await tx
+          .update(teamMembers)
+          .set({ isPrimary: true, updatedAt: new Date() })
+          .where(and(
+            eq(teamMembers.userId, userId),
+            eq(teamMembers.teamId, newPrimaryTeam.teamId)
+          ));
+      }
+
+      // Now delete the team membership within same transaction
+      await tx
+        .delete(teamMembers)
+        .where(and(
+          eq(teamMembers.userId, userId),
+          eq(teamMembers.teamId, teamId)
+        ));
+    });
   }
 
   async updateTeamMemberRole(userId: string, teamId: string, role: string): Promise<TeamMember> {
@@ -1905,20 +1961,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async setPrimaryTeam(userId: string, teamId: string): Promise<void> {
-    // First, unset all primary flags for this user
-    await db
-      .update(teamMembers)
-      .set({ isPrimary: false, updatedAt: new Date() })
-      .where(eq(teamMembers.userId, userId));
-    
-    // Then set the specified team as primary
-    await db
-      .update(teamMembers)
-      .set({ isPrimary: true, updatedAt: new Date() })
-      .where(and(
-        eq(teamMembers.userId, userId),
-        eq(teamMembers.teamId, teamId)
-      ));
+    // Verify the user is a member of this team
+    const memberships = await this.getUserTeamMemberships(userId);
+    const targetMembership = memberships.find(m => m.teamId === teamId);
+    if (!targetMembership) {
+      throw new Error("VALIDATION_ERROR: User is not a member of this team");
+    }
+
+    // Use transaction to atomically handle primary team reassignment
+    await db.transaction(async (tx) => {
+      // First, unset all primary flags for this user
+      await tx
+        .update(teamMembers)
+        .set({ isPrimary: false, updatedAt: new Date() })
+        .where(eq(teamMembers.userId, userId));
+      
+      // Then set the specified team as primary
+      await tx
+        .update(teamMembers)
+        .set({ isPrimary: true, updatedAt: new Date() })
+        .where(and(
+          eq(teamMembers.userId, userId),
+          eq(teamMembers.teamId, teamId)
+        ));
+    });
   }
 
   // Departments Management
