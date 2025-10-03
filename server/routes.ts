@@ -1118,6 +1118,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Team Membership Management (many-to-many)
+  app.get('/api/users/:userId/teams', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Users can view their own teams, supervisors and leadership can view any
+      if (userId !== currentUserId && currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const memberships = await storage.getUserTeamMemberships(userId);
+      res.json(memberships);
+    } catch (error) {
+      console.error("Error fetching user team memberships:", error);
+      res.status(500).json({ message: "Failed to fetch team memberships" });
+    }
+  });
+
+  app.post('/api/users/:userId/teams', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const { teamId, role, isPrimary } = req.body;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Only supervisors and leadership can add team memberships
+      if (currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const membership = await storage.addTeamMember({
+        userId,
+        teamId,
+        role: role || 'Member',
+        isPrimary: isPrimary || false
+      });
+
+      res.json(membership);
+    } catch (error) {
+      console.error("Error adding team membership:", error);
+      res.status(500).json({ message: "Failed to add team membership" });
+    }
+  });
+
+  app.delete('/api/users/:userId/teams/:teamId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, teamId } = req.params;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Only supervisors and leadership can remove team memberships
+      if (currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      // Check that user has at least 2 teams before removing
+      const memberships = await storage.getUserTeamMemberships(userId);
+      if (memberships.length <= 1) {
+        return res.status(400).json({ message: "User must belong to at least one team" });
+      }
+
+      await storage.removeTeamMember(userId, teamId);
+      res.json({ message: "Team membership removed" });
+    } catch (error) {
+      console.error("Error removing team membership:", error);
+      res.status(500).json({ message: "Failed to remove team membership" });
+    }
+  });
+
+  app.put('/api/users/:userId/teams/:teamId/role', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, teamId } = req.params;
+      const { role } = req.body;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Only supervisors and leadership can change team roles
+      if (currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      // Validate role
+      if (!['Lead', 'Member', 'Viewer'].includes(role)) {
+        return res.status(400).json({ message: "Invalid team role. Must be Lead, Member, or Viewer." });
+      }
+
+      const updatedMembership = await storage.updateTeamMemberRole(userId, teamId, role);
+      res.json(updatedMembership);
+    } catch (error) {
+      console.error("Error updating team member role:", error);
+      res.status(500).json({ message: "Failed to update team member role" });
+    }
+  });
+
+  app.put('/api/users/:userId/teams/:teamId/primary', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, teamId } = req.params;
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Only supervisors and leadership can set primary team
+      if (currentUser?.role !== 'supervisor' && currentUser?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      await storage.setPrimaryTeam(userId, teamId);
+      res.json({ message: "Primary team updated" });
+    } catch (error) {
+      console.error("Error setting primary team:", error);
+      res.status(500).json({ message: "Failed to set primary team" });
+    }
+  });
+
   app.get('/api/users/by-manager/:managerId', isAuthenticated, async (req: any, res) => {
     try {
       const { managerId } = req.params;
