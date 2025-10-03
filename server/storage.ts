@@ -1,6 +1,7 @@
 import {
   users,
   teams,
+  departments,
   skillCategories,
   jobRoles,
   learningPathJobRoles,
@@ -62,6 +63,8 @@ import {
   notificationTemplates,
   type User,
   type UpsertUser,
+  type Department,
+  type InsertDepartment,
   type SkillCategory,
   type InsertSkillCategory,
   type JobRole,
@@ -341,6 +344,15 @@ export interface IStorage {
   deleteTeam(teamId: string): Promise<void>;
   getTeamHierarchy(): Promise<TeamHierarchyNode[]>;
   assignUserToTeam(userId: string, teamId: string): Promise<User>;
+
+  // Departments Management
+  getAllDepartments(): Promise<Department[]>;
+  getDepartment(departmentId: string): Promise<Department | undefined>;
+  createDepartment(department: InsertDepartment): Promise<Department>;
+  updateDepartment(departmentId: string, updates: Partial<InsertDepartment>): Promise<Department>;
+  deleteDepartment(departmentId: string): Promise<void>;
+  getJobRolesByDepartmentId(departmentId: string): Promise<JobRole[]>;
+  getTeamsByDepartmentId(departmentId: string): Promise<Team[]>;
 
   // Skill Categories Management
   getAllSkillCategories(): Promise<SkillCategory[]>;
@@ -1817,6 +1829,63 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  // Departments Management
+  async getAllDepartments(): Promise<Department[]> {
+    return await db
+      .select()
+      .from(departments)
+      .where(eq(departments.isActive, true))
+      .orderBy(departments.sortOrder, departments.name);
+  }
+
+  async getDepartment(departmentId: string): Promise<Department | undefined> {
+    const [department] = await db.select().from(departments).where(eq(departments.id, departmentId));
+    return department;
+  }
+
+  async createDepartment(departmentData: InsertDepartment): Promise<Department> {
+    const [department] = await db
+      .insert(departments)
+      .values(departmentData)
+      .returning();
+    return department;
+  }
+
+  async updateDepartment(departmentId: string, updates: Partial<InsertDepartment>): Promise<Department> {
+    const [department] = await db
+      .update(departments)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(departments.id, departmentId))
+      .returning();
+    return department;
+  }
+
+  async deleteDepartment(departmentId: string): Promise<void> {
+    const [department] = await db
+      .update(departments)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(departments.id, departmentId))
+      .returning();
+    
+    if (!department) {
+      throw new Error("Department not found");
+    }
+  }
+
+  async getJobRolesByDepartmentId(departmentId: string): Promise<JobRole[]> {
+    return await db
+      .select()
+      .from(jobRoles)
+      .where(eq(jobRoles.departmentId, departmentId));
+  }
+
+  async getTeamsByDepartmentId(departmentId: string): Promise<Team[]> {
+    return await db
+      .select()
+      .from(teams)
+      .where(eq(teams.departmentId, departmentId));
+  }
+
   // Skill Categories Management
   async getAllSkillCategories(): Promise<SkillCategory[]> {
     return await db
@@ -1849,10 +1918,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteSkillCategory(categoryId: string): Promise<void> {
-    await db
+    const [category] = await db
       .update(skillCategories)
       .set({ isActive: false, updatedAt: new Date() })
-      .where(eq(skillCategories.id, categoryId));
+      .where(eq(skillCategories.id, categoryId))
+      .returning();
+    
+    if (!category) {
+      throw new Error("Skill category not found");
+    }
   }
 
   async getCompetenciesByCategoryId(categoryId: string): Promise<Competency[]> {

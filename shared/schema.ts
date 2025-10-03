@@ -104,6 +104,20 @@ export const webhookEventTypeEnum = pgEnum("webhook_event_type", [
   "course_enrollment", "system_notification", "custom_event"
 ]);
 
+// Departments table - normalized organizational departments
+export const departments = pgTable("departments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull().unique(),
+  code: varchar("code").notNull().unique(),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("departments_sort_order_idx").on(table.sortOrder),
+]);
+
 // Teams table - formal team structure
 export const teams = pgTable("teams", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -111,11 +125,19 @@ export const teams = pgTable("teams", {
   description: text("description"),
   parentTeamId: varchar("parent_team_id"), // For team hierarchies
   teamLeadId: varchar("team_lead_id").notNull(),
-  department: varchar("department"),
+  department: varchar("department"), // DEPRECATED: Keep for migration, use departmentId instead
+  departmentId: varchar("department_id"), // FK to departments.id - normalized department reference
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  foreignKey({
+    columns: [table.departmentId],
+    foreignColumns: [departments.id],
+    name: "teams_department_fk"
+  }).onDelete("set null"),
+  index("teams_department_idx").on(table.departmentId),
+]);
 
 // Skill Categories table - normalized taxonomy for competencies, courses, and learning paths
 export const skillCategories = pgTable("skill_categories", {
@@ -139,7 +161,8 @@ export const jobRoles = pgTable("job_roles", {
   code: varchar("code").notNull().unique(), // "cleaner_contract", "supervisor", etc.
   reportsToJobRoleId: varchar("reports_to_job_role_id"), // FK to job_roles.id for org chart
   level: integer("level").notNull(), // Hierarchy level: 1=entry, 5=director
-  department: varchar("department"), // "Operations", "Quality Assurance", etc.
+  department: varchar("department"), // DEPRECATED: Keep for migration, use departmentId instead
+  departmentId: varchar("department_id"), // FK to departments.id - normalized department reference
   description: text("description"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -150,8 +173,14 @@ export const jobRoles = pgTable("job_roles", {
     foreignColumns: [table.id],
     name: "job_roles_reports_to_fk"
   }).onDelete("set null"),
+  foreignKey({
+    columns: [table.departmentId],
+    foreignColumns: [departments.id],
+    name: "job_roles_department_fk"
+  }).onDelete("set null"),
   index("job_roles_reports_to_idx").on(table.reportsToJobRoleId),
   index("job_roles_level_idx").on(table.level),
+  index("job_roles_department_idx").on(table.departmentId),
 ]);
 
 // Users table - required for Replit Auth
@@ -1583,6 +1612,12 @@ export const insertTeamSchema = createInsertSchema(teams).omit({
   updatedAt: true,
 });
 
+export const insertDepartmentSchema = createInsertSchema(departments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertJobRoleSchema = createInsertSchema(jobRoles).omit({
   id: true,
   createdAt: true,
@@ -2004,6 +2039,7 @@ export const insertUserAchievementSchema = createInsertSchema(userAchievements).
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type Team = typeof teams.$inferSelect;
+export type Department = typeof departments.$inferSelect;
 export type SkillCategory = typeof skillCategories.$inferSelect;
 export type JobRole = typeof jobRoles.$inferSelect;
 export type LearningPathJobRole = typeof learningPathJobRoles.$inferSelect;
@@ -2039,6 +2075,7 @@ export type TrainingRequirement = typeof trainingRequirements.$inferSelect;
 export type PdpCourseLink = typeof pdpCourseLinks.$inferSelect;
 
 export type InsertTeam = z.infer<typeof insertTeamSchema>;
+export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
 export type InsertSkillCategory = z.infer<typeof insertSkillCategorySchema>;
 export type InsertJobRole = z.infer<typeof insertJobRoleSchema>;
 export type InsertLearningPathJobRole = z.infer<typeof insertLearningPathJobRoleSchema>;
@@ -2585,8 +2622,14 @@ export const learningInsights = pgTable("learning_insights", {
   validUntil: timestamp("valid_until"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
+  foreignKey({
+    columns: [table.departmentId],
+    foreignColumns: [departments.id],
+    name: "learning_insights_department_fk"
+  }).onDelete("set null"),
   index("idx_learning_insights_user").on(table.userId),
   index("idx_learning_insights_team").on(table.teamId),
+  index("idx_learning_insights_department").on(table.departmentId),
   index("idx_learning_insights_type").on(table.insightType),
   index("idx_learning_insights_user_created").on(table.userId, table.createdAt),
   index("idx_learning_insights_team_created").on(table.teamId, table.createdAt),

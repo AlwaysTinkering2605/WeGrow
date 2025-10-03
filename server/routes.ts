@@ -14,6 +14,7 @@ import {
   insertMeetingSchema,
   insertRecognitionSchema,
   insertTeamSchema,
+  insertDepartmentSchema,
   insertSkillCategorySchema,
   insertJobRoleSchema,
   updateUserProfileSchema,
@@ -648,6 +649,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Departments Routes
+  app.get('/api/departments', isAuthenticated, async (req: any, res) => {
+    try {
+      const departments = await storage.getAllDepartments();
+      res.json(departments);
+    } catch (error) {
+      console.error("Error fetching departments:", error);
+      res.status(500).json({ message: "Failed to fetch departments" });
+    }
+  });
+
+  app.get('/api/departments/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const department = await storage.getDepartment(id);
+      if (!department) {
+        return res.status(404).json({ message: "Department not found" });
+      }
+      res.json(department);
+    } catch (error) {
+      console.error("Error fetching department:", error);
+      res.status(500).json({ message: "Failed to fetch department" });
+    }
+  });
+
+  app.post('/api/departments', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const departmentData = insertDepartmentSchema.parse(req.body);
+      const department = await storage.createDepartment(departmentData);
+      res.json(department);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating department:", error);
+      res.status(500).json({ message: "Failed to create department" });
+    }
+  });
+
+  app.put('/api/departments/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const departmentData = insertDepartmentSchema.partial().parse(req.body);
+      const department = await storage.updateDepartment(id, departmentData);
+      if (!department) {
+        return res.status(404).json({ message: "Department not found" });
+      }
+      res.json(department);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating department:", error);
+      res.status(500).json({ message: "Failed to update department" });
+    }
+  });
+
+  app.delete('/api/departments/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      
+      // Check if department is in use
+      const jobRolesCount = await storage.getJobRolesByDepartmentId(id);
+      const teamsCount = await storage.getTeamsByDepartmentId(id);
+      
+      const totalUsage = jobRolesCount.length + teamsCount.length;
+      if (totalUsage > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete department that is in use",
+          usage: {
+            jobRoles: jobRolesCount.length,
+            teams: teamsCount.length
+          }
+        });
+      }
+
+      await storage.deleteDepartment(id);
+      res.json({ message: "Department deleted successfully" });
+    } catch (error: any) {
+      if (error.message === "Department not found") {
+        return res.status(404).json({ message: "Department not found" });
+      }
+      console.error("Error deleting department:", error);
+      res.status(500).json({ message: "Failed to delete department" });
+    }
+  });
+
   // Skill Categories Routes
   app.get('/api/skill-categories', isAuthenticated, async (req: any, res) => {
     try {
@@ -743,7 +846,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.deleteSkillCategory(id);
       res.json({ message: "Skill category deleted successfully" });
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === "Skill category not found") {
+        return res.status(404).json({ message: "Skill category not found" });
+      }
       console.error("Error deleting skill category:", error);
       res.status(500).json({ message: "Failed to delete skill category" });
     }
