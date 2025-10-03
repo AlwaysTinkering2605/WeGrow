@@ -48,6 +48,9 @@ export const confidenceLevelEnum = pgEnum("confidence_level", ["green", "amber",
 // Company values enum
 export const companyValueEnum = pgEnum("company_value", ["excellence", "teamwork", "innovation", "reliability"]);
 
+// OKR metric type enum for key results
+export const metricTypeEnum = pgEnum("metric_type", ["percentage", "numeric", "currency", "boolean"]);
+
 // LMS-specific enums
 export const lessonTypeEnum = pgEnum("lesson_type", ["video", "quiz", "document", "link"]);
 export const contentTypeEnum = pgEnum("content_type", [
@@ -271,9 +274,14 @@ export const keyResults = pgTable("key_results", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   objectiveId: varchar("objective_id").notNull(),
   title: text("title").notNull(),
+  ownerId: varchar("owner_id"), // Individual accountable for this KR
+  metricType: metricTypeEnum("metric_type").default("numeric"), // Standardized metric type
+  startValue: integer("start_value").default(0), // Baseline measurement
   targetValue: integer("target_value").notNull(),
   currentValue: integer("current_value").default(0),
   unit: varchar("unit").notNull(), // %, count, score, etc.
+  confidenceScore: integer("confidence_score"), // 1-10 confidence in achieving target
+  lastConfidenceUpdate: timestamp("last_confidence_update"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -305,14 +313,34 @@ export const teamKeyResults = pgTable("team_key_results", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   teamObjectiveId: varchar("team_objective_id").notNull(),
   title: text("title").notNull(),
+  assignedToUserId: varchar("assigned_to_user_id"), // Individual owner for this KR
+  metricType: metricTypeEnum("metric_type").default("numeric"), // Standardized metric type
+  startValue: integer("start_value").default(0), // Baseline measurement
   targetValue: integer("target_value").notNull(),
   currentValue: integer("current_value").default(0),
   unit: varchar("unit").notNull(), // %, count, score, etc.
+  confidenceScore: integer("confidence_score"), // 1-10 confidence in achieving target
+  lastConfidenceUpdate: timestamp("last_confidence_update"),
   isSharedGoal: boolean("is_shared_goal").default(false), // True if whole team contributes
-  assignedToUserId: varchar("assigned_to_user_id"), // For individually owned KRs
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Key result progress updates - time-series history of all KR progress changes
+export const krProgressUpdates = pgTable("kr_progress_updates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  keyResultId: varchar("key_result_id").notNull(),
+  keyResultType: varchar("key_result_type").notNull(), // 'company' or 'team'
+  updatedBy: varchar("updated_by").notNull(),
+  previousValue: integer("previous_value").notNull(),
+  newValue: integer("new_value").notNull(),
+  confidenceScore: integer("confidence_score"), // 1-10 confidence score at time of update
+  updateNote: text("update_note"),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+}, (table) => [
+  index("kr_progress_key_result_idx").on(table.keyResultId, table.timestamp),
+  index("kr_progress_updated_by_idx").on(table.updatedBy),
+]);
 
 // Individual goals (OKRs)
 export const goals = pgTable("goals", {
@@ -1720,6 +1748,9 @@ export const insertKeyResultSchema = createInsertSchema(keyResults).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  lastConfidenceUpdate: true,
+}).extend({
+  confidenceScore: z.number().min(1).max(10).optional(),
 });
 
 export const insertTeamObjectiveSchema = createInsertSchema(teamObjectives).omit({
@@ -1747,6 +1778,16 @@ export const insertTeamKeyResultSchema = createInsertSchema(teamKeyResults).omit
   id: true,
   createdAt: true,
   updatedAt: true,
+  lastConfidenceUpdate: true,
+}).extend({
+  confidenceScore: z.number().min(1).max(10).optional(),
+});
+
+export const insertKrProgressUpdateSchema = createInsertSchema(krProgressUpdates).omit({
+  id: true,
+  timestamp: true,
+}).extend({
+  confidenceScore: z.number().min(1).max(10).optional(),
 });
 
 export const insertGoalSchema = createInsertSchema(goals).omit({
