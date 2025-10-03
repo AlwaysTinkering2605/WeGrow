@@ -1764,6 +1764,8 @@ export const insertKeyResultSchema = createInsertSchema(keyResults).omit({
   lastConfidenceUpdate: true,
 }).extend({
   confidenceScore: z.number().min(1).max(10).optional(),
+  unit: z.string().optional(),
+  currentValue: z.number().optional(),
 });
 
 export const insertTeamObjectiveSchema = createInsertSchema(teamObjectives).omit({
@@ -1794,6 +1796,8 @@ export const insertTeamKeyResultSchema = createInsertSchema(teamKeyResults).omit
   lastConfidenceUpdate: true,
 }).extend({
   confidenceScore: z.number().min(1).max(10).optional(),
+  unit: z.string().optional(),
+  currentValue: z.number().optional(),
 });
 
 export const insertKrProgressUpdateSchema = createInsertSchema(krProgressUpdates).omit({

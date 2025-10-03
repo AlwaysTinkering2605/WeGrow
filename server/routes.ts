@@ -460,10 +460,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { objectiveId } = req.params;
+      
+      // Derive unit from metricType if not provided
+      const metricType = req.body.metricType || 'numeric';
+      const unitMap: Record<string, string> = {
+        percentage: '%',
+        numeric: 'count',
+        currency: '$',
+        boolean: 'status'
+      };
+      const unit = req.body.unit || unitMap[metricType] || 'count';
+      
       const keyResultData = insertKeyResultSchema.parse({ 
         ...req.body, 
         objectiveId,
-        ownerId: req.user.claims.sub
+        ownerId: req.user.claims.sub,
+        unit,
+        currentValue: req.body.currentValue || req.body.startValue || 0
       });
       const keyResult = await storage.createKeyResult(keyResultData);
       res.json(keyResult);
@@ -540,9 +553,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { teamObjectiveId } = req.params;
+      
+      // Derive unit from metricType if not provided
+      const metricType = req.body.metricType || 'numeric';
+      const unitMap: Record<string, string> = {
+        percentage: '%',
+        numeric: 'count',
+        currency: '$',
+        boolean: 'status'
+      };
+      const unit = req.body.unit || unitMap[metricType] || 'count';
+      
       const keyResultData = insertTeamKeyResultSchema.parse({ 
         ...req.body, 
-        teamObjectiveId 
+        teamObjectiveId,
+        unit,
+        currentValue: req.body.currentValue || req.body.startValue || 0
       });
       const keyResult = await storage.createTeamKeyResult(keyResultData);
       res.json(keyResult);
@@ -607,6 +633,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Key result not found" });
       }
 
+      // Parse and validate confidence score (coerce to number if provided)
+      let parsedConfidence = keyResult.confidenceScore;
+      if (confidenceScore !== undefined && confidenceScore !== null && confidenceScore !== '') {
+        const numericConfidence = Number(confidenceScore);
+        if (!isNaN(numericConfidence) && numericConfidence >= 1 && numericConfidence <= 10) {
+          parsedConfidence = numericConfidence;
+          console.log(`[DEBUG] Confidence score updated: ${keyResult.confidenceScore} -> ${parsedConfidence}`);
+        } else {
+          console.log(`[DEBUG] Invalid confidence score: ${confidenceScore}, keeping existing: ${keyResult.confidenceScore}`);
+        }
+      }
+
       // Create progress update with audit trail
       const progressData = insertKrProgressUpdateSchema.parse({ 
         keyResultId: id,
@@ -614,7 +652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         previousValue: keyResult.currentValue || keyResult.startValue,
         newValue,
         updateNote: notes || '',
-        confidenceScore: confidenceScore || keyResult.confidenceScore,
+        confidenceScore: parsedConfidence,
         updatedBy: req.user.claims.sub 
       });
       const progress = await storage.createKrProgressUpdate(progressData);
@@ -622,7 +660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update the key result's current value and confidence
       await storage.updateKeyResult(id, {
         currentValue: newValue,
-        confidenceScore: confidenceScore || keyResult.confidenceScore,
+        confidenceScore: parsedConfidence,
       });
       
       res.json(progress);
