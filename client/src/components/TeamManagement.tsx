@@ -345,10 +345,14 @@ export default function TeamManagement() {
             <div className="flex items-center space-x-3 flex-1">
               {hasChildren && (
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={() => toggleTeamCollapse(team.id)}
+                  className="h-8 w-8 p-0 flex-shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleTeamCollapse(team.id);
+                  }}
                   data-testid={`button-toggle-${team.id}`}
                 >
                   {isCollapsed ? (
@@ -401,7 +405,7 @@ export default function TeamManagement() {
           </div>
           {hasChildren && !isCollapsed && (
             <div className="mt-2">
-              {renderTeamHierarchy(team.children, level + 1)}
+              {renderTeamHierarchy(team.children!, level + 1)}
             </div>
           )}
         </div>
