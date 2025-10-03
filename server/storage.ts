@@ -280,6 +280,7 @@ export interface IStorage {
   
   // Company key results
   getKeyResults(objectiveId: string): Promise<KeyResult[]>;
+  getKeyResult(id: string): Promise<KeyResult | null>;
   createKeyResult(keyResult: InsertKeyResult): Promise<KeyResult>;
   updateKeyResult(id: string, updates: Partial<InsertKeyResult>): Promise<KeyResult>;
   deleteKeyResult(id: string): Promise<void>;
@@ -1140,6 +1141,15 @@ export class DatabaseStorage implements IStorage {
       .from(keyResults)
       .where(eq(keyResults.objectiveId, objectiveId))
       .orderBy(keyResults.createdAt);
+  }
+
+  async getKeyResult(id: string): Promise<KeyResult | null> {
+    const [result] = await db
+      .select()
+      .from(keyResults)
+      .where(eq(keyResults.id, id))
+      .limit(1);
+    return result || null;
   }
 
   async createKeyResult(keyResult: InsertKeyResult): Promise<KeyResult> {

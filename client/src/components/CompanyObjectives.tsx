@@ -63,6 +63,8 @@ export default function CompanyObjectives() {
   const [selectedKeyResult, setSelectedKeyResult] = useState<any>(null);
   const [isProgressDialogOpen, setIsProgressDialogOpen] = useState(false);
   const [expandedObjectives, setExpandedObjectives] = useState<Set<string>>(new Set());
+  const [selectedObjectiveForKR, setSelectedObjectiveForKR] = useState<string | null>(null);
+  const [isKRDialogOpen, setIsKRDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -201,6 +203,45 @@ export default function CompanyObjectives() {
     },
   });
 
+  // Key Result form
+  const krForm = useForm({
+    defaultValues: {
+      title: "",
+      metricType: "percentage" as "percentage" | "numeric" | "currency" | "boolean",
+      startValue: 0,
+      targetValue: 0,
+    },
+  });
+
+  // Create key result mutation
+  const createKeyResultMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (!selectedObjectiveForKR) throw new Error("No objective selected");
+      await apiRequest("POST", `/api/objectives/${selectedObjectiveForKR}/key-results`, {
+        ...data,
+        currentValue: data.startValue,
+      });
+    },
+    onSuccess: () => {
+      if (selectedObjectiveForKR) {
+        queryClient.invalidateQueries({ queryKey: ["/api/objectives", selectedObjectiveForKR, "key-results"] });
+      }
+      setIsKRDialogOpen(false);
+      krForm.reset();
+      toast({
+        title: "Key Result created!",
+        description: "Key result has been added successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create key result. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Handle progress update
   const handleUpdateProgress = (keyResult: any) => {
     setSelectedKeyResult(keyResult);
@@ -269,6 +310,18 @@ export default function CompanyObjectives() {
               Key Results ({keyResults?.length || 0})
             </span>
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setSelectedObjectiveForKR(objectiveId);
+              setIsKRDialogOpen(true);
+            }}
+            data-testid={`button-add-key-result-${objectiveId}`}
+          >
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            Add Key Result
+          </Button>
         </div>
         {keyResults && keyResults.length > 0 ? (
           <div className="grid gap-3">
@@ -517,7 +570,6 @@ export default function CompanyObjectives() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="">No Owner</SelectItem>
                                 {ownerOptions.map((owner) => (
                                   <SelectItem key={owner.id} value={owner.id}>
                                     {owner.firstName} {owner.lastName} ({owner.role})
@@ -689,14 +741,13 @@ export default function CompanyObjectives() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Owner (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-edit-objective-owner">
                           <SelectValue placeholder="Select an owner..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">No Owner</SelectItem>
                         {ownerOptions.map((owner) => (
                           <SelectItem key={owner.id} value={owner.id}>
                             {owner.firstName} {owner.lastName} ({owner.role})
@@ -776,6 +827,101 @@ export default function CompanyObjectives() {
                 </Button>
                 <Button type="submit" disabled={updateObjectiveMutation.isPending} data-testid="button-update-objective">
                   {updateObjectiveMutation.isPending ? "Updating..." : "Update Objective"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Key Result Dialog */}
+      <Dialog open={isKRDialogOpen} onOpenChange={setIsKRDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Key Result</DialogTitle>
+          </DialogHeader>
+          <Form {...krForm}>
+            <form onSubmit={krForm.handleSubmit((data) => createKeyResultMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={krForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Increase market share to 25%" {...field} data-testid="input-key-result-title" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={krForm.control}
+                name="metricType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Metric Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-key-result-metric-type">
+                          <SelectValue placeholder="Select metric type..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="percentage">Percentage</SelectItem>
+                        <SelectItem value="numeric">Numeric</SelectItem>
+                        <SelectItem value="currency">Currency</SelectItem>
+                        <SelectItem value="boolean">Boolean</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={krForm.control}
+                  name="startValue"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Value</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          data-testid="input-key-result-start-value"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={krForm.control}
+                  name="targetValue"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Target Value</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          data-testid="input-key-result-target-value"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button type="button" variant="outline" onClick={() => setIsKRDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createKeyResultMutation.isPending} data-testid="button-submit-key-result">
+                  {createKeyResultMutation.isPending ? "Creating..." : "Create Key Result"}
                 </Button>
               </div>
             </form>

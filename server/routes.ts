@@ -596,13 +596,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Key Result Progress Tracking
-  app.post('/api/key-results/progress', isAuthenticated, async (req: any, res) => {
+  app.post('/api/key-results/:id/progress', isAuthenticated, async (req: any, res) => {
     try {
+      const { id } = req.params;
+      const { newValue, confidenceScore, notes } = req.body;
+      
+      // Get current key result to get previous value and type
+      const keyResult = await storage.getKeyResult(id);
+      if (!keyResult) {
+        return res.status(404).json({ message: "Key result not found" });
+      }
+
+      // Create progress update with audit trail
       const progressData = insertKrProgressUpdateSchema.parse({ 
-        ...req.body, 
+        keyResultId: id,
+        keyResultType: 'company', // Assuming company for now
+        previousValue: keyResult.currentValue || keyResult.startValue,
+        newValue,
+        updateNote: notes || '',
+        confidenceScore: confidenceScore || keyResult.confidenceScore,
         updatedBy: req.user.claims.sub 
       });
       const progress = await storage.createKrProgressUpdate(progressData);
+      
+      // Update the key result's current value and confidence
+      await storage.updateKeyResult(id, {
+        currentValue: newValue,
+        confidenceScore: confidenceScore || keyResult.confidenceScore,
+      });
+      
       res.json(progress);
     } catch (error) {
       if (error instanceof z.ZodError) {

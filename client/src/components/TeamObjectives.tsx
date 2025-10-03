@@ -368,7 +368,6 @@ export default function TeamObjectives() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">No Owner</SelectItem>
                           {ownerOptions.map((owner) => (
                             <SelectItem key={owner.id} value={owner.id}>
                               {owner.firstName} {owner.lastName} ({owner.role})
@@ -581,14 +580,13 @@ export default function TeamObjectives() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Owner (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-edit-team-objective-owner">
                           <SelectValue placeholder="Select an owner..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">No Owner</SelectItem>
                         {ownerOptions.map((owner) => (
                           <SelectItem key={owner.id} value={owner.id}>
                             {owner.firstName} {owner.lastName} ({owner.role})
