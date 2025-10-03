@@ -7,7 +7,9 @@ import {
   insertGoalSchema,
   insertCompanyObjectiveSchema,
   insertTeamObjectiveSchema,
+  insertKeyResultSchema,
   insertTeamKeyResultSchema,
+  insertKrProgressUpdateSchema,
   insertWeeklyCheckInSchema,
   insertUserCompetencySchema,
   insertDevelopmentPlanSchema,
@@ -434,6 +436,197 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting team objective:", error);
       res.status(500).json({ message: "Failed to delete team objective" });
+    }
+  });
+
+  // Company Key Results
+  app.get('/api/objectives/:objectiveId/key-results', isAuthenticated, async (req: any, res) => {
+    try {
+      const { objectiveId } = req.params;
+      const keyResults = await storage.getKeyResults(objectiveId);
+      res.json(keyResults);
+    } catch (error) {
+      console.error("Error fetching company key results:", error);
+      res.status(500).json({ message: "Failed to fetch company key results" });
+    }
+  });
+
+  app.post('/api/objectives/:objectiveId/key-results', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { objectiveId } = req.params;
+      const keyResultData = insertKeyResultSchema.parse({ 
+        ...req.body, 
+        objectiveId,
+        ownerId: req.user.claims.sub
+      });
+      const keyResult = await storage.createKeyResult(keyResultData);
+      res.json(keyResult);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error creating company key result:", error);
+      res.status(500).json({ message: "Failed to create company key result" });
+    }
+  });
+
+  app.patch('/api/key-results/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership or owner
+      const user = await storage.getUser(req.user.claims.sub);
+      const { id } = req.params;
+
+      // For now, allow leadership to update any key result
+      // In a more sophisticated system, we'd check ownership here
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const updateSchema = insertKeyResultSchema.partial().omit({ objectiveId: true, ownerId: true });
+      const updateData = updateSchema.parse(req.body);
+      
+      const updated = await storage.updateKeyResult(id, updateData);
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error updating company key result:", error);
+      res.status(500).json({ message: "Failed to update company key result" });
+    }
+  });
+
+  app.delete('/api/key-results/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      await storage.deleteKeyResult(id);
+      res.json({ message: "Company key result deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting company key result:", error);
+      res.status(500).json({ message: "Failed to delete company key result" });
+    }
+  });
+
+  // Team Key Results
+  app.get('/api/team-objectives/:teamObjectiveId/key-results', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamObjectiveId } = req.params;
+      const keyResults = await storage.getTeamKeyResults(teamObjectiveId);
+      res.json(keyResults);
+    } catch (error) {
+      console.error("Error fetching team key results:", error);
+      res.status(500).json({ message: "Failed to fetch team key results" });
+    }
+  });
+
+  app.post('/api/team-objectives/:teamObjectiveId/key-results', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is supervisor or leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const { teamObjectiveId } = req.params;
+      const keyResultData = insertTeamKeyResultSchema.parse({ 
+        ...req.body, 
+        teamObjectiveId 
+      });
+      const keyResult = await storage.createTeamKeyResult(keyResultData);
+      res.json(keyResult);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error creating team key result:", error);
+      res.status(500).json({ message: "Failed to create team key result" });
+    }
+  });
+
+  app.patch('/api/team-key-results/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is supervisor or leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const { id } = req.params;
+      const updateSchema = insertTeamKeyResultSchema.partial().omit({ teamObjectiveId: true });
+      const updateData = updateSchema.parse(req.body);
+      
+      const updated = await storage.updateTeamKeyResult(id, updateData);
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error updating team key result:", error);
+      res.status(500).json({ message: "Failed to update team key result" });
+    }
+  });
+
+  app.delete('/api/team-key-results/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is supervisor or leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'supervisor' && user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required." });
+      }
+
+      const { id } = req.params;
+      await storage.deleteTeamKeyResult(id);
+      res.json({ message: "Team key result deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting team key result:", error);
+      res.status(500).json({ message: "Failed to delete team key result" });
+    }
+  });
+
+  // Key Result Progress Tracking
+  app.post('/api/key-results/progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const progressData = insertKrProgressUpdateSchema.parse({ 
+        ...req.body, 
+        updatedBy: req.user.claims.sub 
+      });
+      const progress = await storage.createKrProgressUpdate(progressData);
+      res.json(progress);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error creating progress update:", error);
+      res.status(500).json({ message: "Failed to create progress update" });
+    }
+  });
+
+  app.get('/api/key-results/:id/progress-history', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { type } = req.query;
+      
+      if (type !== 'company' && type !== 'team') {
+        return res.status(400).json({ message: "Invalid key result type. Must be 'company' or 'team'." });
+      }
+
+      const history = await storage.getKrProgressHistory(id, type as 'company' | 'team');
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching progress history:", error);
+      res.status(500).json({ message: "Failed to fetch progress history" });
     }
   });
 
