@@ -573,6 +573,88 @@ export default function TeamObjectives() {
                   )}
                 />
               </div>
+              
+              {/* Phase 2: Owner Selection */}
+              <FormField
+                control={editTeamObjectiveForm.control}
+                name="ownerId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Owner (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-team-objective-owner">
+                          <SelectValue placeholder="Select an owner..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">No Owner</SelectItem>
+                        {ownerOptions.map((owner) => (
+                          <SelectItem key={owner.id} value={owner.id}>
+                            {owner.firstName} {owner.lastName} ({owner.role})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Phase 2: Objective Type */}
+              <FormField
+                control={editTeamObjectiveForm.control}
+                name="objectiveType"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>Objective Type</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        className="flex flex-col space-y-1"
+                        data-testid="radio-edit-team-objective-type"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="committed" id="edit-team-committed" />
+                          <Label htmlFor="edit-team-committed" className="font-normal cursor-pointer">
+                            Committed - Must achieve target
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="aspirational" id="edit-team-aspirational" />
+                          <Label htmlFor="edit-team-aspirational" className="font-normal cursor-pointer">
+                            Aspirational - Stretch goal
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Phase 2: Evaluation Method */}
+              <FormField
+                control={editTeamObjectiveForm.control}
+                name="evaluationMethod"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Evaluation Method (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Describe how results will be measured..." 
+                        rows={3}
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="textarea-edit-team-objective-evaluation"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="flex justify-end space-x-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)} data-testid="button-cancel-edit-team-objective">
                   Cancel
