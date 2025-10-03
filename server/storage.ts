@@ -10,6 +10,7 @@ import {
   teamObjectives,
   teamKeyResults,
   keyResults,
+  krProgressUpdates,
   goals,
   weeklyCheckIns,
   competencies,
@@ -74,7 +75,9 @@ import {
   type InsertLearningPathJobRole,
   type CompanyObjective,
   type TeamObjective,
+  type KeyResult,
   type TeamKeyResult,
+  type KrProgressUpdate,
   type Goal,
   type WeeklyCheckIn,
   type Competency,
@@ -118,7 +121,9 @@ import {
   type AutomationRule,
   type InsertCompanyObjective,
   type InsertTeamObjective,
+  type InsertKeyResult,
   type InsertTeamKeyResult,
+  type InsertKrProgressUpdate,
   type InsertGoal,
   type InsertWeeklyCheckIn,
   type InsertUserCompetency,
@@ -273,9 +278,21 @@ export interface IStorage {
   updateTeamObjective(id: string, objective: Partial<InsertTeamObjective>): Promise<TeamObjective>;
   deleteTeamObjective(id: string): Promise<void>;
   
+  // Company key results
+  getKeyResults(objectiveId: string): Promise<KeyResult[]>;
+  createKeyResult(keyResult: InsertKeyResult): Promise<KeyResult>;
+  updateKeyResult(id: string, updates: Partial<InsertKeyResult>): Promise<KeyResult>;
+  deleteKeyResult(id: string): Promise<void>;
+  
   // Team key results
   getTeamKeyResults(teamObjectiveId: string): Promise<TeamKeyResult[]>;
   createTeamKeyResult(keyResult: InsertTeamKeyResult): Promise<TeamKeyResult>;
+  updateTeamKeyResult(id: string, updates: Partial<InsertTeamKeyResult>): Promise<TeamKeyResult>;
+  deleteTeamKeyResult(id: string): Promise<void>;
+  
+  // Key result progress tracking
+  createKrProgressUpdate(update: InsertKrProgressUpdate): Promise<KrProgressUpdate>;
+  getKrProgressHistory(keyResultId: string, keyResultType: 'company' | 'team'): Promise<KrProgressUpdate[]>;
   
   // Goals
   getUserGoals(userId: string): Promise<Goal[]>;
@@ -1116,6 +1133,38 @@ export class DatabaseStorage implements IStorage {
       .where(eq(teamObjectives.id, id));
   }
 
+  // Company key results
+  async getKeyResults(objectiveId: string): Promise<KeyResult[]> {
+    return await db
+      .select()
+      .from(keyResults)
+      .where(eq(keyResults.objectiveId, objectiveId))
+      .orderBy(keyResults.createdAt);
+  }
+
+  async createKeyResult(keyResult: InsertKeyResult): Promise<KeyResult> {
+    const [created] = await db
+      .insert(keyResults)
+      .values(keyResult)
+      .returning();
+    return created;
+  }
+
+  async updateKeyResult(id: string, updates: Partial<InsertKeyResult>): Promise<KeyResult> {
+    const [updated] = await db
+      .update(keyResults)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(keyResults.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteKeyResult(id: string): Promise<void> {
+    await db
+      .delete(keyResults)
+      .where(eq(keyResults.id, id));
+  }
+
   // Team key results
   async getTeamKeyResults(teamObjectiveId: string): Promise<TeamKeyResult[]> {
     return await db
@@ -1131,6 +1180,41 @@ export class DatabaseStorage implements IStorage {
       .values(keyResult)
       .returning();
     return created;
+  }
+
+  async updateTeamKeyResult(id: string, updates: Partial<InsertTeamKeyResult>): Promise<TeamKeyResult> {
+    const [updated] = await db
+      .update(teamKeyResults)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(teamKeyResults.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTeamKeyResult(id: string): Promise<void> {
+    await db
+      .delete(teamKeyResults)
+      .where(eq(teamKeyResults.id, id));
+  }
+
+  // Key result progress tracking
+  async createKrProgressUpdate(update: InsertKrProgressUpdate): Promise<KrProgressUpdate> {
+    const [created] = await db
+      .insert(krProgressUpdates)
+      .values(update)
+      .returning();
+    return created;
+  }
+
+  async getKrProgressHistory(keyResultId: string, keyResultType: 'company' | 'team'): Promise<KrProgressUpdate[]> {
+    return await db
+      .select()
+      .from(krProgressUpdates)
+      .where(and(
+        eq(krProgressUpdates.keyResultId, keyResultId),
+        eq(krProgressUpdates.keyResultType, keyResultType)
+      ))
+      .orderBy(desc(krProgressUpdates.timestamp));
   }
 
   // Goals
