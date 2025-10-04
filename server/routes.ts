@@ -1922,6 +1922,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Phase 4: Audit Log Routes
+  app.get('/api/objectives/:id/audit-history', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { type = 'company' } = req.query;
+      const history = await storage.getObjectiveAuditHistory(id, type as 'company' | 'team');
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching objective audit history:", error);
+      res.status(500).json({ message: "Failed to fetch audit history" });
+    }
+  });
+
+  app.get('/api/key-results/:id/audit-history', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { type = 'company' } = req.query;
+      const history = await storage.getKeyResultAuditHistory(id, type as 'company' | 'team');
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching key result audit history:", error);
+      res.status(500).json({ message: "Failed to fetch audit history" });
+    }
+  });
+
+  // Phase 4: Evidence Routes
+  app.get('/api/evidence', isAuthenticated, async (req: any, res) => {
+    try {
+      const { linkedToId, linkedToType } = req.query;
+      if (!linkedToId || !linkedToType) {
+        return res.status(400).json({ message: "linkedToId and linkedToType are required" });
+      }
+      const evidence = await storage.getEvidence(linkedToId as string, linkedToType as string);
+      res.json(evidence);
+    } catch (error) {
+      console.error("Error fetching evidence:", error);
+      res.status(500).json({ message: "Failed to fetch evidence" });
+    }
+  });
+
+  app.post('/api/evidence', isAuthenticated, async (req: any, res) => {
+    try {
+      const evidenceData = {
+        ...req.body,
+        uploadedBy: req.user.claims.sub,
+      };
+      const evidence = await storage.createEvidence(evidenceData);
+      res.json(evidence);
+    } catch (error) {
+      console.error("Error creating evidence:", error);
+      res.status(500).json({ message: "Failed to create evidence" });
+    }
+  });
+
+  app.put('/api/evidence/:id/verify', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required for verification." });
+      }
+
+      const { id } = req.params;
+      const { status, note } = req.body;
+      const verified = await storage.verifyEvidence(id, req.user.claims.sub, status, note);
+      res.json(verified);
+    } catch (error) {
+      console.error("Error verifying evidence:", error);
+      res.status(500).json({ message: "Failed to verify evidence" });
+    }
+  });
+
+  app.delete('/api/evidence/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteEvidence(id);
+      res.json({ message: "Evidence deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting evidence:", error);
+      res.status(500).json({ message: "Failed to delete evidence" });
+    }
+  });
+
   // Goals
   app.get('/api/goals', isAuthenticated, async (req: any, res) => {
     try {
