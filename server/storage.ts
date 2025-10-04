@@ -1638,6 +1638,107 @@ export class DatabaseStorage implements IStorage {
     return snapshot || null;
   }
 
+  // Phase 5: Corrective Actions & Nonconformity
+  async getCorrectiveActions(status?: string, assignedTo?: string): Promise<CorrectiveAction[]> {
+    const conditions = [];
+    if (status) {
+      conditions.push(eq(correctiveActions.status, status as any));
+    }
+    if (assignedTo) {
+      conditions.push(eq(correctiveActions.assignedTo, assignedTo));
+    }
+    
+    return await db
+      .select()
+      .from(correctiveActions)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(correctiveActions.createdAt));
+  }
+
+  async getCorrectiveAction(id: string): Promise<CorrectiveAction | null> {
+    const [action] = await db
+      .select()
+      .from(correctiveActions)
+      .where(eq(correctiveActions.id, id))
+      .limit(1);
+    return action || null;
+  }
+
+  async createCorrectiveAction(action: InsertCorrectiveAction): Promise<CorrectiveAction> {
+    const [created] = await db
+      .insert(correctiveActions)
+      .values(action)
+      .returning();
+    return created;
+  }
+
+  async updateCorrectiveAction(id: string, updates: Partial<InsertCorrectiveAction>): Promise<CorrectiveAction | null> {
+    const [updated] = await db
+      .update(correctiveActions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(correctiveActions.id, id))
+      .returning();
+    return updated || null;
+  }
+
+  async deleteCorrectiveAction(id: string): Promise<boolean> {
+    const result = await db
+      .delete(correctiveActions)
+      .where(eq(correctiveActions.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getNonconformities(objectiveId?: string, status?: string): Promise<Nonconformity[]> {
+    const conditions = [];
+    if (objectiveId) {
+      conditions.push(eq(nonconformities.objectiveId, objectiveId));
+    }
+    if (status) {
+      conditions.push(eq(nonconformities.status, status as any));
+    }
+    
+    return await db
+      .select()
+      .from(nonconformities)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(nonconformities.detectedDate));
+  }
+
+  async getNonconformity(id: string): Promise<Nonconformity | null> {
+    const [nonconformity] = await db
+      .select()
+      .from(nonconformities)
+      .where(eq(nonconformities.id, id))
+      .limit(1);
+    return nonconformity || null;
+  }
+
+  async createNonconformity(nonconformity: InsertNonconformity): Promise<Nonconformity> {
+    const [created] = await db
+      .insert(nonconformities)
+      .values(nonconformity)
+      .returning();
+    return created;
+  }
+
+  async updateNonconformity(id: string, updates: Partial<InsertNonconformity>): Promise<Nonconformity | null> {
+    const [updated] = await db
+      .update(nonconformities)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(nonconformities.id, id))
+      .returning();
+    return updated || null;
+  }
+
+  async deleteNonconformity(id: string): Promise<boolean> {
+    const result = await db
+      .delete(nonconformities)
+      .where(eq(nonconformities.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
   // Goals
   async getUserGoals(userId: string): Promise<Goal[]> {
     return await db
