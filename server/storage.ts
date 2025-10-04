@@ -6,6 +6,9 @@ import {
   skillCategoryTypes,
   skillCategories,
   proficiencyLevels,
+  skills,
+  lessonSkills,
+  competencySkills,
   jobRoles,
   learningPathJobRoles,
   companyObjectives,
@@ -78,6 +81,12 @@ import {
   type InsertSkillCategory,
   type ProficiencyLevel,
   type InsertProficiencyLevel,
+  type Skill,
+  type InsertSkill,
+  type LessonSkill,
+  type InsertLessonSkill,
+  type CompetencySkill,
+  type InsertCompetencySkill,
   type JobRole,
   type LearningPathJobRole,
   type InsertJobRole,
@@ -424,6 +433,24 @@ export interface IStorage {
   createProficiencyLevel(level: InsertProficiencyLevel): Promise<ProficiencyLevel>;
   updateProficiencyLevel(levelId: string, updates: Partial<InsertProficiencyLevel>): Promise<ProficiencyLevel>;
   deleteProficiencyLevel(levelId: string): Promise<void>;
+
+  // Skills Management
+  getAllSkills(): Promise<Skill[]>;
+  getSkill(skillId: string): Promise<Skill | undefined>;
+  createSkill(skill: InsertSkill): Promise<Skill>;
+  updateSkill(skillId: string, updates: Partial<InsertSkill>): Promise<Skill>;
+  deleteSkill(skillId: string): Promise<void>;
+  getSkillsByCategory(categoryId: string): Promise<Skill[]>;
+  
+  // Lesson Skills Management (Junction)
+  getLessonSkills(lessonId: string): Promise<LessonSkill[]>;
+  assignSkillToLesson(assignment: InsertLessonSkill): Promise<LessonSkill>;
+  removeSkillFromLesson(lessonId: string, skillId: string): Promise<void>;
+  
+  // Competency Skills Management (Junction)
+  getCompetencySkills(competencyId: string): Promise<CompetencySkill[]>;
+  assignSkillToCompetency(assignment: InsertCompetencySkill): Promise<CompetencySkill>;
+  removeSkillFromCompetency(competencyId: string, skillId: string): Promise<void>;
 
   // Skill Categories Management
   getAllSkillCategories(): Promise<SkillCategory[]>;
@@ -2356,6 +2383,107 @@ export class DatabaseStorage implements IStorage {
     if (!level) {
       throw new Error("Proficiency level not found");
     }
+  }
+
+  // Skills Management
+  async getAllSkills(): Promise<Skill[]> {
+    return await db
+      .select()
+      .from(skills)
+      .where(eq(skills.isActive, true))
+      .orderBy(skills.name);
+  }
+
+  async getSkill(skillId: string): Promise<Skill | undefined> {
+    const [skill] = await db.select().from(skills).where(eq(skills.id, skillId));
+    return skill;
+  }
+
+  async createSkill(skillData: InsertSkill): Promise<Skill> {
+    const [skill] = await db
+      .insert(skills)
+      .values(skillData)
+      .returning();
+    return skill;
+  }
+
+  async updateSkill(skillId: string, updates: Partial<InsertSkill>): Promise<Skill> {
+    const [skill] = await db
+      .update(skills)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(skills.id, skillId))
+      .returning();
+    return skill;
+  }
+
+  async deleteSkill(skillId: string): Promise<void> {
+    const [skill] = await db
+      .update(skills)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(skills.id, skillId))
+      .returning();
+    
+    if (!skill) {
+      throw new Error("Skill not found");
+    }
+  }
+
+  async getSkillsByCategory(categoryId: string): Promise<Skill[]> {
+    return await db
+      .select()
+      .from(skills)
+      .where(and(eq(skills.categoryId, categoryId), eq(skills.isActive, true)))
+      .orderBy(skills.name);
+  }
+
+  // Lesson Skills Management (Junction)
+  async getLessonSkills(lessonId: string): Promise<LessonSkill[]> {
+    return await db
+      .select()
+      .from(lessonSkills)
+      .where(eq(lessonSkills.lessonId, lessonId));
+  }
+
+  async assignSkillToLesson(assignment: InsertLessonSkill): Promise<LessonSkill> {
+    const [lessonSkill] = await db
+      .insert(lessonSkills)
+      .values(assignment)
+      .returning();
+    return lessonSkill;
+  }
+
+  async removeSkillFromLesson(lessonId: string, skillId: string): Promise<void> {
+    await db
+      .delete(lessonSkills)
+      .where(and(
+        eq(lessonSkills.lessonId, lessonId),
+        eq(lessonSkills.skillId, skillId)
+      ));
+  }
+
+  // Competency Skills Management (Junction)
+  async getCompetencySkills(competencyId: string): Promise<CompetencySkill[]> {
+    return await db
+      .select()
+      .from(competencySkills)
+      .where(eq(competencySkills.competencyId, competencyId));
+  }
+
+  async assignSkillToCompetency(assignment: InsertCompetencySkill): Promise<CompetencySkill> {
+    const [competencySkill] = await db
+      .insert(competencySkills)
+      .values(assignment)
+      .returning();
+    return competencySkill;
+  }
+
+  async removeSkillFromCompetency(competencyId: string, skillId: string): Promise<void> {
+    await db
+      .delete(competencySkills)
+      .where(and(
+        eq(competencySkills.competencyId, competencyId),
+        eq(competencySkills.skillId, skillId)
+      ));
   }
 
   // Skill Categories Management
