@@ -719,10 +719,12 @@ export default function ManagementReviews() {
                     <div>
                       <h4 className="font-medium text-sm mb-1">Action Items:</h4>
                       <ul className="text-sm text-muted-foreground space-y-1">
-                        {review.actionItems.slice(0, 2).map((item, idx) => (
+                        {review.actionItems.slice(0, 2).map((item: any, idx: number) => (
                           <li key={idx} className="flex items-start gap-2">
                             <span className="text-primary">•</span>
-                            <span className="line-clamp-1">{item}</span>
+                            <span className="line-clamp-1">
+                              {typeof item === "string" ? item : item.description || ""}
+                            </span>
                           </li>
                         ))}
                         {review.actionItems.length > 2 && (
@@ -803,12 +805,14 @@ export default function ManagementReviews() {
                   </p>
                 </div>
 
-                {selectedReview.actionItems.length > 0 && (
+                {selectedReview.actionItems && selectedReview.actionItems.length > 0 && (
                   <div>
                     <h4 className="font-medium mb-2">Action Items</h4>
                     <ul className="list-disc list-inside space-y-1" data-testid="view-dialog-actions">
-                      {selectedReview.actionItems.map((item, idx) => (
-                        <li key={idx} className="text-sm">{item}</li>
+                      {selectedReview.actionItems.map((item: any, idx: number) => (
+                        <li key={idx} className="text-sm">
+                          {typeof item === "string" ? item : item.description || ""}
+                        </li>
                       ))}
                     </ul>
                   </div>
