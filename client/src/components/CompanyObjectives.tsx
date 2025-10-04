@@ -35,6 +35,7 @@ import {
   User2
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { isTestMode } from "@/lib/utils";
 
 // Enhanced form schema with date validation and Phase 2 fields
 const objectiveSchema = insertCompanyObjectiveSchema.omit({ createdBy: true }).extend({
@@ -702,6 +703,22 @@ export default function CompanyObjectives() {
                                 <SelectItem value="financial_performance">Financial Performance</SelectItem>
                               </SelectContent>
                             </Select>
+                            {isTestMode() && (
+                              <select
+                                data-testid="native-select-strategic-theme"
+                                className="absolute left-[-9999px] h-9 w-full"
+                                tabIndex={0}
+                                value={field.value ?? ""}
+                                onChange={(e) => field.onChange(e.target.value || undefined)}
+                              >
+                                <option value="">Select business area...</option>
+                                <option value="quality">Quality Excellence</option>
+                                <option value="customer_satisfaction">Customer Satisfaction</option>
+                                <option value="operational_excellence">Operational Excellence</option>
+                                <option value="innovation">Innovation & Growth</option>
+                                <option value="financial_performance">Financial Performance</option>
+                              </select>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}
@@ -727,6 +744,21 @@ export default function CompanyObjectives() {
                                 <SelectItem value="critical">Critical - Major risks identified</SelectItem>
                               </SelectContent>
                             </Select>
+                            {isTestMode() && (
+                              <select
+                                data-testid="native-select-risk-level"
+                                className="absolute left-[-9999px] h-9 w-full"
+                                tabIndex={0}
+                                value={field.value ?? ""}
+                                onChange={(e) => field.onChange(e.target.value || undefined)}
+                              >
+                                <option value="">Select risk level...</option>
+                                <option value="low">Low - Minor challenges expected</option>
+                                <option value="medium">Medium - Some obstacles likely</option>
+                                <option value="high">High - Significant barriers present</option>
+                                <option value="critical">Critical - Major risks identified</option>
+                              </select>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}
@@ -952,6 +984,22 @@ export default function CompanyObjectives() {
                         <SelectItem value="financial_performance">Financial Performance</SelectItem>
                       </SelectContent>
                     </Select>
+                    {isTestMode() && (
+                      <select
+                        data-testid="native-select-edit-strategic-theme"
+                        className="absolute left-[-9999px] h-9 w-full"
+                        tabIndex={0}
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value || undefined)}
+                      >
+                        <option value="">Select business area...</option>
+                        <option value="quality">Quality Excellence</option>
+                        <option value="customer_satisfaction">Customer Satisfaction</option>
+                        <option value="operational_excellence">Operational Excellence</option>
+                        <option value="innovation">Innovation & Growth</option>
+                        <option value="financial_performance">Financial Performance</option>
+                      </select>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -977,6 +1025,21 @@ export default function CompanyObjectives() {
                         <SelectItem value="critical">Critical - Major risks identified</SelectItem>
                       </SelectContent>
                     </Select>
+                    {isTestMode() && (
+                      <select
+                        data-testid="native-select-edit-risk-level"
+                        className="absolute left-[-9999px] h-9 w-full"
+                        tabIndex={0}
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value || undefined)}
+                      >
+                        <option value="">Select risk level...</option>
+                        <option value="low">Low - Minor challenges expected</option>
+                        <option value="medium">Medium - Some obstacles likely</option>
+                        <option value="high">High - Significant barriers present</option>
+                        <option value="critical">Critical - Major risks identified</option>
+                      </select>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
