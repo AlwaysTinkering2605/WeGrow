@@ -29,6 +29,7 @@ import {
   UserPlus,
   GitBranch,
   Briefcase,
+  Tag,
 } from "lucide-react";
 import { NotificationBadge } from "./NotificationCenter";
 import Dashboard from "./Dashboard";
@@ -56,8 +57,9 @@ import AdvancedAnalyticsDashboard from "./AdvancedAnalyticsDashboard";
 import WebhookConfiguration from "../pages/WebhookConfiguration";
 import Organization from "./Organization";
 import SkillCategories from "./SkillCategories";
+import SkillCategoryTypes from "./SkillCategoryTypes";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "job-roles" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks" | "organization" | "departments" | "skill-categories";
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "job-roles" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks" | "organization" | "departments" | "skill-categories" | "skill-category-types";
 
 export default function Layout() {
   const [location] = useLocation();
@@ -97,6 +99,7 @@ export default function Layout() {
     if (location === "/competency-management") return "competency-management";
     if (location === "/training-matrix") return "training-matrix";
     if (location === "/skill-categories") return "skill-categories";
+    if (location === "/skill-category-types") return "skill-category-types";
     if (location === "/webhooks") return "webhooks";
     return "dashboard";
   };
@@ -148,6 +151,7 @@ export default function Layout() {
       items: [
         { id: "competency-management", label: "Competency Management", icon: Layers, component: CompetencyManagement },
         { id: "skill-categories", label: "Skill Categories", icon: Layers, component: SkillCategories },
+        { id: "skill-category-types", label: "Category Types", icon: Tag, component: SkillCategoryTypes },
         { id: "learning-paths", label: "Learning Paths", icon: Route, component: LearningPathsManagement },
         { id: "training-matrix", label: "Training Matrix", icon: BarChart3, component: TrainingMatrixDashboard },
       ]

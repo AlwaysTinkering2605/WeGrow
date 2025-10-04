@@ -50,6 +50,7 @@ function Router() {
       <Route path="/team-objectives" component={Home} />
       <Route path="/competency-management" component={Home} />
       <Route path="/skill-categories" component={Home} />
+      <Route path="/skill-category-types" component={Home} />
       <Route path="/training-matrix" component={Home} />
       <Route path="/learning-paths" component={Home} />
       <Route path="/user-management" component={Home} />
