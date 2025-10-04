@@ -30,6 +30,7 @@ import {
   GitBranch,
   Briefcase,
   Tag,
+  Sparkles,
 } from "lucide-react";
 import { NotificationBadge } from "./NotificationCenter";
 import Dashboard from "./Dashboard";
@@ -59,8 +60,9 @@ import Organization from "./Organization";
 import SkillCategories from "./SkillCategories";
 import SkillCategoryTypes from "./SkillCategoryTypes";
 import ProficiencyLevels from "./ProficiencyLevels";
+import Skills from "./Skills";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "job-roles" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks" | "organization" | "departments" | "skill-categories" | "skill-category-types" | "proficiency-levels";
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "job-roles" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks" | "organization" | "departments" | "skill-categories" | "skill-category-types" | "proficiency-levels" | "skills";
 
 export default function Layout() {
   const [location] = useLocation();
@@ -102,6 +104,7 @@ export default function Layout() {
     if (location === "/skill-categories") return "skill-categories";
     if (location === "/skill-category-types") return "skill-category-types";
     if (location === "/proficiency-levels") return "proficiency-levels";
+    if (location === "/skills") return "skills";
     if (location === "/webhooks") return "webhooks";
     return "dashboard";
   };
@@ -155,6 +158,7 @@ export default function Layout() {
         { id: "skill-categories", label: "Skill Categories", icon: Layers, component: SkillCategories },
         { id: "skill-category-types", label: "Category Types", icon: Tag, component: SkillCategoryTypes },
         { id: "proficiency-levels", label: "Proficiency Levels", icon: TrendingUp, component: ProficiencyLevels },
+        { id: "skills", label: "Skills", icon: Sparkles, component: Skills },
         { id: "learning-paths", label: "Learning Paths", icon: Route, component: LearningPathsManagement },
         { id: "training-matrix", label: "Training Matrix", icon: BarChart3, component: TrainingMatrixDashboard },
       ]
