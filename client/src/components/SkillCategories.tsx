@@ -24,18 +24,28 @@ import {
 const skillCategorySchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
-  type: z.enum(["technical", "behavioral", "safety", "compliance"]).default("technical"),
+  typeId: z.string().min(1, "Type is required"),
   sortOrder: z.coerce.number().default(0),
   isActive: z.boolean().default(true),
 });
 
 type SkillCategoryFormType = z.infer<typeof skillCategorySchema>;
 
+interface SkillCategoryType {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
 interface SkillCategory {
   id: string;
   name: string;
   description?: string;
-  type: "technical" | "behavioral" | "safety" | "compliance";
+  type?: string; // Legacy enum field
+  typeId?: string; // New normalized FK
   sortOrder: number;
   isActive: boolean;
   createdAt: string;
@@ -50,10 +60,14 @@ export default function SkillCategories() {
     queryKey: ["/api/skill-categories"]
   }) as { data: SkillCategory[] | undefined; isLoading: boolean };
 
+  const { data: categoryTypes, isLoading: isLoadingTypes } = useQuery({
+    queryKey: ["/api/skill-category-types"]
+  }) as { data: SkillCategoryType[] | undefined; isLoading: boolean };
+
   const form = useForm<SkillCategoryFormType>({
     resolver: zodResolver(skillCategorySchema),
     defaultValues: {
-      type: "technical",
+      typeId: "",
       sortOrder: 0,
       isActive: true,
     }
@@ -118,7 +132,7 @@ export default function SkillCategories() {
     form.reset({
       name: category.name,
       description: category.description || "",
-      type: category.type,
+      typeId: category.typeId || "",
       sortOrder: category.sortOrder,
       isActive: category.isActive,
     });
@@ -131,13 +145,22 @@ export default function SkillCategories() {
     }
   };
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case "safety": return "bg-red-100 text-red-800";
-      case "compliance": return "bg-purple-100 text-purple-800";
-      case "behavioral": return "bg-blue-100 text-blue-800";
-      default: return "bg-green-100 text-green-800";
+  const getTypeName = (category: SkillCategory): string => {
+    if (category.typeId && categoryTypes) {
+      const type = categoryTypes.find(t => t.id === category.typeId);
+      return type?.name || category.type || "Unknown";
     }
+    return category.type || "Unknown";
+  };
+
+  const getTypeColor = (typeName: string) => {
+    const lowerName = typeName.toLowerCase();
+    if (lowerName.includes("safety")) return "bg-red-100 text-red-800";
+    if (lowerName.includes("compliance")) return "bg-purple-100 text-purple-800";
+    if (lowerName.includes("behavioral")) return "bg-blue-100 text-blue-800";
+    if (lowerName.includes("leadership")) return "bg-yellow-100 text-yellow-800";
+    if (lowerName.includes("operational")) return "bg-orange-100 text-orange-800";
+    return "bg-green-100 text-green-800";
   };
 
   return (
@@ -179,8 +202,8 @@ export default function SkillCategories() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-medium">{category.name}</h3>
-                      <Badge className={getTypeColor(category.type)}>
-                        {category.type}
+                      <Badge className={getTypeColor(getTypeName(category))}>
+                        {getTypeName(category)}
                       </Badge>
                       {!category.isActive && (
                         <Badge variant="secondary">Inactive</Badge>
@@ -278,21 +301,28 @@ export default function SkillCategories() {
 
               <FormField
                 control={form.control}
-                name="type"
+                name="typeId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-category-type">
-                          <SelectValue />
+                          <SelectValue placeholder="Select a type..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="technical">Technical</SelectItem>
-                        <SelectItem value="behavioral">Behavioral</SelectItem>
-                        <SelectItem value="safety">Safety</SelectItem>
-                        <SelectItem value="compliance">Compliance</SelectItem>
+                        {isLoadingTypes ? (
+                          <div className="p-2 text-sm text-muted-foreground">Loading types...</div>
+                        ) : categoryTypes && categoryTypes.length > 0 ? (
+                          categoryTypes.map((type) => (
+                            <SelectItem key={type.id} value={type.id}>
+                              {type.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-sm text-muted-foreground">No types available</div>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
