@@ -48,7 +48,7 @@ import {
 const competencySchema = z.object({
   title: z.string().min(1, "Competency title is required"),
   description: z.string().min(10, "Description must be at least 10 characters"),
-  category: z.string().min(1, "Category is required"),
+  categoryId: z.string().min(1, "Category is required"),
   level: z.coerce.number().min(1).max(5),
   parentId: z.string().optional(),
   requiredForRoles: z.array(z.string()).default([]),
@@ -86,7 +86,9 @@ interface Competency {
   id: string;
   title: string;
   description: string;
-  category: string;
+  category?: string;
+  categoryId?: string;
+  categoryName?: string;
   level: number;
   parentId?: string;
   children?: Competency[];
