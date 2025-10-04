@@ -599,10 +599,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied. Leadership role required." });
       }
 
+      // Phase 4: Get current state for audit log
+      const oldKeyResult = await storage.getKeyResult(id);
+
       const updateSchema = insertKeyResultSchema.partial().omit({ objectiveId: true, ownerId: true });
       const updateData = updateSchema.parse(req.body);
       
       const updated = await storage.updateKeyResult(id, updateData);
+      
+      // Phase 4: Create audit log entry for update
+      if (oldKeyResult) {
+        await storage.createKeyResultAuditLog({
+          keyResultId: id,
+          keyResultType: 'company',
+          changeType: 'updated',
+          changedBy: req.user.claims.sub,
+          oldValue: oldKeyResult as any,
+          newValue: updated as any,
+        });
+      }
+      
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -688,10 +704,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { id } = req.params;
+      
+      // Phase 4: Get current state for audit log
+      const oldKeyResult = await storage.getTeamKeyResult(id);
+      
       const updateSchema = insertTeamKeyResultSchema.partial().omit({ teamObjectiveId: true });
       const updateData = updateSchema.parse(req.body);
       
       const updated = await storage.updateTeamKeyResult(id, updateData);
+      
+      // Phase 4: Create audit log entry for update
+      if (oldKeyResult) {
+        await storage.createKeyResultAuditLog({
+          keyResultId: id,
+          keyResultType: 'team',
+          changeType: 'updated',
+          changedBy: req.user.claims.sub,
+          oldValue: oldKeyResult as any,
+          newValue: updated as any,
+        });
+      }
+      
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) {
