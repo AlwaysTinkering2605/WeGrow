@@ -25,6 +25,7 @@ import {
   okrSnapshots,
   goals,
   weeklyCheckIns,
+  krWeeklyCheckIns,
   competencies,
   userCompetencies,
   developmentPlans,
@@ -113,6 +114,8 @@ import {
   type InsertOkrSnapshot,
   type Goal,
   type WeeklyCheckIn,
+  type KrWeeklyCheckIn,
+  type InsertKrWeeklyCheckIn,
   type Competency,
   type UserCompetency,
   type DevelopmentPlan,
@@ -392,6 +395,13 @@ export interface IStorage {
   getLatestCheckIn(goalId: string): Promise<WeeklyCheckIn | undefined>;
   createCheckIn(checkIn: InsertWeeklyCheckIn): Promise<WeeklyCheckIn>;
   createCheckInWithGoalUpdate(checkIn: InsertWeeklyCheckIn, absoluteProgress: number): Promise<WeeklyCheckIn>;
+  
+  // Phase 7: KR Weekly check-ins
+  createKRCheckIn(checkIn: InsertKrWeeklyCheckIn): Promise<KrWeeklyCheckIn>;
+  getKRCheckIns(keyResultId: string, keyResultType: string): Promise<KrWeeklyCheckIn[]>;
+  createBulkKRCheckIns(checkIns: InsertKrWeeklyCheckIn[]): Promise<KrWeeklyCheckIn[]>;
+  getCheckInCompletionStats(userId: string, weekOf: Date): Promise<{ completed: number; total: number }>;
+  getUserKRCheckInsByWeek(userId: string, weekOf: Date): Promise<KrWeeklyCheckIn[]>;
   
   // Competencies
   getCompetencies(): Promise<Competency[]>;
@@ -1677,6 +1687,142 @@ export class DatabaseStorage implements IStorage {
 
       return createdCheckIn;
     });
+  }
+
+  // Phase 7: KR Weekly check-ins
+  async createKRCheckIn(checkIn: InsertKrWeeklyCheckIn): Promise<KrWeeklyCheckIn> {
+    return await db.transaction(async (tx) => {
+      // Create the check-in
+      const [createdCheckIn] = await tx
+        .insert(krWeeklyCheckIns)
+        .values(checkIn)
+        .returning();
+
+      // Update the KR current value and confidence
+      const targetTable = checkIn.keyResultType === 'company' ? keyResults : teamKeyResults;
+      await tx
+        .update(targetTable)
+        .set({ 
+          currentValue: checkIn.newValue,
+          confidenceScore: checkIn.confidenceScore,
+          lastConfidenceUpdate: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(targetTable.id, checkIn.keyResultId));
+
+      // Create progress update record
+      await tx
+        .insert(krProgressUpdates)
+        .values({
+          keyResultId: checkIn.keyResultId,
+          keyResultType: checkIn.keyResultType,
+          updatedBy: checkIn.updatedBy,
+          previousValue: checkIn.previousValue,
+          newValue: checkIn.newValue,
+          confidenceScore: checkIn.confidenceScore,
+          updateNote: `Weekly check-in: ${checkIn.achievements || 'No achievements noted'}`,
+        });
+
+      return createdCheckIn;
+    });
+  }
+
+  async getKRCheckIns(keyResultId: string, keyResultType: string): Promise<KrWeeklyCheckIn[]> {
+    return await db
+      .select()
+      .from(krWeeklyCheckIns)
+      .where(
+        and(
+          eq(krWeeklyCheckIns.keyResultId, keyResultId),
+          eq(krWeeklyCheckIns.keyResultType, keyResultType)
+        )
+      )
+      .orderBy(desc(krWeeklyCheckIns.weekOf));
+  }
+
+  async createBulkKRCheckIns(checkIns: InsertKrWeeklyCheckIn[]): Promise<KrWeeklyCheckIn[]> {
+    return await db.transaction(async (tx) => {
+      const created: KrWeeklyCheckIn[] = [];
+
+      for (const checkIn of checkIns) {
+        const [createdCheckIn] = await tx
+          .insert(krWeeklyCheckIns)
+          .values(checkIn)
+          .returning();
+        created.push(createdCheckIn);
+
+        // Update the KR
+        const targetTable = checkIn.keyResultType === 'company' ? keyResults : teamKeyResults;
+        await tx
+          .update(targetTable)
+          .set({ 
+            currentValue: checkIn.newValue,
+            confidenceScore: checkIn.confidenceScore,
+            lastConfidenceUpdate: new Date(),
+            updatedAt: new Date()
+          })
+          .where(eq(targetTable.id, checkIn.keyResultId));
+
+        // Create progress update
+        await tx
+          .insert(krProgressUpdates)
+          .values({
+            keyResultId: checkIn.keyResultId,
+            keyResultType: checkIn.keyResultType,
+            updatedBy: checkIn.updatedBy,
+            previousValue: checkIn.previousValue,
+            newValue: checkIn.newValue,
+            confidenceScore: checkIn.confidenceScore,
+            updateNote: `Bulk check-in: ${checkIn.achievements || ''}`,
+          });
+      }
+
+      return created;
+    });
+  }
+
+  async getCheckInCompletionStats(userId: string, weekOf: Date): Promise<{ completed: number; total: number }> {
+    // Get all KRs owned by the user
+    const userCompanyKRs = await db
+      .select({ id: keyResults.id })
+      .from(keyResults)
+      .where(eq(keyResults.ownerId, userId));
+
+    const userTeamKRs = await db
+      .select({ id: teamKeyResults.id })
+      .from(teamKeyResults)
+      .where(eq(teamKeyResults.assignedToUserId, userId));
+
+    const totalKRs = userCompanyKRs.length + userTeamKRs.length;
+
+    // Get check-ins for this week
+    const checkIns = await db
+      .select()
+      .from(krWeeklyCheckIns)
+      .where(
+        and(
+          eq(krWeeklyCheckIns.updatedBy, userId),
+          eq(krWeeklyCheckIns.weekOf, weekOf)
+        )
+      );
+
+    return {
+      completed: checkIns.length,
+      total: totalKRs
+    };
+  }
+
+  async getUserKRCheckInsByWeek(userId: string, weekOf: Date): Promise<KrWeeklyCheckIn[]> {
+    return await db
+      .select()
+      .from(krWeeklyCheckIns)
+      .where(
+        and(
+          eq(krWeeklyCheckIns.updatedBy, userId),
+          eq(krWeeklyCheckIns.weekOf, weekOf)
+        )
+      )
+      .orderBy(desc(krWeeklyCheckIns.submittedAt));
   }
 
   // Competencies
