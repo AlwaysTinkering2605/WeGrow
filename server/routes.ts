@@ -1125,6 +1125,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Phase 6: OKR Snapshots (Point-in-time captures)
+  app.post('/api/okr-snapshots', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const snapshotData = insertOkrSnapshotSchema.parse(req.body);
+      const snapshot = await storage.createOkrSnapshot(snapshotData);
+      res.json(snapshot);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error creating OKR snapshot:", error);
+      res.status(500).json({ message: "Failed to create OKR snapshot" });
+    }
+  });
+
+  app.get('/api/okr-snapshots', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { objectiveId, managementReviewId } = req.query;
+      const snapshots = await storage.getOkrSnapshots(
+        objectiveId as string | undefined,
+        managementReviewId as string | undefined
+      );
+      res.json(snapshots);
+    } catch (error) {
+      console.error("Error fetching OKR snapshots:", error);
+      res.status(500).json({ message: "Failed to fetch OKR snapshots" });
+    }
+  });
+
+  app.get('/api/okr-snapshots/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const snapshot = await storage.getOkrSnapshot(id);
+      if (!snapshot) {
+        return res.status(404).json({ message: "OKR snapshot not found" });
+      }
+      res.json(snapshot);
+    } catch (error) {
+      console.error("Error fetching OKR snapshot:", error);
+      res.status(500).json({ message: "Failed to fetch OKR snapshot" });
+    }
+  });
+
+  // Phase 6: Executive Dashboard Metrics
+  app.get('/api/executive-dashboard', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      // Get all company objectives and their key results
+      const companyObjectives = await storage.getActiveCompanyObjectives();
+      const allKeyResults = await Promise.all(
+        companyObjectives.map(obj => storage.getKeyResults(obj.id))
+      );
+
+      // Calculate metrics
+      const totalObjectives = companyObjectives.length;
+      const totalKeyResults = allKeyResults.flat().length;
+      
+      // Calculate completion rates
+      const completedObjectives = companyObjectives.filter(obj => obj.status === 'completed').length;
+      const completedKeyResults = allKeyResults.flat().filter(kr => 
+        kr.currentValue >= kr.targetValue
+      ).length;
+      
+      const objectiveCompletionRate = totalObjectives > 0 
+        ? (completedObjectives / totalObjectives) * 100 
+        : 0;
+      const keyResultCompletionRate = totalKeyResults > 0 
+        ? (completedKeyResults / totalKeyResults) * 100 
+        : 0;
+
+      // Identify at-risk objectives (low confidence or behind target)
+      const atRiskObjectives = companyObjectives.filter(obj => {
+        const keyResults = allKeyResults.find((_, idx) => 
+          companyObjectives[idx].id === obj.id
+        ) || [];
+        
+        const avgProgress = keyResults.length > 0
+          ? keyResults.reduce((sum, kr) => {
+              const progress = kr.targetValue > 0 
+                ? (kr.currentValue / kr.targetValue) * 100 
+                : 0;
+              return sum + progress;
+            }, 0) / keyResults.length
+          : 0;
+        
+        const avgConfidence = keyResults.length > 0
+          ? keyResults.reduce((sum, kr) => sum + (kr.confidenceScore || 50), 0) / keyResults.length
+          : 50;
+
+        return obj.status !== 'completed' && (avgProgress < 50 || avgConfidence < 60);
+      }).map(obj => ({
+        id: obj.id,
+        title: obj.title,
+        status: obj.status,
+        strategicTheme: obj.strategicTheme,
+        riskLevel: obj.riskLevel,
+        targetDate: obj.targetDate
+      }));
+
+      // Group by strategic theme
+      const themeMetrics = companyObjectives.reduce((acc, obj) => {
+        const theme = obj.strategicTheme || 'not_specified';
+        if (!acc[theme]) {
+          acc[theme] = { total: 0, completed: 0, inProgress: 0, atRisk: 0 };
+        }
+        acc[theme].total++;
+        if (obj.status === 'completed') acc[theme].completed++;
+        else if (obj.status === 'in_progress') acc[theme].inProgress++;
+        
+        const isAtRisk = atRiskObjectives.some(risk => risk.id === obj.id);
+        if (isAtRisk) acc[theme].atRisk++;
+        
+        return acc;
+      }, {} as Record<string, { total: number; completed: number; inProgress: number; atRisk: number; }>);
+
+      // Calculate overall averages
+      const objectivesWithMetrics = companyObjectives.map((obj, idx) => {
+        const keyResults = allKeyResults[idx];
+        const avgProgress = keyResults.length > 0
+          ? keyResults.reduce((sum, kr) => {
+              const progress = kr.targetValue > 0 
+                ? (kr.currentValue / kr.targetValue) * 100 
+                : 0;
+              return sum + progress;
+            }, 0) / keyResults.length
+          : 0;
+        const avgConfidence = keyResults.length > 0
+          ? keyResults.reduce((sum, kr) => sum + (kr.confidenceScore || 50), 0) / keyResults.length
+          : 50;
+        
+        return {
+          id: obj.id,
+          title: obj.title,
+          status: obj.status,
+          strategicTheme: obj.strategicTheme,
+          riskLevel: obj.riskLevel,
+          targetDate: obj.targetDate,
+          keyResultCount: keyResults.length,
+          avgProgress: Math.round(avgProgress * 10) / 10,
+          avgConfidence: Math.round(avgConfidence),
+        };
+      });
+
+      const overallAvgProgress = objectivesWithMetrics.length > 0
+        ? objectivesWithMetrics.reduce((sum, obj) => sum + obj.avgProgress, 0) / objectivesWithMetrics.length
+        : 0;
+      const overallAvgConfidence = objectivesWithMetrics.length > 0
+        ? objectivesWithMetrics.reduce((sum, obj) => sum + obj.avgConfidence, 0) / objectivesWithMetrics.length
+        : 0;
+
+      res.json({
+        summary: {
+          totalObjectives,
+          completedObjectives,
+          inProgressObjectives: companyObjectives.filter(obj => obj.status === 'in_progress').length,
+          atRiskCount: atRiskObjectives.length,
+          objectiveCompletionRate: Math.round(objectiveCompletionRate * 10) / 10,
+          totalKeyResults,
+          completedKeyResults,
+          keyResultCompletionRate: Math.round(keyResultCompletionRate * 10) / 10,
+          overallAvgProgress: Math.round(overallAvgProgress * 10) / 10,
+          overallAvgConfidence: Math.round(overallAvgConfidence),
+        },
+        atRiskObjectives,
+        themeMetrics,
+        objectives: objectivesWithMetrics
+      });
+    } catch (error) {
+      console.error("Error fetching executive dashboard data:", error);
+      res.status(500).json({ message: "Failed to fetch executive dashboard data" });
+    }
+  });
+
   // Company Reports (Leadership only)
   app.get('/api/company/metrics', isAuthenticated, async (req: any, res) => {
     try {
