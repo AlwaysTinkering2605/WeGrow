@@ -47,7 +47,7 @@ export default function WeeklyKRCheckIn() {
 
   // Fetch company key results
   const { data: companyObjectives = [] } = useQuery({
-    queryKey: ['/api/company-objectives'],
+    queryKey: ['/api/objectives'],
   });
 
   // Fetch team key results
@@ -86,7 +86,7 @@ export default function WeeklyKRCheckIn() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/kr-check-ins'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/company-objectives'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/objectives'] });
       queryClient.invalidateQueries({ queryKey: ['/api/team-objectives'] });
       queryClient.invalidateQueries({ queryKey: ['/api/kr-check-ins/stats/completion'] });
       toast({
@@ -106,7 +106,7 @@ export default function WeeklyKRCheckIn() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/kr-check-ins'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/company-objectives'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/objectives'] });
       queryClient.invalidateQueries({ queryKey: ['/api/team-objectives'] });
       queryClient.invalidateQueries({ queryKey: ['/api/kr-check-ins/stats/completion'] });
       setSelectedKRs(new Set());

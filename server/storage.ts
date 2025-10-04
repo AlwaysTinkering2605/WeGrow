@@ -1184,12 +1184,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Company objectives
-  async getActiveCompanyObjectives(): Promise<CompanyObjective[]> {
-    return await db
+  async getActiveCompanyObjectives(): Promise<any[]> {
+    const objectives = await db
       .select()
       .from(companyObjectives)
       .where(eq(companyObjectives.isActive, true))
       .orderBy(desc(companyObjectives.startDate));
+    
+    // Fetch key results for each objective
+    const objectivesWithKRs = await Promise.all(
+      objectives.map(async (obj) => {
+        const krs = await this.getKeyResults(obj.id);
+        return { ...obj, keyResults: krs };
+      })
+    );
+    
+    return objectivesWithKRs;
   }
 
   async createCompanyObjective(objective: InsertCompanyObjective): Promise<CompanyObjective> {
@@ -1217,16 +1227,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Team objectives
-  async getTeamObjectives(teamId?: string, supervisorId?: string): Promise<TeamObjective[]> {
+  async getTeamObjectives(teamId?: string, supervisorId?: string): Promise<any[]> {
     const conditions = [];
     if (teamId) conditions.push(eq(teamObjectives.teamId, teamId));
     if (supervisorId) conditions.push(eq(teamObjectives.supervisorId, supervisorId));
     
-    return await db
+    const objectives = await db
       .select()
       .from(teamObjectives)
       .where(and(eq(teamObjectives.isActive, true), ...conditions))
       .orderBy(desc(teamObjectives.startDate));
+    
+    // Fetch key results for each objective
+    const objectivesWithKRs = await Promise.all(
+      objectives.map(async (obj) => {
+        const krs = await this.getTeamKeyResults(obj.id);
+        return { ...obj, keyResults: krs };
+      })
+    );
+    
+    return objectivesWithKRs;
   }
 
   async getTeamObjectiveById(id: string): Promise<TeamObjective | null> {
