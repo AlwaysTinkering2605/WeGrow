@@ -11,6 +11,9 @@ import {
   teamKeyResults,
   keyResults,
   krProgressUpdates,
+  objectiveAuditLog,
+  keyResultAuditLog,
+  okrEvidence,
   goals,
   weeklyCheckIns,
   competencies,
@@ -78,6 +81,9 @@ import {
   type KeyResult,
   type TeamKeyResult,
   type KrProgressUpdate,
+  type ObjectiveAuditLog,
+  type KeyResultAuditLog,
+  type OkrEvidence,
   type Goal,
   type WeeklyCheckIn,
   type Competency,
@@ -123,6 +129,9 @@ import {
   type InsertTeamObjective,
   type InsertKeyResult,
   type InsertTeamKeyResult,
+  type InsertObjectiveAuditLog,
+  type InsertKeyResultAuditLog,
+  type InsertOkrEvidence,
   type InsertKrProgressUpdate,
   type InsertGoal,
   type InsertWeeklyCheckIn,
@@ -294,6 +303,18 @@ export interface IStorage {
   // Key result progress tracking
   createKrProgressUpdate(update: InsertKrProgressUpdate): Promise<KrProgressUpdate>;
   getKrProgressHistory(keyResultId: string, keyResultType: 'company' | 'team'): Promise<KrProgressUpdate[]>;
+  
+  // Phase 4: Audit log operations (read-only - logs are system-generated)
+  createObjectiveAuditLog(log: InsertObjectiveAuditLog): Promise<ObjectiveAuditLog>;
+  createKeyResultAuditLog(log: InsertKeyResultAuditLog): Promise<KeyResultAuditLog>;
+  getObjectiveAuditHistory(objectiveId: string, objectiveType: 'company' | 'team'): Promise<ObjectiveAuditLog[]>;
+  getKeyResultAuditHistory(keyResultId: string, keyResultType: 'company' | 'team'): Promise<KeyResultAuditLog[]>;
+  
+  // Phase 4: Evidence management
+  createEvidence(evidence: InsertOkrEvidence): Promise<OkrEvidence>;
+  getEvidence(linkedToId: string, linkedToType: string): Promise<OkrEvidence[]>;
+  verifyEvidence(evidenceId: string, verifiedBy: string, status: 'verified' | 'rejected', note?: string): Promise<OkrEvidence>;
+  deleteEvidence(evidenceId: string): Promise<void>;
   
   // Goals
   getUserGoals(userId: string): Promise<Goal[]>;
@@ -1225,6 +1246,85 @@ export class DatabaseStorage implements IStorage {
         eq(krProgressUpdates.keyResultType, keyResultType)
       ))
       .orderBy(desc(krProgressUpdates.timestamp));
+  }
+
+  // Phase 4: Audit log operations
+  async createObjectiveAuditLog(log: InsertObjectiveAuditLog): Promise<ObjectiveAuditLog> {
+    const [created] = await db
+      .insert(objectiveAuditLog)
+      .values(log)
+      .returning();
+    return created;
+  }
+
+  async createKeyResultAuditLog(log: InsertKeyResultAuditLog): Promise<KeyResultAuditLog> {
+    const [created] = await db
+      .insert(keyResultAuditLog)
+      .values(log)
+      .returning();
+    return created;
+  }
+
+  async getObjectiveAuditHistory(objectiveId: string, objectiveType: 'company' | 'team'): Promise<ObjectiveAuditLog[]> {
+    return await db
+      .select()
+      .from(objectiveAuditLog)
+      .where(and(
+        eq(objectiveAuditLog.objectiveId, objectiveId),
+        eq(objectiveAuditLog.objectiveType, objectiveType)
+      ))
+      .orderBy(desc(objectiveAuditLog.changeTimestamp));
+  }
+
+  async getKeyResultAuditHistory(keyResultId: string, keyResultType: 'company' | 'team'): Promise<KeyResultAuditLog[]> {
+    return await db
+      .select()
+      .from(keyResultAuditLog)
+      .where(and(
+        eq(keyResultAuditLog.keyResultId, keyResultId),
+        eq(keyResultAuditLog.keyResultType, keyResultType)
+      ))
+      .orderBy(desc(keyResultAuditLog.changeTimestamp));
+  }
+
+  // Phase 4: Evidence management
+  async createEvidence(evidence: InsertOkrEvidence): Promise<OkrEvidence> {
+    const [created] = await db
+      .insert(okrEvidence)
+      .values(evidence)
+      .returning();
+    return created;
+  }
+
+  async getEvidence(linkedToId: string, linkedToType: string): Promise<OkrEvidence[]> {
+    return await db
+      .select()
+      .from(okrEvidence)
+      .where(and(
+        eq(okrEvidence.linkedToId, linkedToId),
+        eq(okrEvidence.linkedToType, linkedToType)
+      ))
+      .orderBy(desc(okrEvidence.uploadedAt));
+  }
+
+  async verifyEvidence(evidenceId: string, verifiedBy: string, status: 'verified' | 'rejected', note?: string): Promise<OkrEvidence> {
+    const [verified] = await db
+      .update(okrEvidence)
+      .set({
+        verificationStatus: status,
+        verifiedBy,
+        verificationNote: note,
+        verifiedAt: new Date(),
+      })
+      .where(eq(okrEvidence.id, evidenceId))
+      .returning();
+    return verified;
+  }
+
+  async deleteEvidence(evidenceId: string): Promise<void> {
+    await db
+      .delete(okrEvidence)
+      .where(eq(okrEvidence.id, evidenceId));
   }
 
   // Goals
