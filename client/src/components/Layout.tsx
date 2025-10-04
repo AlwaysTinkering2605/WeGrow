@@ -58,8 +58,9 @@ import WebhookConfiguration from "../pages/WebhookConfiguration";
 import Organization from "./Organization";
 import SkillCategories from "./SkillCategories";
 import SkillCategoryTypes from "./SkillCategoryTypes";
+import ProficiencyLevels from "./ProficiencyLevels";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "job-roles" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks" | "organization" | "departments" | "skill-categories" | "skill-category-types";
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "job-roles" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks" | "organization" | "departments" | "skill-categories" | "skill-category-types" | "proficiency-levels";
 
 export default function Layout() {
   const [location] = useLocation();
@@ -100,6 +101,7 @@ export default function Layout() {
     if (location === "/training-matrix") return "training-matrix";
     if (location === "/skill-categories") return "skill-categories";
     if (location === "/skill-category-types") return "skill-category-types";
+    if (location === "/proficiency-levels") return "proficiency-levels";
     if (location === "/webhooks") return "webhooks";
     return "dashboard";
   };
@@ -152,6 +154,7 @@ export default function Layout() {
         { id: "competency-management", label: "Competency Management", icon: Layers, component: CompetencyManagement },
         { id: "skill-categories", label: "Skill Categories", icon: Layers, component: SkillCategories },
         { id: "skill-category-types", label: "Category Types", icon: Tag, component: SkillCategoryTypes },
+        { id: "proficiency-levels", label: "Proficiency Levels", icon: TrendingUp, component: ProficiencyLevels },
         { id: "learning-paths", label: "Learning Paths", icon: Route, component: LearningPathsManagement },
         { id: "training-matrix", label: "Training Matrix", icon: BarChart3, component: TrainingMatrixDashboard },
       ]
