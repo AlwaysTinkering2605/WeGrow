@@ -2265,13 +2265,16 @@ export const insertKrWeeklyCheckInSchema = createInsertSchema(krWeeklyCheckIns).
   submittedAt: true,
 }).extend({
   confidenceScore: z.number().min(1).max(10).optional(),
-  weekOf: z.string()
-    .min(1, "Week date is required")
-    .refine((str) => {
-      const date = new Date(str);
-      return !isNaN(date.getTime());
-    }, "Invalid date format")
-    .transform((str) => new Date(str)),
+  weekOf: z.union([
+    z.string()
+      .min(1, "Week date is required")
+      .refine((str) => {
+        const date = new Date(str);
+        return !isNaN(date.getTime());
+      }, "Invalid date format")
+      .transform((str) => new Date(str)),
+    z.date()
+  ]),
 });
 
 export const insertUserCompetencySchema = createInsertSchema(userCompetencies).omit({
