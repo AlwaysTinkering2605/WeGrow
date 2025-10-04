@@ -587,6 +587,7 @@ export const correctiveActions = pgTable("corrective_actions", {
   title: text("title").notNull(),
   description: text("description").notNull(),
   rootCause: text("root_cause"), // Why did failure occur?
+  fiveWhysAnalysis: jsonb("five_whys_analysis"), // 5 Whys root cause analysis
   proposedAction: text("proposed_action").notNull(), // What will be done?
   assignedTo: varchar("assigned_to").notNull(),
   targetCompletionDate: timestamp("target_completion_date"),
@@ -2288,8 +2289,8 @@ export const insertCorrectiveActionSchema = createInsertSchema(correctiveActions
     if (!val) return undefined;
     return typeof val === 'string' ? new Date(val) : val;
   }),
-  actualCompletionDate: z.union([z.string(), z.date()]).optional().transform((val) => {
-    if (!val) return undefined;
+  actualCompletionDate: z.union([z.string(), z.date()]).nullable().optional().transform((val) => {
+    if (!val) return null;
     return typeof val === 'string' ? new Date(val) : val;
   }),
 });

@@ -1232,11 +1232,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/corrective-actions', isAuthenticated, async (req: any, res) => {
+    console.log("=== CORRECTIVE ACTION CREATE ROUTE HIT ===");
+    console.log("Request body:", JSON.stringify(req.body, null, 2));
     try {
       const processedBody = {
-        ...req.body,
-        targetDate: req.body.targetDate ? new Date(req.body.targetDate) : undefined,
+        title: req.body.title,
+        description: req.body.description,
+        rootCause: req.body.rootCause,
+        fiveWhysAnalysis: req.body.fiveWhysAnalysis || null,
+        proposedAction: req.body.proposedAction,
+        assignedTo: req.body.assignedTo,
+        targetCompletionDate: req.body.targetDate ? new Date(req.body.targetDate) : undefined,
         actualCompletionDate: req.body.actualCompletionDate ? new Date(req.body.actualCompletionDate) : null,
+        linkedObjectiveId: req.body.linkedObjectiveId || null,
+        linkedKeyResultId: req.body.linkedKeyResultId || null,
+        status: req.body.status || 'open',
+        effectiveness: req.body.effectiveness || 'not_evaluated',
+        effectivenessNote: req.body.effectivenessNote || null,
         createdBy: req.user.claims.sub
       };
 
@@ -1245,6 +1257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(action);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("Zod validation error:", error.errors);
         return res.status(400).json({ message: "Invalid request data", errors: error.errors });
       }
       console.error("Error creating corrective action:", error);
@@ -1256,7 +1269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const processedBody = {
         ...req.body,
-        targetDate: req.body.targetDate ? new Date(req.body.targetDate) : undefined,
+        targetCompletionDate: req.body.targetDate ? new Date(req.body.targetDate) : undefined,
         actualCompletionDate: req.body.actualCompletionDate ? new Date(req.body.actualCompletionDate) : null
       };
 

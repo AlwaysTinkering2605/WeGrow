@@ -32,6 +32,7 @@ import {
   Tag,
   Sparkles,
   FileText,
+  AlertTriangle,
 } from "lucide-react";
 import { NotificationBadge } from "./NotificationCenter";
 import Dashboard from "./Dashboard";
@@ -64,8 +65,9 @@ import ProficiencyLevels from "./ProficiencyLevels";
 import Skills from "./Skills";
 import ExecutiveDashboard from "./ExecutiveDashboard";
 import ManagementReviews from "./ManagementReviews";
+import CorrectiveActionsBoard from "./CorrectiveActionsBoard";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "job-roles" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks" | "organization" | "departments" | "skill-categories" | "skill-category-types" | "proficiency-levels" | "skills" | "executive-dashboard" | "management-reviews";
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "job-roles" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks" | "organization" | "departments" | "skill-categories" | "skill-category-types" | "proficiency-levels" | "skills" | "executive-dashboard" | "management-reviews" | "corrective-actions";
 
 export default function Layout() {
   const [location] = useLocation();
@@ -91,6 +93,7 @@ export default function Layout() {
     if (location === "/analytics") return "analytics";
     if (location === "/executive-dashboard") return "executive-dashboard";
     if (location === "/management-reviews") return "management-reviews";
+    if (location === "/corrective-actions") return "corrective-actions";
     if (location.startsWith("/learning")) return "learning";
     if (location === "/recognition") return "recognition";
     if (location === "/meetings") return "meetings";
@@ -175,6 +178,7 @@ export default function Layout() {
       items: [
         { id: "executive-dashboard", label: "Executive Dashboard", icon: TrendingUp, component: ExecutiveDashboard },
         { id: "management-reviews", label: "Management Reviews", icon: FileText, component: ManagementReviews },
+        { id: "corrective-actions", label: "Corrective Actions", icon: AlertTriangle, component: CorrectiveActionsBoard },
         { id: "reports", label: "Reports", icon: BarChart3, component: Reports },
         { id: "analytics", label: "Advanced Analytics", icon: Brain, component: AdvancedAnalyticsDashboard },
       ]
