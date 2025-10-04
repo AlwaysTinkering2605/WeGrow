@@ -415,6 +415,13 @@ export interface IStorage {
   updateSkillCategoryType(typeId: string, updates: Partial<InsertSkillCategoryType>): Promise<SkillCategoryType>;
   deleteSkillCategoryType(typeId: string): Promise<void>;
 
+  // Proficiency Levels Management
+  getAllProficiencyLevels(): Promise<ProficiencyLevel[]>;
+  getProficiencyLevel(levelId: string): Promise<ProficiencyLevel | undefined>;
+  createProficiencyLevel(level: InsertProficiencyLevel): Promise<ProficiencyLevel>;
+  updateProficiencyLevel(levelId: string, updates: Partial<InsertProficiencyLevel>): Promise<ProficiencyLevel>;
+  deleteProficiencyLevel(levelId: string): Promise<void>;
+
   // Skill Categories Management
   getAllSkillCategories(): Promise<SkillCategory[]>;
   getSkillCategory(categoryId: string): Promise<SkillCategory | undefined>;
@@ -2302,6 +2309,49 @@ export class DatabaseStorage implements IStorage {
     
     if (!type) {
       throw new Error("Skill category type not found");
+    }
+  }
+
+  // Proficiency Levels Management
+  async getAllProficiencyLevels(): Promise<ProficiencyLevel[]> {
+    return await db
+      .select()
+      .from(proficiencyLevels)
+      .where(eq(proficiencyLevels.isActive, true))
+      .orderBy(proficiencyLevels.sortOrder, proficiencyLevels.numericValue);
+  }
+
+  async getProficiencyLevel(levelId: string): Promise<ProficiencyLevel | undefined> {
+    const [level] = await db.select().from(proficiencyLevels).where(eq(proficiencyLevels.id, levelId));
+    return level;
+  }
+
+  async createProficiencyLevel(levelData: InsertProficiencyLevel): Promise<ProficiencyLevel> {
+    const [level] = await db
+      .insert(proficiencyLevels)
+      .values(levelData)
+      .returning();
+    return level;
+  }
+
+  async updateProficiencyLevel(levelId: string, updates: Partial<InsertProficiencyLevel>): Promise<ProficiencyLevel> {
+    const [level] = await db
+      .update(proficiencyLevels)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(proficiencyLevels.id, levelId))
+      .returning();
+    return level;
+  }
+
+  async deleteProficiencyLevel(levelId: string): Promise<void> {
+    const [level] = await db
+      .update(proficiencyLevels)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(proficiencyLevels.id, levelId))
+      .returning();
+    
+    if (!level) {
+      throw new Error("Proficiency level not found");
     }
   }
 
