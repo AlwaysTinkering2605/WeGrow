@@ -95,6 +95,38 @@ export const keyResultChangeTypeEnum = pgEnum("key_result_change_type", ["create
 export const evidenceTypeEnum = pgEnum("evidence_type", ["document", "report", "data_export", "survey", "photo", "link"]);
 export const verificationStatusEnum = pgEnum("verification_status", ["pending", "verified", "rejected"]);
 
+// Phase 5: Corrective Actions & Nonconformity enums
+export const correctiveActionStatusEnum = pgEnum("corrective_action_status", [
+  "open",
+  "in_progress",
+  "completed",
+  "verified",
+  "closed"
+]);
+
+export const effectivenessEnum = pgEnum("effectiveness", [
+  "not_evaluated",
+  "effective",
+  "partially_effective",
+  "ineffective"
+]);
+
+export const nonconformityTypeEnum = pgEnum("nonconformity_type", [
+  "missed_target",
+  "delayed_completion",
+  "scope_change",
+  "resource_shortage"
+]);
+
+export const impactEnum = pgEnum("impact", ["low", "medium", "high", "critical"]);
+
+export const nonconformityStatusEnum = pgEnum("nonconformity_status", [
+  "identified",
+  "under_investigation",
+  "action_planned",
+  "resolved"
+]);
+
 // Phase 6: Management Review & Reporting enums
 export const managementReviewStatusEnum = pgEnum("management_review_status", [
   "scheduled",
@@ -545,6 +577,51 @@ export const objectiveResources = pgTable("objective_resources", {
 }, (table) => [
   index("objective_resources_objective_idx").on(table.objectiveId, table.objectiveType),
   index("objective_resources_status_idx").on(table.status),
+]);
+
+// Phase 5: Corrective Actions & Nonconformity tables (ISO 9001:2015 Clause 10.2)
+export const correctiveActions = pgTable("corrective_actions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  linkedObjectiveId: varchar("linked_objective_id"),
+  linkedKeyResultId: varchar("linked_key_result_id"),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  rootCause: text("root_cause"), // Why did failure occur?
+  proposedAction: text("proposed_action").notNull(), // What will be done?
+  assignedTo: varchar("assigned_to").notNull(),
+  targetCompletionDate: timestamp("target_completion_date"),
+  actualCompletionDate: timestamp("actual_completion_date"),
+  status: correctiveActionStatusEnum("status").default("open"),
+  effectiveness: effectivenessEnum("effectiveness").default("not_evaluated"),
+  effectivenessNote: text("effectiveness_note"),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("corrective_actions_assigned_idx").on(table.assignedTo, table.status),
+  index("corrective_actions_status_idx").on(table.status),
+  index("corrective_actions_objective_idx").on(table.linkedObjectiveId),
+]);
+
+export const nonconformities = pgTable("nonconformities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  objectiveId: varchar("objective_id").notNull(),
+  objectiveType: varchar("objective_type").notNull(), // 'company' or 'team'
+  nonconformityType: nonconformityTypeEnum("nonconformity_type").notNull(),
+  description: text("description").notNull(),
+  impact: impactEnum("impact").notNull(),
+  detectedBy: varchar("detected_by").notNull(),
+  detectedDate: timestamp("detected_date").defaultNow().notNull(),
+  correctiveActionId: varchar("corrective_action_id"),
+  status: nonconformityStatusEnum("status").default("identified"),
+  resolutionNote: text("resolution_note"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("nonconformities_objective_idx").on(table.objectiveId, table.objectiveType),
+  index("nonconformities_status_idx").on(table.status),
+  index("nonconformities_impact_idx").on(table.impact),
 ]);
 
 // Phase 6: Management Review & Reporting tables
@@ -2201,6 +2278,30 @@ export const insertObjectiveResourceSchema = createInsertSchema(objectiveResourc
   updatedAt: true,
 });
 
+// Phase 5: Corrective Actions & Nonconformity insert schemas
+export const insertCorrectiveActionSchema = createInsertSchema(correctiveActions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  targetCompletionDate: z.union([z.string(), z.date()]).optional().transform((val) => {
+    if (!val) return undefined;
+    return typeof val === 'string' ? new Date(val) : val;
+  }),
+  actualCompletionDate: z.union([z.string(), z.date()]).optional().transform((val) => {
+    if (!val) return undefined;
+    return typeof val === 'string' ? new Date(val) : val;
+  }),
+});
+
+export const insertNonconformitySchema = createInsertSchema(nonconformities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  detectedDate: true,
+  resolvedAt: true,
+});
+
 // Phase 6: Management Review & Reporting insert schemas
 export const insertManagementReviewSchema = createInsertSchema(managementReviews).omit({
   id: true,
@@ -2593,6 +2694,8 @@ export type KeyResultAuditLog = typeof keyResultAuditLog.$inferSelect;
 export type OkrEvidence = typeof okrEvidence.$inferSelect;
 export type QualityPolicy = typeof qualityPolicies.$inferSelect;
 export type ObjectiveResource = typeof objectiveResources.$inferSelect;
+export type CorrectiveAction = typeof correctiveActions.$inferSelect;
+export type Nonconformity = typeof nonconformities.$inferSelect;
 export type ManagementReview = typeof managementReviews.$inferSelect;
 export type OkrSnapshot = typeof okrSnapshots.$inferSelect;
 export type Goal = typeof goals.$inferSelect;
@@ -2645,6 +2748,8 @@ export type InsertKeyResultAuditLog = z.infer<typeof insertKeyResultAuditLogSche
 export type InsertOkrEvidence = z.infer<typeof insertOkrEvidenceSchema>;
 export type InsertQualityPolicy = z.infer<typeof insertQualityPolicySchema>;
 export type InsertObjectiveResource = z.infer<typeof insertObjectiveResourceSchema>;
+export type InsertCorrectiveAction = z.infer<typeof insertCorrectiveActionSchema>;
+export type InsertNonconformity = z.infer<typeof insertNonconformitySchema>;
 export type InsertManagementReview = z.infer<typeof insertManagementReviewSchema>;
 export type InsertOkrSnapshot = z.infer<typeof insertOkrSnapshotSchema>;
 export type InsertGoal = z.infer<typeof insertGoalSchema>;
