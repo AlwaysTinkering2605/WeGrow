@@ -62,8 +62,9 @@ import SkillCategoryTypes from "./SkillCategoryTypes";
 import ProficiencyLevels from "./ProficiencyLevels";
 import Skills from "./Skills";
 import ExecutiveDashboard from "./ExecutiveDashboard";
+import ManagementReviews from "./ManagementReviews";
 
-type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "job-roles" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks" | "organization" | "departments" | "skill-categories" | "skill-category-types" | "proficiency-levels" | "skills" | "executive-dashboard";
+type TabType = "dashboard" | "goals" | "development" | "recognition" | "meetings" | "learning" | "profile" | "user-management" | "job-roles" | "team" | "company-objectives" | "team-objectives" | "analytics" | "reports" | "settings" | "competency-management" | "training-matrix" | "learning-paths" | "automation-engine" | "webhooks" | "organization" | "departments" | "skill-categories" | "skill-category-types" | "proficiency-levels" | "skills" | "executive-dashboard" | "management-reviews";
 
 export default function Layout() {
   const [location] = useLocation();
@@ -88,6 +89,7 @@ export default function Layout() {
     if (location === "/automation-engine") return "automation-engine";
     if (location === "/analytics") return "analytics";
     if (location === "/executive-dashboard") return "executive-dashboard";
+    if (location === "/management-reviews") return "management-reviews";
     if (location.startsWith("/learning")) return "learning";
     if (location === "/recognition") return "recognition";
     if (location === "/meetings") return "meetings";
@@ -171,6 +173,7 @@ export default function Layout() {
       icon: Brain,
       items: [
         { id: "executive-dashboard", label: "Executive Dashboard", icon: TrendingUp, component: ExecutiveDashboard },
+        { id: "management-reviews", label: "Management Reviews", icon: FileText, component: ManagementReviews },
         { id: "reports", label: "Reports", icon: BarChart3, component: Reports },
         { id: "analytics", label: "Advanced Analytics", icon: Brain, component: AdvancedAnalyticsDashboard },
       ]
