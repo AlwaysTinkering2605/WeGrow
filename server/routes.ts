@@ -313,6 +313,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { id } = req.params;
+      
+      // Phase 4: Get current state for audit log
+      const currentObjectives = await storage.getActiveCompanyObjectives();
+      const oldObjective = currentObjectives.find(obj => obj.id === id);
+      
       const updateData = {
         ...req.body,
         // Convert ISO string dates to Date objects for Drizzle
@@ -320,6 +325,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
       };
       const objective = await storage.updateCompanyObjective(id, updateData);
+      
+      // Phase 4: Create audit log entry
+      if (oldObjective) {
+        await storage.createObjectiveAuditLog({
+          objectiveId: id,
+          objectiveType: 'company',
+          changeType: 'updated',
+          changedBy: req.user.claims.sub,
+          oldValue: oldObjective as any,
+          newValue: objective as any,
+        });
+      }
+      
       res.json(objective);
     } catch (error) {
       console.error("Error updating company objective:", error);
