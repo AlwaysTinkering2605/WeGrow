@@ -1539,6 +1539,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Aggregated Competency Skills Route - includes directly assigned + lesson-derived skills
+  app.get('/api/competencies/:competencyId/skills/aggregated', isAuthenticated, async (req: any, res) => {
+    try {
+      const { competencyId } = req.params;
+      const aggregatedSkills = await storage.getCompetencySkillsWithSources(competencyId);
+      res.json(aggregatedSkills);
+    } catch (error) {
+      console.error("Error fetching aggregated competency skills:", error);
+      res.status(500).json({ message: "Failed to fetch aggregated competency skills" });
+    }
+  });
+
   // Skill Categories Routes
   app.get('/api/skill-categories', isAuthenticated, async (req: any, res) => {
     try {

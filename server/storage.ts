@@ -283,6 +283,18 @@ export interface ManagerOrgChartNode {
   directReportCount: number;
 }
 
+export interface AggregatedSkill {
+  skillId: string;
+  skillName: string;
+  skillDescription?: string | null;
+  skillCode: string;
+  categoryId: string;
+  categoryName: string;
+  source: "direct" | "lesson";
+  courses?: Array<{ courseId: string; courseName: string }>;
+  lessons?: Array<{ lessonId: string; lessonName: string }>;
+}
+
 export interface IStorage {
   // User operations - required for Replit Auth
   getUser(id: string): Promise<User | undefined>;
@@ -449,6 +461,7 @@ export interface IStorage {
   
   // Competency Skills Management (Junction)
   getCompetencySkills(competencyId: string): Promise<CompetencySkill[]>;
+  getCompetencySkillsWithSources(competencyId: string): Promise<AggregatedSkill[]>;
   assignSkillToCompetency(assignment: InsertCompetencySkill): Promise<CompetencySkill>;
   removeSkillFromCompetency(competencyId: string, skillId: string): Promise<void>;
 
@@ -2484,6 +2497,109 @@ export class DatabaseStorage implements IStorage {
         eq(competencySkills.competencyId, competencyId),
         eq(competencySkills.skillId, skillId)
       ));
+  }
+
+  async getCompetencySkillsWithSources(competencyId: string): Promise<AggregatedSkill[]> {
+    // Get directly assigned skills
+    const directSkills = await db
+      .select({
+        skillId: skills.id,
+        skillName: skills.name,
+        skillDescription: skills.description,
+        skillCode: skills.code,
+        categoryId: skillCategories.id,
+        categoryName: skillCategories.name,
+      })
+      .from(competencySkills)
+      .innerJoin(skills, eq(competencySkills.skillId, skills.id))
+      .innerJoin(skillCategories, eq(skills.categoryId, skillCategories.id))
+      .where(eq(competencySkills.competencyId, competencyId));
+
+    // Get skills from lessons via courses
+    const lessonSkillsData = await db
+      .select({
+        skillId: skills.id,
+        skillName: skills.name,
+        skillDescription: skills.description,
+        skillCode: skills.code,
+        categoryId: skillCategories.id,
+        categoryName: skillCategories.name,
+        courseId: courses.id,
+        courseName: courses.title,
+        lessonId: lessons.id,
+        lessonName: lessons.title,
+      })
+      .from(competencies)
+      .innerJoin(courses, eq(courses.categoryId, competencies.categoryId))
+      .innerJoin(courseModules, eq(courseModules.courseVersionId, courses.currentVersionId))
+      .innerJoin(lessons, eq(lessons.moduleId, courseModules.id))
+      .innerJoin(lessonSkills, eq(lessonSkills.lessonId, lessons.id))
+      .innerJoin(skills, eq(lessonSkills.skillId, skills.id))
+      .innerJoin(skillCategories, eq(skills.categoryId, skillCategories.id))
+      .where(eq(competencies.id, competencyId));
+
+    // Aggregate lesson skills by skill ID
+    const lessonSkillsMap = new Map<string, {
+      skillId: string;
+      skillName: string;
+      skillDescription: string | null;
+      skillCode: string;
+      categoryId: string;
+      categoryName: string;
+      courses: Array<{ courseId: string; courseName: string }>;
+      lessons: Array<{ lessonId: string; lessonName: string }>;
+    }>();
+
+    lessonSkillsData.forEach((item) => {
+      if (!lessonSkillsMap.has(item.skillId)) {
+        lessonSkillsMap.set(item.skillId, {
+          skillId: item.skillId,
+          skillName: item.skillName,
+          skillDescription: item.skillDescription,
+          skillCode: item.skillCode,
+          categoryId: item.categoryId,
+          categoryName: item.categoryName,
+          courses: [],
+          lessons: [],
+        });
+      }
+      const skill = lessonSkillsMap.get(item.skillId)!;
+      
+      // Add course if not already added
+      if (!skill.courses.some(c => c.courseId === item.courseId)) {
+        skill.courses.push({ courseId: item.courseId, courseName: item.courseName });
+      }
+      
+      // Add lesson if not already added
+      if (!skill.lessons.some(l => l.lessonId === item.lessonId)) {
+        skill.lessons.push({ lessonId: item.lessonId, lessonName: item.lessonName });
+      }
+    });
+
+    // Merge both sources
+    const result: AggregatedSkill[] = [];
+    const processedSkillIds = new Set<string>();
+
+    // Add direct skills
+    directSkills.forEach((skill) => {
+      result.push({
+        ...skill,
+        source: "direct",
+      });
+      processedSkillIds.add(skill.skillId);
+    });
+
+    // Add lesson skills (excluding duplicates)
+    lessonSkillsMap.forEach((skill) => {
+      if (!processedSkillIds.has(skill.skillId)) {
+        result.push({
+          ...skill,
+          source: "lesson",
+        });
+      }
+    });
+
+    return result;
   }
 
   // Skill Categories Management
