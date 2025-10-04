@@ -227,6 +227,23 @@ export const skillCategories = pgTable("skill_categories", {
   index("skill_categories_sort_order_idx").on(table.sortOrder),
 ]);
 
+// Proficiency Levels table - normalized proficiency/skill level taxonomy
+export const proficiencyLevels = pgTable("proficiency_levels", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull().unique(),
+  code: varchar("code").notNull().unique(), // beginner, intermediate, advanced, expert, master
+  description: text("description"),
+  numericValue: integer("numeric_value").notNull(), // 1-5 or 1-10 scale for ordering and calculations
+  sortOrder: integer("sort_order").default(0),
+  color: varchar("color"), // Optional hex color for UI badges
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("proficiency_levels_sort_order_idx").on(table.sortOrder),
+  index("proficiency_levels_numeric_value_idx").on(table.numericValue),
+]);
+
 // Job Roles table - normalized job role master data with hierarchy
 export const jobRoles = pgTable("job_roles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1822,6 +1839,12 @@ export const insertSkillCategorySchema = createInsertSchema(skillCategories).omi
   updatedAt: true,
 });
 
+export const insertProficiencyLevelSchema = createInsertSchema(proficiencyLevels).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertLearningPathJobRoleSchema = createInsertSchema(learningPathJobRoles).omit({
   id: true,
   createdAt: true,
@@ -2272,6 +2295,7 @@ export type Team = typeof teams.$inferSelect;
 export type Department = typeof departments.$inferSelect;
 export type SkillCategoryType = typeof skillCategoryTypes.$inferSelect;
 export type SkillCategory = typeof skillCategories.$inferSelect;
+export type ProficiencyLevel = typeof proficiencyLevels.$inferSelect;
 export type JobRole = typeof jobRoles.$inferSelect;
 export type LearningPathJobRole = typeof learningPathJobRoles.$inferSelect;
 export type User = typeof users.$inferSelect;
@@ -2312,6 +2336,7 @@ export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
 export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
 export type InsertSkillCategoryType = z.infer<typeof insertSkillCategoryTypeSchema>;
 export type InsertSkillCategory = z.infer<typeof insertSkillCategorySchema>;
+export type InsertProficiencyLevel = z.infer<typeof insertProficiencyLevelSchema>;
 export type InsertJobRole = z.infer<typeof insertJobRoleSchema>;
 export type InsertLearningPathJobRole = z.infer<typeof insertLearningPathJobRoleSchema>;
 export type InsertCompanyObjective = z.infer<typeof insertCompanyObjectiveSchema>;
