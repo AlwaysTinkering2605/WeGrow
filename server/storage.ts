@@ -21,6 +21,8 @@ import {
   okrEvidence,
   qualityPolicies,
   objectiveResources,
+  managementReviews,
+  okrSnapshots,
   goals,
   weeklyCheckIns,
   competencies,
@@ -103,8 +105,12 @@ import {
   type OkrEvidence,
   type QualityPolicy,
   type ObjectiveResource,
+  type ManagementReview,
+  type OkrSnapshot,
   type InsertQualityPolicy,
   type InsertObjectiveResource,
+  type InsertManagementReview,
+  type InsertOkrSnapshot,
   type Goal,
   type WeeklyCheckIn,
   type Competency,
@@ -361,6 +367,18 @@ export interface IStorage {
   getEvidence(linkedToId: string, linkedToType: string): Promise<OkrEvidence[]>;
   verifyEvidence(evidenceId: string, verifiedBy: string, status: 'verified' | 'rejected', note?: string): Promise<OkrEvidence>;
   deleteEvidence(evidenceId: string): Promise<void>;
+  
+  // Phase 6: Management Review & Reporting
+  getManagementReviews(status?: 'scheduled' | 'in_progress' | 'completed' | 'published'): Promise<ManagementReview[]>;
+  getManagementReview(id: string): Promise<ManagementReview | null>;
+  createManagementReview(review: InsertManagementReview): Promise<ManagementReview>;
+  updateManagementReview(id: string, updates: Partial<InsertManagementReview>): Promise<ManagementReview | null>;
+  deleteManagementReview(id: string): Promise<boolean>;
+  
+  // Phase 6: OKR Snapshots
+  createOkrSnapshot(snapshot: InsertOkrSnapshot): Promise<OkrSnapshot>;
+  getOkrSnapshots(objectiveId?: string, managementReviewId?: string): Promise<OkrSnapshot[]>;
+  getOkrSnapshot(id: string): Promise<OkrSnapshot | null>;
   
   // Goals
   getUserGoals(userId: string): Promise<Goal[]>;
@@ -1493,6 +1511,88 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(okrEvidence)
       .where(eq(okrEvidence.id, evidenceId));
+  }
+
+  // Phase 6: Management Review & Reporting
+  async getManagementReviews(status?: 'scheduled' | 'in_progress' | 'completed' | 'published'): Promise<ManagementReview[]> {
+    const conditions = [];
+    if (status) {
+      conditions.push(eq(managementReviews.status, status));
+    }
+    
+    return await db
+      .select()
+      .from(managementReviews)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(managementReviews.reviewDate));
+  }
+
+  async getManagementReview(id: string): Promise<ManagementReview | null> {
+    const [review] = await db
+      .select()
+      .from(managementReviews)
+      .where(eq(managementReviews.id, id))
+      .limit(1);
+    return review || null;
+  }
+
+  async createManagementReview(review: InsertManagementReview): Promise<ManagementReview> {
+    const [created] = await db
+      .insert(managementReviews)
+      .values(review)
+      .returning();
+    return created;
+  }
+
+  async updateManagementReview(id: string, updates: Partial<InsertManagementReview>): Promise<ManagementReview | null> {
+    const [updated] = await db
+      .update(managementReviews)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(managementReviews.id, id))
+      .returning();
+    return updated || null;
+  }
+
+  async deleteManagementReview(id: string): Promise<boolean> {
+    const result = await db
+      .delete(managementReviews)
+      .where(eq(managementReviews.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Phase 6: OKR Snapshots
+  async createOkrSnapshot(snapshot: InsertOkrSnapshot): Promise<OkrSnapshot> {
+    const [created] = await db
+      .insert(okrSnapshots)
+      .values(snapshot)
+      .returning();
+    return created;
+  }
+
+  async getOkrSnapshots(objectiveId?: string, managementReviewId?: string): Promise<OkrSnapshot[]> {
+    const conditions = [];
+    if (objectiveId) {
+      conditions.push(eq(okrSnapshots.objectiveId, objectiveId));
+    }
+    if (managementReviewId) {
+      conditions.push(eq(okrSnapshots.managementReviewId, managementReviewId));
+    }
+    
+    return await db
+      .select()
+      .from(okrSnapshots)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(okrSnapshots.snapshotDate));
+  }
+
+  async getOkrSnapshot(id: string): Promise<OkrSnapshot | null> {
+    const [snapshot] = await db
+      .select()
+      .from(okrSnapshots)
+      .where(eq(okrSnapshots.id, id))
+      .limit(1);
+    return snapshot || null;
   }
 
   // Goals
