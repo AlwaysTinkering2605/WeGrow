@@ -20,6 +20,9 @@ import {
   insertSkillCategoryTypeSchema,
   insertSkillCategorySchema,
   insertProficiencyLevelSchema,
+  insertSkillSchema,
+  insertLessonSkillSchema,
+  insertCompetencySkillSchema,
   insertJobRoleSchema,
   updateUserProfileSchema,
   // LMS schemas
@@ -1320,6 +1323,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error deleting proficiency level:", error);
       res.status(500).json({ message: "Failed to delete proficiency level" });
+    }
+  });
+
+  // Skills Routes
+  app.get('/api/skills', isAuthenticated, async (req: any, res) => {
+    try {
+      const { categoryId } = req.query;
+      
+      if (categoryId) {
+        const skills = await storage.getSkillsByCategory(categoryId);
+        return res.json(skills);
+      }
+      
+      const skills = await storage.getAllSkills();
+      res.json(skills);
+    } catch (error) {
+      console.error("Error fetching skills:", error);
+      res.status(500).json({ message: "Failed to fetch skills" });
+    }
+  });
+
+  app.get('/api/skills/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const skill = await storage.getSkill(id);
+      if (!skill) {
+        return res.status(404).json({ message: "Skill not found" });
+      }
+      res.json(skill);
+    } catch (error) {
+      console.error("Error fetching skill:", error);
+      res.status(500).json({ message: "Failed to fetch skill" });
+    }
+  });
+
+  app.post('/api/skills', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const skillData = insertSkillSchema.parse(req.body);
+      const skill = await storage.createSkill(skillData);
+      res.json(skill);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating skill:", error);
+      res.status(500).json({ message: "Failed to create skill" });
+    }
+  });
+
+  app.put('/api/skills/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const skillData = insertSkillSchema.partial().parse(req.body);
+      const skill = await storage.updateSkill(id, skillData);
+      if (!skill) {
+        return res.status(404).json({ message: "Skill not found" });
+      }
+      res.json(skill);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating skill:", error);
+      res.status(500).json({ message: "Failed to update skill" });
+    }
+  });
+
+  app.delete('/api/skills/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      await storage.deleteSkill(id);
+      res.json({ message: "Skill deleted successfully" });
+    } catch (error: any) {
+      if (error.message === "Skill not found") {
+        return res.status(404).json({ message: "Skill not found" });
+      }
+      console.error("Error deleting skill:", error);
+      res.status(500).json({ message: "Failed to delete skill" });
+    }
+  });
+
+  // Lesson Skills Junction Routes
+  app.get('/api/lessons/:lessonId/skills', isAuthenticated, async (req: any, res) => {
+    try {
+      const { lessonId } = req.params;
+      const lessonSkills = await storage.getLessonSkills(lessonId);
+      res.json(lessonSkills);
+    } catch (error) {
+      console.error("Error fetching lesson skills:", error);
+      res.status(500).json({ message: "Failed to fetch lesson skills" });
+    }
+  });
+
+  app.post('/api/lessons/:lessonId/skills', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { lessonId } = req.params;
+      const assignmentData = insertLessonSkillSchema.parse({
+        ...req.body,
+        lessonId
+      });
+      const lessonSkill = await storage.assignSkillToLesson(assignmentData);
+      res.json(lessonSkill);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error assigning skill to lesson:", error);
+      res.status(500).json({ message: "Failed to assign skill to lesson" });
+    }
+  });
+
+  app.delete('/api/lessons/:lessonId/skills/:skillId', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { lessonId, skillId } = req.params;
+      await storage.removeSkillFromLesson(lessonId, skillId);
+      res.json({ message: "Skill removed from lesson successfully" });
+    } catch (error) {
+      console.error("Error removing skill from lesson:", error);
+      res.status(500).json({ message: "Failed to remove skill from lesson" });
+    }
+  });
+
+  // Competency Skills Junction Routes
+  app.get('/api/competencies/:competencyId/skills', isAuthenticated, async (req: any, res) => {
+    try {
+      const { competencyId } = req.params;
+      const competencySkills = await storage.getCompetencySkills(competencyId);
+      res.json(competencySkills);
+    } catch (error) {
+      console.error("Error fetching competency skills:", error);
+      res.status(500).json({ message: "Failed to fetch competency skills" });
+    }
+  });
+
+  app.post('/api/competencies/:competencyId/skills', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { competencyId } = req.params;
+      const assignmentData = insertCompetencySkillSchema.parse({
+        ...req.body,
+        competencyId
+      });
+      const competencySkill = await storage.assignSkillToCompetency(assignmentData);
+      res.json(competencySkill);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error assigning skill to competency:", error);
+      res.status(500).json({ message: "Failed to assign skill to competency" });
+    }
+  });
+
+  app.delete('/api/competencies/:competencyId/skills/:skillId', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { competencyId, skillId } = req.params;
+      await storage.removeSkillFromCompetency(competencyId, skillId);
+      res.json({ message: "Skill removed from competency successfully" });
+    } catch (error) {
+      console.error("Error removing skill from competency:", error);
+      res.status(500).json({ message: "Failed to remove skill from competency" });
     }
   });
 
