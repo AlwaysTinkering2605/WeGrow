@@ -10,7 +10,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Badge } from "@/components/ui/badge";
 import { KeyResultCard } from "@/components/KeyResultCard";
 import { KeyResultProgressDialog } from "@/components/KeyResultProgressDialog";
+import { AuditHistoryTimeline } from "@/components/AuditHistoryTimeline";
+import { EvidenceManager } from "@/components/EvidenceManager";
 import { useState, useMemo } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -312,46 +315,79 @@ export default function CompanyObjectives() {
 
     return (
       <div className="mt-4 pt-4 border-t">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <ListTodo className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">
+        <Tabs defaultValue="key-results" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="key-results" data-testid="tab-key-results">
               Key Results ({keyResults?.length || 0})
-            </span>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setSelectedObjectiveForKR(objectiveId);
-              setIsKRDialogOpen(true);
-            }}
-            data-testid={`button-add-key-result-${objectiveId}`}
-          >
-            <Plus className="w-3.5 h-3.5 mr-1" />
-            Add Key Result
-          </Button>
-        </div>
-        {keyResults && keyResults.length > 0 ? (
-          <div className="grid gap-3">
-            {keyResults.map((kr: any) => {
-              const owner = users?.find((u: any) => u.id === kr.ownerId);
-              return (
-                <KeyResultCard
-                  key={kr.id}
-                  keyResult={kr}
-                  ownerName={owner ? `${owner.firstName} ${owner.lastName}` : undefined}
-                  onUpdateProgress={handleUpdateProgress}
-                  isCompanyLevel={true}
-                />
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-6 text-sm text-muted-foreground">
-            No key results yet. Add key results to track progress.
-          </div>
-        )}
+            </TabsTrigger>
+            <TabsTrigger value="audit-history" data-testid="tab-audit-history">
+              Audit History
+            </TabsTrigger>
+            <TabsTrigger value="evidence" data-testid="tab-evidence">
+              Evidence
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="key-results" className="mt-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <ListTodo className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">
+                  Key Results ({keyResults?.length || 0})
+                </span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setSelectedObjectiveForKR(objectiveId);
+                  setIsKRDialogOpen(true);
+                }}
+                data-testid={`button-add-key-result-${objectiveId}`}
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                Add Key Result
+              </Button>
+            </div>
+            {keyResults && keyResults.length > 0 ? (
+              <div className="grid gap-3">
+                {keyResults.map((kr: any) => {
+                  const owner = users?.find((u: any) => u.id === kr.ownerId);
+                  return (
+                    <KeyResultCard
+                      key={kr.id}
+                      keyResult={kr}
+                      ownerName={owner ? `${owner.firstName} ${owner.lastName}` : undefined}
+                      onUpdateProgress={handleUpdateProgress}
+                      isCompanyLevel={true}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-sm text-muted-foreground">
+                No key results yet. Add key results to track progress.
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="audit-history" className="mt-4">
+            <AuditHistoryTimeline 
+              entityId={objectiveId}
+              entityType="objective"
+              objectiveType="company"
+            />
+          </TabsContent>
+
+          <TabsContent value="evidence" className="mt-4">
+            <EvidenceManager
+              linkedToId={objectiveId}
+              linkedToType="company_objective"
+              canUpload={true}
+              canVerify={true}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     );
   }
