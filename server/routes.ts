@@ -1066,10 +1066,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied. Leadership role required." });
       }
 
-      const reviewData = insertManagementReviewSchema.parse({
+      // Convert date strings to Date objects for Zod validation
+      const processedBody = {
         ...req.body,
+        reviewDate: req.body.reviewDate ? new Date(req.body.reviewDate) : undefined,
+        reviewPeriodStart: req.body.reviewPeriodStart ? new Date(req.body.reviewPeriodStart) : undefined,
+        reviewPeriodEnd: req.body.reviewPeriodEnd ? new Date(req.body.reviewPeriodEnd) : undefined,
+        nextReviewDate: req.body.nextReviewDate ? new Date(req.body.nextReviewDate) : null,
         createdBy: req.user.claims.sub
-      });
+      };
+
+      const reviewData = insertManagementReviewSchema.parse(processedBody);
       const review = await storage.createManagementReview(reviewData);
       res.json(review);
     } catch (error) {
@@ -1089,8 +1096,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied. Leadership role required." });
       }
 
+      // Convert date strings to Date objects for Zod validation
+      const processedBody = {
+        ...req.body,
+        reviewDate: req.body.reviewDate ? new Date(req.body.reviewDate) : undefined,
+        reviewPeriodStart: req.body.reviewPeriodStart ? new Date(req.body.reviewPeriodStart) : undefined,
+        reviewPeriodEnd: req.body.reviewPeriodEnd ? new Date(req.body.reviewPeriodEnd) : undefined,
+        nextReviewDate: req.body.nextReviewDate ? new Date(req.body.nextReviewDate) : null
+      };
+
       const { id } = req.params;
-      const updateData = insertManagementReviewSchema.partial().parse(req.body);
+      const updateData = insertManagementReviewSchema.partial().parse(processedBody);
       const review = await storage.updateManagementReview(id, updateData);
       if (!review) {
         return res.status(404).json({ message: "Management review not found" });
@@ -1101,7 +1117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid request data", errors: error.errors });
       }
       console.error("Error updating management review:", error);
-      res.status(500).json({ message: "Failed to update management review" });
+      res.status(500).json({ message: "Failed to create management review" });
     }
   });
 

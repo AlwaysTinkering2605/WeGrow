@@ -31,6 +31,7 @@ import {
   Briefcase,
   Tag,
   Sparkles,
+  FileText,
 } from "lucide-react";
 import { NotificationBadge } from "./NotificationCenter";
 import Dashboard from "./Dashboard";

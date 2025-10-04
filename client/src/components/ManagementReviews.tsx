@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -31,13 +32,16 @@ import {
 type ManagementReview = {
   id: string;
   reviewDate: Date;
+  reviewPeriodStart: Date;
+  reviewPeriodEnd: Date;
+  chairPerson: string;
   attendees: string[];
   objectivesReviewed: string[];
   keyFindings: string;
   decisionsRequired: string;
-  actionItems: string[];
+  actionItems: any; // JSONB from backend
   nextReviewDate: Date | null;
-  status: "draft" | "in_review" | "approved" | "implemented";
+  status: "scheduled" | "in_progress" | "completed" | "published";
   createdBy: string;
   createdAt: Date;
   updatedAt: Date | null;
@@ -45,29 +49,32 @@ type ManagementReview = {
 
 const managementReviewSchema = z.object({
   reviewDate: z.string().min(1, "Review date is required"),
+  reviewPeriodStart: z.string().min(1, "Review period start is required"),
+  reviewPeriodEnd: z.string().min(1, "Review period end is required"),
+  chairPerson: z.string().min(1, "Chair person is required"),
   attendees: z.string().min(1, "At least one attendee is required"),
   objectivesReviewed: z.string().min(1, "Objectives reviewed are required"),
   keyFindings: z.string().min(1, "Key findings are required"),
   decisionsRequired: z.string().min(1, "Decisions required are required"),
   actionItems: z.string().optional(),
   nextReviewDate: z.string().optional(),
-  status: z.enum(["draft", "in_review", "approved", "implemented"]),
+  status: z.enum(["scheduled", "in_progress", "completed", "published"]),
 });
 
 type ManagementReviewForm = z.infer<typeof managementReviewSchema>;
 
 const statusLabels: Record<string, string> = {
-  draft: "Draft",
-  in_review: "In Review",
-  approved: "Approved",
-  implemented: "Implemented",
+  scheduled: "Scheduled",
+  in_progress: "In Progress",
+  completed: "Completed",
+  published: "Published",
 };
 
 const statusColors: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
-  in_review: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  approved: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  implemented: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  scheduled: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
+  in_progress: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  completed: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  published: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
 };
 
 export default function ManagementReviews() {
@@ -78,6 +85,7 @@ export default function ManagementReviews() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const { data: reviews, isLoading } = useQuery<ManagementReview[]>({
     queryKey: ["/api/management-reviews"],
@@ -87,13 +95,16 @@ export default function ManagementReviews() {
     resolver: zodResolver(managementReviewSchema),
     defaultValues: {
       reviewDate: new Date().toISOString().split("T")[0],
+      reviewPeriodStart: "",
+      reviewPeriodEnd: "",
+      chairPerson: "",
       attendees: "",
       objectivesReviewed: "",
       keyFindings: "",
       decisionsRequired: "",
       actionItems: "",
       nextReviewDate: "",
-      status: "draft",
+      status: "scheduled",
     },
   });
 
@@ -103,17 +114,32 @@ export default function ManagementReviews() {
 
   const createMutation = useMutation({
     mutationFn: async (data: ManagementReviewForm) => {
+      // Convert action items to structured JSONB format
+      const actionItemsArray = data.actionItems 
+        ? data.actionItems.split("\n").filter((a) => a.trim()).map((item, index) => ({
+            id: index + 1,
+            description: item,
+            assignedTo: null,
+            dueDate: null,
+            status: "pending"
+          }))
+        : [];
+
       return await apiRequest("/api/management-reviews", {
         method: "POST",
         body: JSON.stringify({
-          reviewDate: new Date(data.reviewDate),
+          reviewDate: data.reviewDate,
+          reviewPeriodStart: data.reviewPeriodStart,
+          reviewPeriodEnd: data.reviewPeriodEnd,
+          chairPerson: data.chairPerson,
           attendees: data.attendees.split("\n").filter((a) => a.trim()),
           objectivesReviewed: data.objectivesReviewed.split("\n").filter((o) => o.trim()),
           keyFindings: data.keyFindings,
           decisionsRequired: data.decisionsRequired,
-          actionItems: data.actionItems ? data.actionItems.split("\n").filter((a) => a.trim()) : [],
-          nextReviewDate: data.nextReviewDate ? new Date(data.nextReviewDate) : null,
+          actionItems: actionItemsArray,
+          nextReviewDate: data.nextReviewDate || null,
           status: data.status,
+          createdBy: user?.id || "unknown",
         }),
       });
     },
@@ -137,16 +163,30 @@ export default function ManagementReviews() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ManagementReviewForm }) => {
+      // Convert action items to structured JSONB format
+      const actionItemsArray = data.actionItems 
+        ? data.actionItems.split("\n").filter((a) => a.trim()).map((item, index) => ({
+            id: index + 1,
+            description: item,
+            assignedTo: null,
+            dueDate: null,
+            status: "pending"
+          }))
+        : [];
+
       return await apiRequest(`/api/management-reviews/${id}`, {
         method: "PUT",
         body: JSON.stringify({
-          reviewDate: new Date(data.reviewDate),
+          reviewDate: data.reviewDate,
+          reviewPeriodStart: data.reviewPeriodStart,
+          reviewPeriodEnd: data.reviewPeriodEnd,
+          chairPerson: data.chairPerson,
           attendees: data.attendees.split("\n").filter((a) => a.trim()),
           objectivesReviewed: data.objectivesReviewed.split("\n").filter((o) => o.trim()),
           keyFindings: data.keyFindings,
           decisionsRequired: data.decisionsRequired,
-          actionItems: data.actionItems ? data.actionItems.split("\n").filter((a) => a.trim()) : [],
-          nextReviewDate: data.nextReviewDate ? new Date(data.nextReviewDate) : null,
+          actionItems: actionItemsArray,
+          nextReviewDate: data.nextReviewDate || null,
           status: data.status,
         }),
       });
@@ -203,28 +243,39 @@ export default function ManagementReviews() {
   // Get valid status transitions
   const getValidStatusTransitions = (currentStatus: string): string[] => {
     switch (currentStatus) {
-      case "draft":
-        return ["draft", "in_review"];
-      case "in_review":
-        return ["draft", "in_review", "approved"];
-      case "approved":
-        return ["in_review", "approved", "implemented"];
-      case "implemented":
-        return ["approved", "implemented"];
+      case "scheduled":
+        return ["scheduled", "in_progress"];
+      case "in_progress":
+        return ["in_progress", "completed"];
+      case "completed":
+        return ["completed", "published"];
+      case "published":
+        return ["published"];
       default:
-        return ["draft"];
+        return ["scheduled"];
     }
   };
 
   const handleEditReview = (review: ManagementReview) => {
     setSelectedReview(review);
+    // Convert actionItems from JSONB to newline-separated string
+    let actionItemsText = "";
+    if (Array.isArray(review.actionItems)) {
+      actionItemsText = review.actionItems.map((item: any) => 
+        typeof item === "string" ? item : item.description || ""
+      ).join("\n");
+    }
+    
     editForm.reset({
       reviewDate: format(new Date(review.reviewDate), "yyyy-MM-dd"),
+      reviewPeriodStart: format(new Date(review.reviewPeriodStart), "yyyy-MM-dd"),
+      reviewPeriodEnd: format(new Date(review.reviewPeriodEnd), "yyyy-MM-dd"),
+      chairPerson: review.chairPerson,
       attendees: review.attendees.join("\n"),
       objectivesReviewed: review.objectivesReviewed.join("\n"),
       keyFindings: review.keyFindings,
       decisionsRequired: review.decisionsRequired,
-      actionItems: review.actionItems.join("\n"),
+      actionItems: actionItemsText,
       nextReviewDate: review.nextReviewDate ? format(new Date(review.nextReviewDate), "yyyy-MM-dd") : "",
       status: review.status,
     });
@@ -327,18 +378,64 @@ export default function ManagementReviews() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="draft">Draft</SelectItem>
-                            <SelectItem value="in_review">In Review</SelectItem>
+                            <SelectItem value="scheduled">Scheduled</SelectItem>
+                            <SelectItem value="in_progress">In Progress</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormDescription>
-                          New reviews can start as Draft or In Review
+                          New reviews can start as Scheduled or In Progress
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={createForm.control}
+                    name="reviewPeriodStart"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Review Period Start *</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-period-start" />
+                        </FormControl>
+                        <FormDescription>Start date of review period</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createForm.control}
+                    name="reviewPeriodEnd"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Review Period End *</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-period-end" />
+                        </FormControl>
+                        <FormDescription>End date of review period</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={createForm.control}
+                  name="chairPerson"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Chair Person *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Name of meeting chair" data-testid="input-chair-person" />
+                      </FormControl>
+                      <FormDescription>Person chairing the management review</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={createForm.control}
@@ -661,6 +758,20 @@ export default function ManagementReviews() {
                 </div>
 
                 <div>
+                  <h4 className="font-medium mb-2">Review Period</h4>
+                  <p className="text-sm" data-testid="view-dialog-period">
+                    {format(new Date(selectedReview.reviewPeriodStart), "MMMM d, yyyy")} - {format(new Date(selectedReview.reviewPeriodEnd), "MMMM d, yyyy")}
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Chair Person</h4>
+                  <p className="text-sm" data-testid="view-dialog-chair">
+                    {selectedReview.chairPerson}
+                  </p>
+                </div>
+
+                <div>
                   <h4 className="font-medium mb-2">Attendees</h4>
                   <ul className="list-disc list-inside space-y-1" data-testid="view-dialog-attendees">
                     {selectedReview.attendees.map((attendee, idx) => (
@@ -777,7 +888,7 @@ export default function ManagementReviews() {
                   render={({ field }) => {
                     const validStatuses = selectedReview 
                       ? getValidStatusTransitions(selectedReview.status)
-                      : ["draft", "in_review"];
+                      : ["scheduled", "in_progress"];
                     return (
                       <FormItem>
                         <FormLabel>Status *</FormLabel>
@@ -788,17 +899,17 @@ export default function ManagementReviews() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {validStatuses.includes("draft") && <SelectItem value="draft">Draft</SelectItem>}
-                            {validStatuses.includes("in_review") && <SelectItem value="in_review">In Review</SelectItem>}
-                            {validStatuses.includes("approved") && <SelectItem value="approved">Approved</SelectItem>}
-                            {validStatuses.includes("implemented") && <SelectItem value="implemented">Implemented</SelectItem>}
+                            {validStatuses.includes("scheduled") && <SelectItem value="scheduled">Scheduled</SelectItem>}
+                            {validStatuses.includes("in_progress") && <SelectItem value="in_progress">In Progress</SelectItem>}
+                            {validStatuses.includes("completed") && <SelectItem value="completed">Completed</SelectItem>}
+                            {validStatuses.includes("published") && <SelectItem value="published">Published</SelectItem>}
                           </SelectContent>
                         </Select>
                         <FormDescription>
-                          {selectedReview?.status === "draft" && "Move to In Review when ready for formal review"}
-                          {selectedReview?.status === "in_review" && "Approve when review is complete"}
-                          {selectedReview?.status === "approved" && "Mark as Implemented when actions are complete"}
-                          {selectedReview?.status === "implemented" && "Review is complete"}
+                          {selectedReview?.status === "scheduled" && "Move to In Progress when review starts"}
+                          {selectedReview?.status === "in_progress" && "Mark as Completed when review is done"}
+                          {selectedReview?.status === "completed" && "Publish when ready to share"}
+                          {selectedReview?.status === "published" && "Review is published"}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -806,6 +917,49 @@ export default function ManagementReviews() {
                   }}
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="reviewPeriodStart"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Review Period Start *</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-edit-period-start" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="reviewPeriodEnd"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Review Period End *</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-edit-period-end" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={editForm.control}
+                name="chairPerson"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Chair Person *</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Name of meeting chair" data-testid="input-edit-chair-person" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={editForm.control}
