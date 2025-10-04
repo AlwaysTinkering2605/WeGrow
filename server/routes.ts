@@ -1235,6 +1235,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Proficiency Levels Routes
+  app.get('/api/proficiency-levels', isAuthenticated, async (req: any, res) => {
+    try {
+      const levels = await storage.getAllProficiencyLevels();
+      res.json(levels);
+    } catch (error) {
+      console.error("Error fetching proficiency levels:", error);
+      res.status(500).json({ message: "Failed to fetch proficiency levels" });
+    }
+  });
+
+  app.get('/api/proficiency-levels/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const level = await storage.getProficiencyLevel(id);
+      if (!level) {
+        return res.status(404).json({ message: "Proficiency level not found" });
+      }
+      res.json(level);
+    } catch (error) {
+      console.error("Error fetching proficiency level:", error);
+      res.status(500).json({ message: "Failed to fetch proficiency level" });
+    }
+  });
+
+  app.post('/api/proficiency-levels', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const levelData = insertProficiencyLevelSchema.parse(req.body);
+      const level = await storage.createProficiencyLevel(levelData);
+      res.json(level);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating proficiency level:", error);
+      res.status(500).json({ message: "Failed to create proficiency level" });
+    }
+  });
+
+  app.put('/api/proficiency-levels/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const levelData = insertProficiencyLevelSchema.partial().parse(req.body);
+      const level = await storage.updateProficiencyLevel(id, levelData);
+      if (!level) {
+        return res.status(404).json({ message: "Proficiency level not found" });
+      }
+      res.json(level);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating proficiency level:", error);
+      res.status(500).json({ message: "Failed to update proficiency level" });
+    }
+  });
+
+  app.delete('/api/proficiency-levels/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+
+      await storage.deleteProficiencyLevel(id);
+      res.json({ message: "Proficiency level deleted successfully" });
+    } catch (error: any) {
+      if (error.message === "Proficiency level not found") {
+        return res.status(404).json({ message: "Proficiency level not found" });
+      }
+      console.error("Error deleting proficiency level:", error);
+      res.status(500).json({ message: "Failed to delete proficiency level" });
+    }
+  });
+
   // Skill Categories Routes
   app.get('/api/skill-categories', isAuthenticated, async (req: any, res) => {
     try {
