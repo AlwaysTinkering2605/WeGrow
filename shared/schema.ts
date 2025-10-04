@@ -66,6 +66,12 @@ export const strategicThemeEnum = pgEnum("strategic_theme", [
 // Risk level enum for Phase 3 risk assessment
 export const riskLevelEnum = pgEnum("risk_level", ["low", "medium", "high", "critical"]);
 
+// Phase 4: Audit Trail enums
+export const objectiveChangeTypeEnum = pgEnum("objective_change_type", ["created", "updated", "deleted", "status_changed"]);
+export const keyResultChangeTypeEnum = pgEnum("key_result_change_type", ["created", "updated", "progress_updated", "confidence_changed"]);
+export const evidenceTypeEnum = pgEnum("evidence_type", ["document", "report", "data_export", "survey", "photo", "link"]);
+export const verificationStatusEnum = pgEnum("verification_status", ["pending", "verified", "rejected"]);
+
 // LMS-specific enums
 export const lessonTypeEnum = pgEnum("lesson_type", ["video", "quiz", "document", "link"]);
 export const contentTypeEnum = pgEnum("content_type", [
@@ -375,6 +381,61 @@ export const krProgressUpdates = pgTable("kr_progress_updates", {
 }, (table) => [
   index("kr_progress_key_result_idx").on(table.keyResultId, table.timestamp),
   index("kr_progress_updated_by_idx").on(table.updatedBy),
+]);
+
+// Phase 4: Objective audit log - immutable history of all objective changes
+export const objectiveAuditLog = pgTable("objective_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  objectiveId: varchar("objective_id").notNull(),
+  objectiveType: varchar("objective_type").notNull(), // 'company' or 'team'
+  changeType: objectiveChangeTypeEnum("change_type").notNull(),
+  changedBy: varchar("changed_by").notNull(),
+  changeTimestamp: timestamp("change_timestamp").defaultNow().notNull(),
+  fieldChanged: varchar("field_changed"),
+  oldValue: jsonb("old_value"),
+  newValue: jsonb("new_value"),
+  changeReason: text("change_reason"),
+}, (table) => [
+  index("audit_objective_idx").on(table.objectiveId, table.changeTimestamp),
+  index("audit_objective_changed_by_idx").on(table.changedBy),
+]);
+
+// Phase 4: Key result audit log - immutable history of all KR changes
+export const keyResultAuditLog = pgTable("key_result_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  keyResultId: varchar("key_result_id").notNull(),
+  keyResultType: varchar("key_result_type").notNull(), // 'company' or 'team'
+  changeType: keyResultChangeTypeEnum("change_type").notNull(),
+  changedBy: varchar("changed_by").notNull(),
+  changeTimestamp: timestamp("change_timestamp").defaultNow().notNull(),
+  fieldChanged: varchar("field_changed"),
+  oldValue: jsonb("old_value"),
+  newValue: jsonb("new_value"),
+  changeReason: text("change_reason"),
+}, (table) => [
+  index("audit_key_result_idx").on(table.keyResultId, table.changeTimestamp),
+  index("audit_key_result_changed_by_idx").on(table.changedBy),
+]);
+
+// Phase 4: Evidence and documentation attachments for objectives and KRs
+export const okrEvidence = pgTable("okr_evidence", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  linkedToId: varchar("linked_to_id").notNull(),
+  linkedToType: varchar("linked_to_type").notNull(), // 'company_objective', 'team_objective', 'key_result', 'team_key_result'
+  evidenceType: evidenceTypeEnum("evidence_type").notNull(),
+  fileName: varchar("file_name"),
+  fileUrl: varchar("file_url"), // Object storage path
+  externalUrl: varchar("external_url"), // For external links
+  description: text("description").notNull(),
+  uploadedBy: varchar("uploaded_by").notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+  verifiedBy: varchar("verified_by"),
+  verificationStatus: verificationStatusEnum("verification_status").default("pending"),
+  verificationNote: text("verification_note"),
+  verifiedAt: timestamp("verified_at"),
+}, (table) => [
+  index("evidence_linked_idx").on(table.linkedToId, table.linkedToType),
+  index("evidence_uploaded_by_idx").on(table.uploadedBy),
 ]);
 
 // Individual goals (OKRs)
@@ -1827,6 +1888,27 @@ export const insertKrProgressUpdateSchema = createInsertSchema(krProgressUpdates
   timestamp: true,
 }).extend({
   confidenceScore: z.number().min(1).max(10).optional(),
+});
+
+// Phase 4: Audit log schemas (system-generated, but exported for type safety)
+export const insertObjectiveAuditLogSchema = createInsertSchema(objectiveAuditLog).omit({
+  id: true,
+  changeTimestamp: true,
+});
+
+export const insertKeyResultAuditLogSchema = createInsertSchema(keyResultAuditLog).omit({
+  id: true,
+  changeTimestamp: true,
+});
+
+// Phase 4: Evidence upload schema
+export const insertOkrEvidenceSchema = createInsertSchema(okrEvidence).omit({
+  id: true,
+  uploadedAt: true,
+  verifiedAt: true,
+}).extend({
+  description: z.string().min(1, "Description is required"),
+  evidenceType: z.enum(["document", "report", "data_export", "survey", "photo", "link"]),
 });
 
 export const insertGoalSchema = createInsertSchema(goals).omit({
