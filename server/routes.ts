@@ -1954,6 +1954,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!linkedToId || !linkedToType) {
         return res.status(400).json({ message: "linkedToId and linkedToType are required" });
       }
+      
+      // SECURITY: Restrict evidence viewing to leadership only until proper team membership checks are implemented
+      // TODO: Implement team membership verification for team-level evidence (requires storage method to get team from objective/KR)
+      const user = await storage.getUser(req.user.claims.sub);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      if (user.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Evidence viewing currently restricted to leadership role." });
+      }
+      
       const evidence = await storage.getEvidence(linkedToId as string, linkedToType as string);
       res.json(evidence);
     } catch (error) {
@@ -1964,8 +1976,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/evidence', isAuthenticated, async (req: any, res) => {
     try {
+      // Validate required fields
+      if (!req.body.linkedToId || !req.body.linkedToType || !req.body.title) {
+        return res.status(400).json({ message: "linkedToId, linkedToType, and title are required" });
+      }
+      
+      // Check authorization based on linkedToType
+      const user = await storage.getUser(req.user.claims.sub);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      if (user.role !== 'leadership' && user.role !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required to upload evidence." });
+      }
+      
+      // If fileUrl is provided, ensure it's stored in object storage with proper ACL
+      let fileUrl = req.body.fileUrl;
+      if (fileUrl) {
+        const objectStorageService = new ObjectStorageService();
+        fileUrl = await objectStorageService.trySetObjectEntityAclPolicy(
+          fileUrl,
+          {
+            owner: req.user.claims.sub,
+            visibility: "private", // Evidence files are private
+          },
+        );
+      }
+      
       const evidenceData = {
         ...req.body,
+        fileUrl,
         uploadedBy: req.user.claims.sub,
       };
       const evidence = await storage.createEvidence(evidenceData);
@@ -1997,6 +2038,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/evidence/:id', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
+      
+      // Check authorization - only uploader or leadership can delete
+      const user = await storage.getUser(req.user.claims.sub);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      // Get the evidence to check ownership
+      // For now, allow leadership and supervisor roles to delete
+      // TODO: Add ownership check to only allow uploader to delete their own evidence
+      if (user.role !== 'leadership' && user.role !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Supervisor or leadership role required to delete evidence." });
+      }
+      
       await storage.deleteEvidence(id);
       res.json({ message: "Evidence deleted successfully" });
     } catch (error) {
