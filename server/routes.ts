@@ -297,6 +297,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: req.user.claims.sub 
       });
       const objective = await storage.createCompanyObjective(objectiveData);
+      
+      // Phase 4: Create audit log entry for creation
+      await storage.createObjectiveAuditLog({
+        objectiveId: objective.id,
+        objectiveType: 'company',
+        changeType: 'created',
+        changedBy: req.user.claims.sub,
+        oldValue: null,
+        newValue: objective as any,
+      });
+      
       res.json(objective);
     } catch (error) {
       console.error("Error creating company objective:", error);
@@ -354,7 +365,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { id } = req.params;
+      
+      // Phase 4: Get current state for audit log before deletion
+      const currentObjectives = await storage.getActiveCompanyObjectives();
+      const oldObjective = currentObjectives.find(obj => obj.id === id);
+      
       await storage.deleteCompanyObjective(id);
+      
+      // Phase 4: Create audit log entry for deletion
+      if (oldObjective) {
+        await storage.createObjectiveAuditLog({
+          objectiveId: id,
+          objectiveType: 'company',
+          changeType: 'deleted',
+          changedBy: req.user.claims.sub,
+          oldValue: oldObjective as any,
+          newValue: null,
+        });
+      }
+      
       res.json({ message: "Company objective deleted successfully" });
     } catch (error) {
       console.error("Error deleting company objective:", error);
