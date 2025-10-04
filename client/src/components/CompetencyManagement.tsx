@@ -144,7 +144,8 @@ function CompetencyManagementDashboard() {
     const matchesSearch = !searchTerm || 
       comp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       comp.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !categoryFilter || categoryFilter === "all" || comp.category === categoryFilter;
+    const matchesCategory = !categoryFilter || categoryFilter === "all" || 
+      comp.category === categoryFilter || comp.categoryName === categoryFilter || comp.categoryId === categoryFilter;
     const matchesSkillType = !skillTypeFilter || skillTypeFilter === "all" || comp.skillType === skillTypeFilter;
     return matchesSearch && matchesCategory && matchesSkillType;
   });
@@ -429,7 +430,7 @@ function CompetencyLibraryView({ competencies, isLoading }: {
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">{competency.description}</p>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>📂 {competency.category}</span>
+                      <span>📂 {competency.categoryName || competency.category || "Uncategorized"}</span>
                       {competency.assessmentCriteria && (
                         <span>📋 Has Assessment Criteria</span>
                       )}
