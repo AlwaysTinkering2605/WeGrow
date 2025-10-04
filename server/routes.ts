@@ -19,6 +19,7 @@ import {
   insertDepartmentSchema,
   insertSkillCategoryTypeSchema,
   insertSkillCategorySchema,
+  insertProficiencyLevelSchema,
   insertJobRoleSchema,
   updateUserProfileSchema,
   // LMS schemas
