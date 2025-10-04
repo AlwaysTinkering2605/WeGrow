@@ -688,6 +688,89 @@ export const lessons = pgTable("lessons", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Skills table - granular skills taxonomy (e.g., "Vacuuming", "Mopping", "Toilet Cleaning")
+export const skills = pgTable("skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull().unique(),
+  code: varchar("code").notNull().unique(), // vacuuming, mopping, toilet_cleaning
+  description: text("description"),
+  categoryId: varchar("category_id").notNull(), // FK to skill_categories.id - what category this skill belongs to
+  targetProficiencyId: varchar("target_proficiency_id"), // Optional FK to proficiency_levels.id - default proficiency level for this skill
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.categoryId],
+    foreignColumns: [skillCategories.id],
+    name: "skills_category_fk"
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.targetProficiencyId],
+    foreignColumns: [proficiencyLevels.id],
+    name: "skills_target_proficiency_fk"
+  }).onDelete("set null"),
+  index("skills_category_idx").on(table.categoryId),
+  index("skills_target_proficiency_idx").on(table.targetProficiencyId),
+]);
+
+// Lesson Skills junction table - links lessons to the granular skills they teach
+export const lessonSkills = pgTable("lesson_skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lessonId: varchar("lesson_id").notNull(), // FK to lessons.id
+  skillId: varchar("skill_id").notNull(), // FK to skills.id
+  targetProficiencyId: varchar("target_proficiency_id"), // FK to proficiency_levels.id - what level this lesson teaches the skill to
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.lessonId],
+    foreignColumns: [lessons.id],
+    name: "lesson_skills_lesson_fk"
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.skillId],
+    foreignColumns: [skills.id],
+    name: "lesson_skills_skill_fk"
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.targetProficiencyId],
+    foreignColumns: [proficiencyLevels.id],
+    name: "lesson_skills_target_proficiency_fk"
+  }).onDelete("set null"),
+  index("lesson_skills_lesson_idx").on(table.lessonId),
+  index("lesson_skills_skill_idx").on(table.skillId),
+  unique("lesson_skills_lesson_skill_unique").on(table.lessonId, table.skillId),
+]);
+
+// Competency Skills junction table - aggregates required skills for competencies
+export const competencySkills = pgTable("competency_skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  competencyId: varchar("competency_id").notNull(), // FK to competencies.id
+  skillId: varchar("skill_id").notNull(), // FK to skills.id
+  requiredProficiencyId: varchar("required_proficiency_id"), // FK to proficiency_levels.id - required mastery level
+  isRequired: boolean("is_required").default(true), // Whether this skill is required or optional for the competency
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.competencyId],
+    foreignColumns: [competencies.id],
+    name: "competency_skills_competency_fk"
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.skillId],
+    foreignColumns: [skills.id],
+    name: "competency_skills_skill_fk"
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [table.requiredProficiencyId],
+    foreignColumns: [proficiencyLevels.id],
+    name: "competency_skills_required_proficiency_fk"
+  }).onDelete("set null"),
+  index("competency_skills_competency_idx").on(table.competencyId),
+  index("competency_skills_skill_idx").on(table.skillId),
+  unique("competency_skills_competency_skill_unique").on(table.competencyId, table.skillId),
+]);
+
 // Quizzes for lessons
 export const quizzes = pgTable("quizzes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1845,6 +1928,22 @@ export const insertProficiencyLevelSchema = createInsertSchema(proficiencyLevels
   updatedAt: true,
 });
 
+export const insertSkillSchema = createInsertSchema(skills).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLessonSkillSchema = createInsertSchema(lessonSkills).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCompetencySkillSchema = createInsertSchema(competencySkills).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertLearningPathJobRoleSchema = createInsertSchema(learningPathJobRoles).omit({
   id: true,
   createdAt: true,
@@ -2296,6 +2395,9 @@ export type Department = typeof departments.$inferSelect;
 export type SkillCategoryType = typeof skillCategoryTypes.$inferSelect;
 export type SkillCategory = typeof skillCategories.$inferSelect;
 export type ProficiencyLevel = typeof proficiencyLevels.$inferSelect;
+export type Skill = typeof skills.$inferSelect;
+export type LessonSkill = typeof lessonSkills.$inferSelect;
+export type CompetencySkill = typeof competencySkills.$inferSelect;
 export type JobRole = typeof jobRoles.$inferSelect;
 export type LearningPathJobRole = typeof learningPathJobRoles.$inferSelect;
 export type User = typeof users.$inferSelect;
@@ -2337,6 +2439,9 @@ export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
 export type InsertSkillCategoryType = z.infer<typeof insertSkillCategoryTypeSchema>;
 export type InsertSkillCategory = z.infer<typeof insertSkillCategorySchema>;
 export type InsertProficiencyLevel = z.infer<typeof insertProficiencyLevelSchema>;
+export type InsertSkill = z.infer<typeof insertSkillSchema>;
+export type InsertLessonSkill = z.infer<typeof insertLessonSkillSchema>;
+export type InsertCompetencySkill = z.infer<typeof insertCompetencySkillSchema>;
 export type InsertJobRole = z.infer<typeof insertJobRoleSchema>;
 export type InsertLearningPathJobRole = z.infer<typeof insertLearningPathJobRoleSchema>;
 export type InsertCompanyObjective = z.infer<typeof insertCompanyObjectiveSchema>;
