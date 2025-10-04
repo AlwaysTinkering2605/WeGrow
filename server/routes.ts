@@ -431,6 +431,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         supervisorId: req.user.claims.sub 
       });
       const objective = await storage.createTeamObjective(objectiveData);
+      
+      // Phase 4: Create audit log entry for creation
+      await storage.createObjectiveAuditLog({
+        objectiveId: objective.id,
+        objectiveType: 'team',
+        changeType: 'created',
+        changedBy: req.user.claims.sub,
+        oldValue: null,
+        newValue: objective as any,
+      });
+      
       res.json(objective);
     } catch (error) {
       console.error("Error creating team objective:", error);
@@ -471,6 +482,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const objective = await storage.updateTeamObjective(id, updateData);
+      
+      // Phase 4: Create audit log entry for update
+      await storage.createObjectiveAuditLog({
+        objectiveId: id,
+        objectiveType: 'team',
+        changeType: 'updated',
+        changedBy: req.user.claims.sub,
+        oldValue: existingObjective as any,
+        newValue: objective as any,
+      });
+      
       res.json(objective);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -490,7 +512,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { id } = req.params;
+      
+      // Phase 4: Get current state for audit log before deletion
+      const existingObjective = await storage.getTeamObjectiveById(id);
+      
       await storage.deleteTeamObjective(id);
+      
+      // Phase 4: Create audit log entry for deletion
+      if (existingObjective) {
+        await storage.createObjectiveAuditLog({
+          objectiveId: id,
+          objectiveType: 'team',
+          changeType: 'deleted',
+          changedBy: req.user.claims.sub,
+          oldValue: existingObjective as any,
+          newValue: null,
+        });
+      }
+      
       res.json({ message: "Team objective deleted successfully" });
     } catch (error) {
       console.error("Error deleting team objective:", error);
