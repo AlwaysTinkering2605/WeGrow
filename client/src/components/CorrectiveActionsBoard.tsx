@@ -40,8 +40,8 @@ type CorrectiveAction = {
   assignedTo: string;
   targetCompletionDate: Date;
   actualCompletionDate: Date | null;
-  status: "open" | "in_progress" | "implementation" | "verification" | "closed";
-  effectiveness: "not_evaluated" | "under_review" | "effective" | "ineffective" | null;
+  status: "open" | "in_progress" | "completed" | "verified" | "closed";
+  effectiveness: "not_evaluated" | "effective" | "partially_effective" | "ineffective" | null;
   effectivenessNote: string | null;
   createdBy: string;
   createdAt: Date;
@@ -65,30 +65,30 @@ type CorrectiveActionForm = z.infer<typeof correctiveActionSchema>;
 const statusLabels: Record<string, string> = {
   open: "Open",
   in_progress: "In Progress",
-  implementation: "Implementation",
-  verification: "Verification",
+  completed: "Completed",
+  verified: "Verified",
   closed: "Closed",
 };
 
 const statusColors: Record<string, string> = {
   open: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
   in_progress: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  implementation: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  verification: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  completed: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  verified: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
   closed: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
 };
 
 const effectivenessLabels: Record<string, string> = {
-  not_started: "Not Started",
-  pending: "Pending",
+  not_evaluated: "Not Evaluated",
   effective: "Effective",
+  partially_effective: "Partially Effective",
   ineffective: "Ineffective",
 };
 
 const effectivenessColors: Record<string, string> = {
-  not_started: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
-  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  not_evaluated: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
   effective: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  partially_effective: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
   ineffective: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
 };
 
@@ -283,13 +283,13 @@ export default function CorrectiveActionsBoard() {
       assignedTo: action.assignedTo,
       targetDate: action.targetCompletionDate ? format(new Date(action.targetCompletionDate), "yyyy-MM-dd") : "",
       fiveWhysAnalysis: fiveWhysText,
-      objectiveId: action.objectiveId || "",
-      nonconformityId: action.nonconformityId || "",
+      objectiveId: action.linkedObjectiveId || "",
+      nonconformityId: action.linkedKeyResultId || "",
     });
     setIsEditDialogOpen(true);
   };
 
-  const statuses = ["open", "in_progress", "implementation", "verification", "closed"];
+  const statuses = ["open", "in_progress", "completed", "verified", "closed"];
 
   const groupedActions = statuses.reduce((acc, status) => {
     acc[status] = actions.filter((action) => action.status === status);
@@ -487,9 +487,9 @@ export default function CorrectiveActionsBoard() {
                       <Clock className="h-3 w-3 mr-1" />
                       {format(new Date(action.targetCompletionDate), "MMM dd, yyyy")}
                     </div>
-                    {action.effectivenessReview && action.effectivenessReview !== "not_started" && (
-                      <Badge className={`text-xs ${effectivenessColors[action.effectivenessReview]}`}>
-                        {effectivenessLabels[action.effectivenessReview]}
+                    {action.effectiveness && action.effectiveness !== "not_evaluated" && (
+                      <Badge className={`text-xs ${effectivenessColors[action.effectiveness]}`}>
+                        {effectivenessLabels[action.effectiveness]}
                       </Badge>
                     )}
                   </CardContent>
@@ -512,9 +512,9 @@ export default function CorrectiveActionsBoard() {
                 <Badge className={statusColors[selectedAction.status]}>
                   {statusLabels[selectedAction.status]}
                 </Badge>
-                {selectedAction.effectivenessReview && selectedAction.effectivenessReview !== "not_started" && (
-                  <Badge className={effectivenessColors[selectedAction.effectivenessReview]}>
-                    {effectivenessLabels[selectedAction.effectivenessReview]}
+                {selectedAction.effectiveness && selectedAction.effectiveness !== "not_evaluated" && (
+                  <Badge className={effectivenessColors[selectedAction.effectiveness]}>
+                    {effectivenessLabels[selectedAction.effectiveness]}
                   </Badge>
                 )}
               </div>
