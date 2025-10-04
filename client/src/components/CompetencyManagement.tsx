@@ -315,6 +315,11 @@ function CompetencyLibraryView({ competencies, isLoading }: {
   const [editingCompetency, setEditingCompetency] = useState<Competency | null>(null);
   const { toast } = useToast();
 
+  // Fetch skill categories for the dropdown
+  const { data: skillCategories } = useQuery({
+    queryKey: ["/api/skill-categories"]
+  }) as { data: any[] | undefined };
+
   const form = useForm<CompetencyFormType>({
     resolver: zodResolver(competencySchema),
     defaultValues: {
@@ -368,7 +373,7 @@ function CompetencyLibraryView({ competencies, isLoading }: {
     form.reset({
       title: competency.title,
       description: competency.description,
-      category: competency.category,
+      categoryId: competency.categoryId || "",
       level: competency.level,
       parentId: competency.parentId,
       skillType: competency.skillType,
@@ -506,13 +511,24 @@ function CompetencyLibraryView({ competencies, isLoading }: {
 
                   <FormField
                     control={form.control}
-                    name="category"
+                    name="categoryId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-competency-category" />
-                        </FormControl>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-competency-category">
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {skillCategories?.map((cat: any) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
