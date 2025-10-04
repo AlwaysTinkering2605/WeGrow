@@ -3,6 +3,7 @@ import {
   teams,
   teamMembers,
   departments,
+  skillCategoryTypes,
   skillCategories,
   jobRoles,
   learningPathJobRoles,
@@ -70,6 +71,8 @@ import {
   type UpsertUser,
   type Department,
   type InsertDepartment,
+  type SkillCategoryType,
+  type InsertSkillCategoryType,
   type SkillCategory,
   type InsertSkillCategory,
   type JobRole,
@@ -404,6 +407,13 @@ export interface IStorage {
   deleteDepartment(departmentId: string): Promise<void>;
   getJobRolesByDepartmentId(departmentId: string): Promise<JobRole[]>;
   getTeamsByDepartmentId(departmentId: string): Promise<Team[]>;
+
+  // Skill Category Types Management
+  getAllSkillCategoryTypes(): Promise<SkillCategoryType[]>;
+  getSkillCategoryType(typeId: string): Promise<SkillCategoryType | undefined>;
+  createSkillCategoryType(type: InsertSkillCategoryType): Promise<SkillCategoryType>;
+  updateSkillCategoryType(typeId: string, updates: Partial<InsertSkillCategoryType>): Promise<SkillCategoryType>;
+  deleteSkillCategoryType(typeId: string): Promise<void>;
 
   // Skill Categories Management
   getAllSkillCategories(): Promise<SkillCategory[]>;
@@ -2250,6 +2260,49 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(teams)
       .where(eq(teams.departmentId, departmentId));
+  }
+
+  // Skill Category Types Management
+  async getAllSkillCategoryTypes(): Promise<SkillCategoryType[]> {
+    return await db
+      .select()
+      .from(skillCategoryTypes)
+      .where(eq(skillCategoryTypes.isActive, true))
+      .orderBy(skillCategoryTypes.sortOrder, skillCategoryTypes.name);
+  }
+
+  async getSkillCategoryType(typeId: string): Promise<SkillCategoryType | undefined> {
+    const [type] = await db.select().from(skillCategoryTypes).where(eq(skillCategoryTypes.id, typeId));
+    return type;
+  }
+
+  async createSkillCategoryType(typeData: InsertSkillCategoryType): Promise<SkillCategoryType> {
+    const [type] = await db
+      .insert(skillCategoryTypes)
+      .values(typeData)
+      .returning();
+    return type;
+  }
+
+  async updateSkillCategoryType(typeId: string, updates: Partial<InsertSkillCategoryType>): Promise<SkillCategoryType> {
+    const [type] = await db
+      .update(skillCategoryTypes)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(skillCategoryTypes.id, typeId))
+      .returning();
+    return type;
+  }
+
+  async deleteSkillCategoryType(typeId: string): Promise<void> {
+    const [type] = await db
+      .update(skillCategoryTypes)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(skillCategoryTypes.id, typeId))
+      .returning();
+    
+    if (!type) {
+      throw new Error("Skill category type not found");
+    }
   }
 
   // Skill Categories Management
