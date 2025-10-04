@@ -383,6 +383,19 @@ export interface IStorage {
   getOkrSnapshots(objectiveId?: string, managementReviewId?: string): Promise<OkrSnapshot[]>;
   getOkrSnapshot(id: string): Promise<OkrSnapshot | null>;
   
+  // Phase 5: Corrective Actions & Nonconformity
+  getCorrectiveActions(status?: string, assignedTo?: string): Promise<CorrectiveAction[]>;
+  getCorrectiveAction(id: string): Promise<CorrectiveAction | null>;
+  createCorrectiveAction(action: InsertCorrectiveAction): Promise<CorrectiveAction>;
+  updateCorrectiveAction(id: string, updates: Partial<InsertCorrectiveAction>): Promise<CorrectiveAction | null>;
+  deleteCorrectiveAction(id: string): Promise<boolean>;
+  
+  getNonconformities(objectiveId?: string, status?: string): Promise<Nonconformity[]>;
+  getNonconformity(id: string): Promise<Nonconformity | null>;
+  createNonconformity(nonconformity: InsertNonconformity): Promise<Nonconformity>;
+  updateNonconformity(id: string, updates: Partial<InsertNonconformity>): Promise<Nonconformity | null>;
+  deleteNonconformity(id: string): Promise<boolean>;
+  
   // Goals
   getUserGoals(userId: string): Promise<Goal[]>;
   createGoal(goal: InsertGoal): Promise<Goal>;
