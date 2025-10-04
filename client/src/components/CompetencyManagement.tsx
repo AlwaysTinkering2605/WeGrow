@@ -515,7 +515,7 @@ function CompetencyLibraryView({ competencies, isLoading }: {
                     name="categoryId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Category</FormLabel>
+                        <FormLabel>Skill Category</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-competency-category">
@@ -556,7 +556,7 @@ function CompetencyLibraryView({ competencies, isLoading }: {
                     name="skillType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Skill Type</FormLabel>
+                        <FormLabel>Category Type</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-skill-type">
@@ -1547,7 +1547,7 @@ export default function CompetencyManagement() {
                   name="categoryId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Category</FormLabel>
+                      <FormLabel>Skill Category</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-competency-category">
@@ -1588,7 +1588,7 @@ export default function CompetencyManagement() {
                   name="skillType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Skill Type</FormLabel>
+                      <FormLabel>Category Type</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-skill-type">
