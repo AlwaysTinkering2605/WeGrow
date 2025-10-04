@@ -95,6 +95,21 @@ export const keyResultChangeTypeEnum = pgEnum("key_result_change_type", ["create
 export const evidenceTypeEnum = pgEnum("evidence_type", ["document", "report", "data_export", "survey", "photo", "link"]);
 export const verificationStatusEnum = pgEnum("verification_status", ["pending", "verified", "rejected"]);
 
+// Phase 6: Management Review & Reporting enums
+export const managementReviewStatusEnum = pgEnum("management_review_status", [
+  "scheduled",
+  "in_progress",
+  "completed",
+  "published"
+]);
+
+export const snapshotCreatedForEnum = pgEnum("snapshot_created_for", [
+  "management_review",
+  "quarterly_report",
+  "audit",
+  "scheduled"
+]);
+
 // LMS-specific enums
 export const lessonTypeEnum = pgEnum("lesson_type", ["video", "quiz", "document", "link"]);
 export const contentTypeEnum = pgEnum("content_type", [
@@ -530,6 +545,44 @@ export const objectiveResources = pgTable("objective_resources", {
 }, (table) => [
   index("objective_resources_objective_idx").on(table.objectiveId, table.objectiveType),
   index("objective_resources_status_idx").on(table.status),
+]);
+
+// Phase 6: Management Review & Reporting tables
+export const managementReviews = pgTable("management_reviews", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reviewDate: timestamp("review_date").notNull(),
+  reviewPeriodStart: timestamp("review_period_start").notNull(),
+  reviewPeriodEnd: timestamp("review_period_end").notNull(),
+  attendees: text("attendees").array().notNull(), // Array of user IDs - ISO 9001 required
+  chairPerson: varchar("chair_person").notNull(),
+  objectivesReviewed: text("objectives_reviewed").array().notNull(), // Array of objective IDs
+  keyFindings: text("key_findings").notNull(), // ISO 9001 required
+  decisionsRequired: text("decisions_required").notNull(), // ISO 9001 required
+  actionItems: jsonb("action_items").notNull(), // Structured action items - ISO 9001 required
+  nextReviewDate: timestamp("next_review_date"),
+  status: managementReviewStatusEnum("status").default("scheduled"),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("management_reviews_date_idx").on(table.reviewDate),
+  index("management_reviews_status_idx").on(table.status),
+]);
+
+export const okrSnapshots = pgTable("okr_snapshots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  snapshotDate: timestamp("snapshot_date").defaultNow().notNull(),
+  objectiveId: varchar("objective_id").notNull(),
+  objectiveType: varchar("objective_type").notNull(), // 'company' or 'team'
+  objectiveData: jsonb("objective_data").notNull(), // Complete objective state
+  keyResultsData: jsonb("key_results_data").notNull(), // Array of all KRs
+  progressMetrics: jsonb("progress_metrics"), // Calculated metrics
+  createdFor: snapshotCreatedForEnum("created_for"),
+  managementReviewId: varchar("management_review_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("okr_snapshots_objective_idx").on(table.objectiveId, table.snapshotDate),
+  index("okr_snapshots_review_idx").on(table.managementReviewId),
 ]);
 
 // Individual goals (OKRs)
@@ -2120,6 +2173,18 @@ export const insertObjectiveResourceSchema = createInsertSchema(objectiveResourc
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+// Phase 6: Management Review & Reporting insert schemas
+export const insertManagementReviewSchema = createInsertSchema(managementReviews).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertOkrSnapshotSchema = createInsertSchema(okrSnapshots).omit({
+  id: true,
+  createdAt: true,
 });
 
 // Phase 4: Evidence upload schema
