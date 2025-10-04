@@ -14,6 +14,8 @@ import {
   insertObjectiveResourceSchema,
   insertManagementReviewSchema,
   insertOkrSnapshotSchema,
+  insertCorrectiveActionSchema,
+  insertNonconformitySchema,
   insertWeeklyCheckInSchema,
   insertKrWeeklyCheckInSchema,
   insertUserCompetencySchema,
@@ -1200,6 +1202,174 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching OKR snapshot:", error);
       res.status(500).json({ message: "Failed to fetch OKR snapshot" });
+    }
+  });
+
+  // Phase 5: Corrective Actions (ISO 9001:2015 Clause 10.2)
+  app.get('/api/corrective-actions', isAuthenticated, async (req: any, res) => {
+    try {
+      const { status, assignedTo } = req.query;
+      const actions = await storage.getCorrectiveActions(status as string | undefined, assignedTo as string | undefined);
+      res.json(actions);
+    } catch (error) {
+      console.error("Error fetching corrective actions:", error);
+      res.status(500).json({ message: "Failed to fetch corrective actions" });
+    }
+  });
+
+  app.get('/api/corrective-actions/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const action = await storage.getCorrectiveAction(id);
+      if (!action) {
+        return res.status(404).json({ message: "Corrective action not found" });
+      }
+      res.json(action);
+    } catch (error) {
+      console.error("Error fetching corrective action:", error);
+      res.status(500).json({ message: "Failed to fetch corrective action" });
+    }
+  });
+
+  app.post('/api/corrective-actions', isAuthenticated, async (req: any, res) => {
+    try {
+      const processedBody = {
+        ...req.body,
+        targetDate: req.body.targetDate ? new Date(req.body.targetDate) : undefined,
+        actualCompletionDate: req.body.actualCompletionDate ? new Date(req.body.actualCompletionDate) : null,
+        createdBy: req.user.claims.sub
+      };
+
+      const actionData = insertCorrectiveActionSchema.parse(processedBody);
+      const action = await storage.createCorrectiveAction(actionData);
+      res.json(action);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error creating corrective action:", error);
+      res.status(500).json({ message: "Failed to create corrective action" });
+    }
+  });
+
+  app.put('/api/corrective-actions/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const processedBody = {
+        ...req.body,
+        targetDate: req.body.targetDate ? new Date(req.body.targetDate) : undefined,
+        actualCompletionDate: req.body.actualCompletionDate ? new Date(req.body.actualCompletionDate) : null
+      };
+
+      const { id } = req.params;
+      const updateData = insertCorrectiveActionSchema.partial().parse(processedBody);
+      const action = await storage.updateCorrectiveAction(id, updateData);
+      if (!action) {
+        return res.status(404).json({ message: "Corrective action not found" });
+      }
+      res.json(action);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error updating corrective action:", error);
+      res.status(500).json({ message: "Failed to update corrective action" });
+    }
+  });
+
+  app.delete('/api/corrective-actions/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteCorrectiveAction(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Corrective action not found" });
+      }
+      res.json({ message: "Corrective action deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting corrective action:", error);
+      res.status(500).json({ message: "Failed to delete corrective action" });
+    }
+  });
+
+  // Phase 5: Nonconformities (Quality Issues)
+  app.get('/api/nonconformities', isAuthenticated, async (req: any, res) => {
+    try {
+      const { objectiveId, status } = req.query;
+      const nonconformities = await storage.getNonconformities(objectiveId as string | undefined, status as string | undefined);
+      res.json(nonconformities);
+    } catch (error) {
+      console.error("Error fetching nonconformities:", error);
+      res.status(500).json({ message: "Failed to fetch nonconformities" });
+    }
+  });
+
+  app.get('/api/nonconformities/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const nonconformity = await storage.getNonconformity(id);
+      if (!nonconformity) {
+        return res.status(404).json({ message: "Nonconformity not found" });
+      }
+      res.json(nonconformity);
+    } catch (error) {
+      console.error("Error fetching nonconformity:", error);
+      res.status(500).json({ message: "Failed to fetch nonconformity" });
+    }
+  });
+
+  app.post('/api/nonconformities', isAuthenticated, async (req: any, res) => {
+    try {
+      const processedBody = {
+        ...req.body,
+        detectedDate: req.body.detectedDate ? new Date(req.body.detectedDate) : new Date(),
+        reportedBy: req.user.claims.sub
+      };
+
+      const nonconformityData = insertNonconformitySchema.parse(processedBody);
+      const nonconformity = await storage.createNonconformity(nonconformityData);
+      res.json(nonconformity);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error creating nonconformity:", error);
+      res.status(500).json({ message: "Failed to create nonconformity" });
+    }
+  });
+
+  app.put('/api/nonconformities/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const processedBody = {
+        ...req.body,
+        detectedDate: req.body.detectedDate ? new Date(req.body.detectedDate) : undefined
+      };
+
+      const { id } = req.params;
+      const updateData = insertNonconformitySchema.partial().parse(processedBody);
+      const nonconformity = await storage.updateNonconformity(id, updateData);
+      if (!nonconformity) {
+        return res.status(404).json({ message: "Nonconformity not found" });
+      }
+      res.json(nonconformity);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error updating nonconformity:", error);
+      res.status(500).json({ message: "Failed to update nonconformity" });
+    }
+  });
+
+  app.delete('/api/nonconformities/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteNonconformity(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Nonconformity not found" });
+      }
+      res.json({ message: "Nonconformity deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting nonconformity:", error);
+      res.status(500).json({ message: "Failed to delete nonconformity" });
     }
   });
 
