@@ -12,6 +12,8 @@ import {
   insertKrProgressUpdateSchema,
   insertQualityPolicySchema,
   insertObjectiveResourceSchema,
+  insertManagementReviewSchema,
+  insertOkrSnapshotSchema,
   insertWeeklyCheckInSchema,
   insertUserCompetencySchema,
   insertDevelopmentPlanSchema,
@@ -1015,6 +1017,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting objective resource:", error);
       res.status(500).json({ message: "Failed to delete objective resource" });
+    }
+  });
+
+  // Phase 6: Management Reviews (ISO 9001:2015 Clause 9.3)
+  app.get('/api/management-reviews', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { status } = req.query;
+      const reviews = await storage.getManagementReviews(status as any);
+      res.json(reviews);
+    } catch (error) {
+      console.error("Error fetching management reviews:", error);
+      res.status(500).json({ message: "Failed to fetch management reviews" });
+    }
+  });
+
+  app.get('/api/management-reviews/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const review = await storage.getManagementReview(id);
+      if (!review) {
+        return res.status(404).json({ message: "Management review not found" });
+      }
+      res.json(review);
+    } catch (error) {
+      console.error("Error fetching management review:", error);
+      res.status(500).json({ message: "Failed to fetch management review" });
+    }
+  });
+
+  app.post('/api/management-reviews', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const reviewData = insertManagementReviewSchema.parse({
+        ...req.body,
+        createdBy: req.user.claims.sub
+      });
+      const review = await storage.createManagementReview(reviewData);
+      res.json(review);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error creating management review:", error);
+      res.status(500).json({ message: "Failed to create management review" });
+    }
+  });
+
+  app.put('/api/management-reviews/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const updateData = insertManagementReviewSchema.partial().parse(req.body);
+      const review = await storage.updateManagementReview(id, updateData);
+      if (!review) {
+        return res.status(404).json({ message: "Management review not found" });
+      }
+      res.json(review);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error updating management review:", error);
+      res.status(500).json({ message: "Failed to update management review" });
+    }
+  });
+
+  app.delete('/api/management-reviews/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const deleted = await storage.deleteManagementReview(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Management review not found" });
+      }
+      res.json({ message: "Management review deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting management review:", error);
+      res.status(500).json({ message: "Failed to delete management review" });
     }
   });
 
