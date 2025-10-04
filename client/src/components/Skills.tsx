@@ -26,7 +26,7 @@ const skillSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
   categoryId: z.string().min(1, "Category is required"),
-  targetProficiencyId: z.string().optional().nullable(),
+  targetProficiencyId: z.string().nullish(),
   isActive: z.boolean().default(true),
 });
 
@@ -167,7 +167,7 @@ export default function Skills() {
     return proficiencyLevels?.find(p => p.id === proficiencyId)?.name;
   };
 
-  const filteredSkills = selectedCategory 
+  const filteredSkills = selectedCategory && selectedCategory !== "all"
     ? skills?.filter(s => s.categoryId === selectedCategory)
     : skills;
 
@@ -191,12 +191,12 @@ export default function Skills() {
       </div>
 
       <div className="flex gap-4">
-        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+        <Select value={selectedCategory || "all"} onValueChange={setSelectedCategory}>
           <SelectTrigger className="w-64" data-testid="select-category-filter">
             <SelectValue placeholder="Filter by category" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="" data-testid="option-all-categories">All Categories</SelectItem>
+            <SelectItem value="all" data-testid="option-all-categories">All Categories</SelectItem>
             {categories?.map((category) => (
               <SelectItem key={category.id} value={category.id} data-testid={`option-category-${category.id}`}>
                 {category.name}
@@ -204,8 +204,8 @@ export default function Skills() {
             ))}
           </SelectContent>
         </Select>
-        {selectedCategory && (
-          <Button variant="outline" onClick={() => setSelectedCategory("")} data-testid="button-clear-filter">
+        {selectedCategory && selectedCategory !== "all" && (
+          <Button variant="outline" onClick={() => setSelectedCategory("all")} data-testid="button-clear-filter">
             Clear Filter
           </Button>
         )}
@@ -361,8 +361,8 @@ export default function Skills() {
                   <FormItem>
                     <FormLabel>Target Proficiency Level (Optional)</FormLabel>
                     <Select 
-                      onValueChange={(value) => field.onChange(value === "" ? null : value)} 
-                      value={field.value || ""}
+                      onValueChange={(value) => field.onChange(value === "none" ? null : value)} 
+                      value={field.value || "none"}
                     >
                       <FormControl>
                         <SelectTrigger data-testid="select-target-proficiency">
@@ -370,7 +370,7 @@ export default function Skills() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="" data-testid="option-no-proficiency">No target proficiency</SelectItem>
+                        <SelectItem value="none" data-testid="option-no-proficiency">No target proficiency</SelectItem>
                         {proficiencyLevels?.map((level) => (
                           <SelectItem key={level.id} value={level.id} data-testid={`option-proficiency-${level.id}`}>
                             {level.name} (Level {level.numericValue})

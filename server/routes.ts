@@ -1366,6 +1366,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const skillData = insertSkillSchema.parse(req.body);
+      
+      // Auto-generate code from name if not provided
+      if (!skillData.code) {
+        skillData.code = skillData.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '');
+      }
+      
       const skill = await storage.createSkill(skillData);
       res.json(skill);
     } catch (error) {
@@ -1386,6 +1395,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { id } = req.params;
       const skillData = insertSkillSchema.partial().parse(req.body);
+      
+      // Auto-generate code from name if name is being updated and code is not provided
+      if (skillData.name && !skillData.code) {
+        skillData.code = skillData.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '');
+      }
+      
       const skill = await storage.updateSkill(id, skillData);
       if (!skill) {
         return res.status(404).json({ message: "Skill not found" });

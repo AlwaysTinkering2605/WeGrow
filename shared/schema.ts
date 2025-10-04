@@ -1932,6 +1932,8 @@ export const insertSkillSchema = createInsertSchema(skills).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  code: z.string().optional(), // Auto-generated from name on backend if not provided
 });
 
 export const insertLessonSkillSchema = createInsertSchema(lessonSkills).omit({
