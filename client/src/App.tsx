@@ -61,6 +61,7 @@ function Router() {
       <Route path="/organization" component={Home} />
       <Route path="/automation-engine" component={Home} />
       <Route path="/analytics" component={Home} />
+      <Route path="/executive-dashboard" component={Home} />
       <Route path="/reports" component={Home} />
       <Route path="/settings" component={Home} />
       <Route path="/webhooks" component={Home} />
