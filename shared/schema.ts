@@ -193,18 +193,38 @@ export const teamMembers = pgTable("team_members", {
   unique("team_members_user_team_unique").on(table.userId, table.teamId),
 ]);
 
-// Skill Categories table - normalized taxonomy for competencies, courses, and learning paths
-export const skillCategories = pgTable("skill_categories", {
+// Skill Category Types table - normalized taxonomy types for skill categories
+export const skillCategoryTypes = pgTable("skill_category_types", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull().unique(),
+  code: varchar("code").notNull().unique(), // technical, behavioral, safety, compliance, etc.
   description: text("description"),
-  type: skillCategoryTypeEnum("type").default("technical").notNull(),
   sortOrder: integer("sort_order").default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
-  index("skill_categories_type_idx").on(table.type),
+  index("skill_category_types_sort_order_idx").on(table.sortOrder),
+]);
+
+// Skill Categories table - normalized taxonomy for competencies, courses, and learning paths
+export const skillCategories = pgTable("skill_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull().unique(),
+  description: text("description"),
+  type: skillCategoryTypeEnum("type"), // DEPRECATED: Keep for migration, use typeId instead
+  typeId: varchar("type_id"), // FK to skill_category_types.id - normalized type reference
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  foreignKey({
+    columns: [table.typeId],
+    foreignColumns: [skillCategoryTypes.id],
+    name: "skill_categories_type_fk"
+  }).onDelete("set null"),
+  index("skill_categories_type_idx").on(table.typeId),
   index("skill_categories_sort_order_idx").on(table.sortOrder),
 ]);
 
@@ -1791,6 +1811,12 @@ export const insertJobRoleSchema = createInsertSchema(jobRoles).omit({
   updatedAt: true,
 });
 
+export const insertSkillCategoryTypeSchema = createInsertSchema(skillCategoryTypes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertSkillCategorySchema = createInsertSchema(skillCategories).omit({
   id: true,
   createdAt: true,
@@ -2245,6 +2271,7 @@ export const insertUserAchievementSchema = createInsertSchema(userAchievements).
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type Team = typeof teams.$inferSelect;
 export type Department = typeof departments.$inferSelect;
+export type SkillCategoryType = typeof skillCategoryTypes.$inferSelect;
 export type SkillCategory = typeof skillCategories.$inferSelect;
 export type JobRole = typeof jobRoles.$inferSelect;
 export type LearningPathJobRole = typeof learningPathJobRoles.$inferSelect;
@@ -2284,6 +2311,7 @@ export type TeamMember = typeof teamMembers.$inferSelect;
 export type InsertTeam = z.infer<typeof insertTeamSchema>;
 export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
 export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
+export type InsertSkillCategoryType = z.infer<typeof insertSkillCategoryTypeSchema>;
 export type InsertSkillCategory = z.infer<typeof insertSkillCategorySchema>;
 export type InsertJobRole = z.infer<typeof insertJobRoleSchema>;
 export type InsertLearningPathJobRole = z.infer<typeof insertLearningPathJobRoleSchema>;
