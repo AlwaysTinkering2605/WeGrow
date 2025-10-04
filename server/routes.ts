@@ -2036,6 +2036,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Alias route for audit (same as audit-history)
+  app.get('/api/objectives/:id/audit', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { type = 'company' } = req.query;
+      const history = await storage.getObjectiveAuditHistory(id, type as 'company' | 'team');
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching objective audit:", error);
+      res.status(500).json({ message: "Failed to fetch audit" });
+    }
+  });
+
   app.get('/api/key-results/:id/audit-history', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
