@@ -15,6 +15,7 @@ import {
   insertManagementReviewSchema,
   insertOkrSnapshotSchema,
   insertWeeklyCheckInSchema,
+  insertKrWeeklyCheckInSchema,
   insertUserCompetencySchema,
   insertDevelopmentPlanSchema,
   insertMeetingSchema,
@@ -3216,6 +3217,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(500).json({ message: "Failed to create check-in" });
+    }
+  });
+
+  // Phase 7: KR Weekly check-ins
+  app.post('/api/kr-check-ins', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Convert date strings to Date objects before validation
+      const processedBody = {
+        ...req.body,
+        weekOf: req.body.weekOf ? new Date(req.body.weekOf) : undefined,
+        updatedBy: userId
+      };
+      
+      const checkInData = insertKrWeeklyCheckInSchema.parse(processedBody);
+      const checkIn = await storage.createKRCheckIn(checkInData);
+      
+      res.status(201).json(checkIn);
+    } catch (error: any) {
+      console.error("Error creating KR check-in:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid data provided", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create KR check-in" });
+    }
+  });
+
+  app.post('/api/kr-check-ins/bulk', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { checkIns } = req.body;
+      
+      if (!Array.isArray(checkIns)) {
+        return res.status(400).json({ message: "checkIns must be an array" });
+      }
+      
+      // Process and validate all check-ins
+      const processedCheckIns = checkIns.map((checkIn: any) => ({
+        ...checkIn,
+        weekOf: checkIn.weekOf ? new Date(checkIn.weekOf) : undefined,
+        updatedBy: userId
+      }));
+      
+      const validatedCheckIns = processedCheckIns.map((checkIn: any) => 
+        insertKrWeeklyCheckInSchema.parse(checkIn)
+      );
+      
+      const created = await storage.createBulkKRCheckIns(validatedCheckIns);
+      res.status(201).json(created);
+    } catch (error: any) {
+      console.error("Error creating bulk KR check-ins:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid data provided", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create bulk KR check-ins" });
+    }
+  });
+
+  app.get('/api/kr-check-ins/:krId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { krId } = req.params;
+      const { type } = req.query;
+      
+      if (!type || (type !== 'company' && type !== 'team')) {
+        return res.status(400).json({ message: "Query parameter 'type' must be 'company' or 'team'" });
+      }
+      
+      const checkIns = await storage.getKRCheckIns(krId, type);
+      res.json(checkIns);
+    } catch (error) {
+      console.error("Error fetching KR check-ins:", error);
+      res.status(500).json({ message: "Failed to fetch KR check-ins" });
+    }
+  });
+
+  app.get('/api/kr-check-ins/stats/completion', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { weekOf } = req.query;
+      
+      if (!weekOf) {
+        return res.status(400).json({ message: "weekOf query parameter is required" });
+      }
+      
+      const stats = await storage.getCheckInCompletionStats(userId, new Date(weekOf));
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching check-in completion stats:", error);
+      res.status(500).json({ message: "Failed to fetch completion stats" });
+    }
+  });
+
+  app.get('/api/kr-check-ins/user/week', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { weekOf } = req.query;
+      
+      if (!weekOf) {
+        return res.status(400).json({ message: "weekOf query parameter is required" });
+      }
+      
+      const checkIns = await storage.getUserKRCheckInsByWeek(userId, new Date(weekOf));
+      res.json(checkIns);
+    } catch (error) {
+      console.error("Error fetching user KR check-ins by week:", error);
+      res.status(500).json({ message: "Failed to fetch check-ins" });
     }
   });
 
