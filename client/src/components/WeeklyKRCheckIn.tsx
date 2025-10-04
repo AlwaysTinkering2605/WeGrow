@@ -78,13 +78,22 @@ export default function WeeklyKRCheckIn() {
 
   // Individual check-in mutation
   const createCheckInMutation = useMutation({
-    mutationFn: async (data: CheckInFormData) => {
+    mutationFn: async (data: CheckInFormData & { _krId?: string }) => {
+      const { _krId, ...checkInData } = data;
       await apiRequest("POST", "/api/kr-check-ins", {
-        ...data,
-        weekOf: data.weekOf.toISOString(),
+        ...checkInData,
+        weekOf: checkInData.weekOf.toISOString(),
       });
+      return _krId;
     },
-    onSuccess: () => {
+    onSuccess: (krId) => {
+      // Clear the submitted KR from form data
+      if (krId) {
+        const newData = new Map(checkInData);
+        newData.delete(krId);
+        setCheckInData(newData);
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['/api/kr-check-ins'] });
       queryClient.invalidateQueries({ queryKey: ['/api/objectives'] });
       queryClient.invalidateQueries({ queryKey: ['/api/team-objectives'] });
@@ -203,6 +212,7 @@ export default function WeeklyKRCheckIn() {
     }
 
     createCheckInMutation.mutate({
+      _krId: kr.id,
       keyResultId: kr.id,
       keyResultType: kr.type,
       previousValue: kr.currentValue || kr.startValue,
