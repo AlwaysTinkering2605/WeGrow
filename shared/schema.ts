@@ -212,8 +212,7 @@ export const skillCategories = pgTable("skill_categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull().unique(),
   description: text("description"),
-  type: skillCategoryTypeEnum("type"), // DEPRECATED: Keep for migration, use typeId instead
-  typeId: varchar("type_id"), // FK to skill_category_types.id - normalized type reference
+  typeId: varchar("type_id").notNull(), // FK to skill_category_types.id - normalized type reference
   sortOrder: integer("sort_order").default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
