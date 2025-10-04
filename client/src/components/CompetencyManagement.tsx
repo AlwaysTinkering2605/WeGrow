@@ -1361,6 +1361,11 @@ export default function CompetencyManagement() {
     queryKey: ["/api/competency-library/hierarchical"]
   });
 
+  // Fetch skill categories for the dropdown
+  const { data: skillCategories } = useQuery({
+    queryKey: ["/api/skill-categories"]
+  }) as { data: any[] | undefined };
+
   const createCompetencyMutation = useMutation({
     mutationFn: (data: CompetencyFormType) => apiRequest("/api/competency-library", {
       method: "POST",
@@ -1420,7 +1425,7 @@ export default function CompetencyManagement() {
     form.reset({
       title: competency.title,
       description: competency.description,
-      category: competency.category,
+      categoryId: competency.categoryId || "",
       level: competency.level,
       parentId: competency.parentId,
       skillType: competency.skillType,
@@ -1539,13 +1544,24 @@ export default function CompetencyManagement() {
 
                 <FormField
                   control={form.control}
-                  name="category"
+                  name="categoryId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Category</FormLabel>
-                      <FormControl>
-                        <Input {...field} data-testid="input-competency-category" />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-competency-category">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {skillCategories?.map((cat: any) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

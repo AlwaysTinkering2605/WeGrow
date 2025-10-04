@@ -331,6 +331,7 @@ export interface IStorage {
   
   // Competencies
   getCompetencies(): Promise<Competency[]>;
+  createCompetency(competency: { name: string; description: string; categoryId?: string }): Promise<Competency>;
   getUserCompetencies(userId: string): Promise<UserCompetencyView[]>;
   createUserCompetency(userCompetency: InsertUserCompetency): Promise<UserCompetency>;
   
@@ -1418,6 +1419,19 @@ export class DatabaseStorage implements IStorage {
       .from(competencies)
       .where(eq(competencies.isActive, true))
       .orderBy(competencies.name);
+  }
+
+  async createCompetency(competency: { name: string; description: string; categoryId?: string }): Promise<Competency> {
+    const [created] = await db
+      .insert(competencies)
+      .values({
+        name: competency.name,
+        description: competency.description,
+        categoryId: competency.categoryId,
+        isActive: true,
+      })
+      .returning();
+    return created;
   }
 
   /**

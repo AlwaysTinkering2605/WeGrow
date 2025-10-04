@@ -2389,9 +2389,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/competency-library', isAuthenticated, requireLeadership(), async (req: any, res) => {
     try {
-      const competencyData = insertCompetencyLibrarySchema.parse(req.body);
-      const competency = await storage.createCompetencyLibraryItem(competencyData);
-      res.json(competency);
+      // Extract data for base competency creation (if provided)
+      const { title, description, categoryId, skillType, level, ...libraryData } = req.body;
+      
+      // Auto-populate createdBy from authenticated user
+      const userId = req.user.claims.sub;
+      
+      // If creating a new competency with title/description, create the base competency first
+      if (title && description) {
+        const baseCompetency = await storage.createCompetency({
+          name: title,
+          description,
+          categoryId,
+        });
+        
+        // Now create the competency library item that references it
+        const competencyLibraryData = insertCompetencyLibrarySchema.parse({
+          ...libraryData,
+          competencyId: baseCompetency.id,
+          createdBy: userId,
+        });
+        
+        const competency = await storage.createCompetencyLibraryItem(competencyLibraryData);
+        res.json({...competency, categoryId, categoryName: null}); // Include categoryId in response for UI
+      } else {
+        // Otherwise, use the provided competency ID
+        const competencyLibraryData = insertCompetencyLibrarySchema.parse({
+          ...req.body,
+          createdBy: userId,
+        });
+        const competency = await storage.createCompetencyLibraryItem(competencyLibraryData);
+        res.json(competency);
+      }
     } catch (error: any) {
       console.error("Error creating competency:", error);
       
