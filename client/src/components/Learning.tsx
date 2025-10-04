@@ -1195,6 +1195,8 @@ export default function Learning() {
   const [selectedQuizForQuestions, setSelectedQuizForQuestions] = useState<string>("");
   const [adminTab, setAdminTab] = useState("courses");
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [isManageSkillsOpen, setIsManageSkillsOpen] = useState(false);
+  const [selectedLessonForSkills, setSelectedLessonForSkills] = useState<any>(null);
 
   // Learning Paths Management State
   const [isCreatePathOpen, setIsCreatePathOpen] = useState(false);
@@ -1816,6 +1818,65 @@ export default function Learning() {
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update lesson. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Skills Management - Fetch all available skills
+  const { data: availableSkills = [], refetch: refetchAvailableSkills } = useQuery<any[]>({
+    queryKey: ["/api/skills"],
+    enabled: isManageSkillsOpen,
+  });
+
+  // Skills Management - Fetch lesson skills
+  const { data: lessonSkills = [], refetch: refetchLessonSkills } = useQuery<any[]>({
+    queryKey: ["/api/lessons", selectedLessonForSkills?.id, "skills"],
+    enabled: !!selectedLessonForSkills?.id && isManageSkillsOpen,
+  });
+
+  // Assign skill to lesson mutation
+  const assignSkillToLessonMutation = useMutation({
+    mutationFn: async ({ lessonId, skillId, targetProficiencyId }: { lessonId: string; skillId: string; targetProficiencyId?: string | null }) => {
+      const response = await apiRequest("POST", `/api/lessons/${lessonId}/skills`, { 
+        skillId, 
+        targetProficiencyId: targetProficiencyId || null 
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Skill Assigned",
+        description: "Skill has been assigned to the lesson successfully.",
+      });
+      refetchLessonSkills();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Assignment Failed",
+        description: error.message || "Failed to assign skill. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Remove skill from lesson mutation
+  const removeSkillFromLessonMutation = useMutation({
+    mutationFn: async ({ lessonId, skillId }: { lessonId: string; skillId: string }) => {
+      const response = await apiRequest("DELETE", `/api/lessons/${lessonId}/skills/${skillId}`);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Skill Removed",
+        description: "Skill has been removed from the lesson successfully.",
+      });
+      refetchLessonSkills();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Removal Failed",
+        description: error.message || "Failed to remove skill. Please try again.",
         variant: "destructive",
       });
     },
@@ -5134,6 +5195,18 @@ export default function Learning() {
                                 >
                                   <Copy className="w-4 h-4" />
                                 </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedLessonForSkills(lesson);
+                                    setIsManageSkillsOpen(true);
+                                  }}
+                                  data-testid={`button-manage-skills-${lesson.id}`}
+                                  title="Manage Skills"
+                                >
+                                  <Target className="w-4 h-4" />
+                                </Button>
                               </div>
                             </div>
                           </div>
@@ -5920,6 +5993,111 @@ export default function Learning() {
                             </div>
                           </form>
                         </Form>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Skills Management Dialog */}
+                    <Dialog open={isManageSkillsOpen} onOpenChange={setIsManageSkillsOpen}>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Manage Skills for Lesson</DialogTitle>
+                          <DialogDescription>
+                            {selectedLessonForSkills && `Assign skills that are taught in "${selectedLessonForSkills.title}"`}
+                          </DialogDescription>
+                        </DialogHeader>
+                        
+                        <div className="space-y-4">
+                          {/* Assigned Skills List */}
+                          <div className="space-y-2">
+                            <h4 className="font-medium text-sm">Assigned Skills</h4>
+                            {lessonSkills.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">No skills assigned yet.</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {lessonSkills.map((lessonSkill: any) => (
+                                  <div 
+                                    key={lessonSkill.id} 
+                                    className="flex items-center justify-between p-2 border rounded-md"
+                                    data-testid={`assigned-skill-${lessonSkill.skillId}`}
+                                  >
+                                    <div className="flex-1">
+                                      <p className="font-medium">{lessonSkill.skill?.name || 'Unknown Skill'}</p>
+                                      {lessonSkill.skill?.description && (
+                                        <p className="text-sm text-muted-foreground">{lessonSkill.skill.description}</p>
+                                      )}
+                                      {lessonSkill.targetProficiency && (
+                                        <Badge variant="outline" className="mt-1">
+                                          Target: {lessonSkill.targetProficiency.name}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        if (confirm(`Remove skill "${lessonSkill.skill?.name}"?`)) {
+                                          removeSkillFromLessonMutation.mutate({
+                                            lessonId: selectedLessonForSkills.id,
+                                            skillId: lessonSkill.skillId,
+                                          });
+                                        }
+                                      }}
+                                      disabled={removeSkillFromLessonMutation.isPending}
+                                      data-testid={`button-remove-skill-${lessonSkill.skillId}`}
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Assign New Skill */}
+                          <div className="space-y-2">
+                            <h4 className="font-medium text-sm">Assign New Skill</h4>
+                            <div className="flex gap-2">
+                              <Select 
+                                onValueChange={(skillId) => {
+                                  if (selectedLessonForSkills && skillId) {
+                                    assignSkillToLessonMutation.mutate({
+                                      lessonId: selectedLessonForSkills.id,
+                                      skillId,
+                                    });
+                                  }
+                                }}
+                                disabled={assignSkillToLessonMutation.isPending}
+                              >
+                                <SelectTrigger className="flex-1" data-testid="select-assign-skill">
+                                  <SelectValue placeholder="Select a skill to assign..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {availableSkills
+                                    .filter((skill: any) => !lessonSkills.some((ls: any) => ls.skillId === skill.id))
+                                    .map((skill: any) => (
+                                      <SelectItem key={skill.id} value={skill.id}>
+                                        {skill.name} {skill.category && `(${skill.category.name})`}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          {/* Dialog Actions */}
+                          <div className="flex justify-end">
+                            <Button 
+                              type="button" 
+                              onClick={() => {
+                                setIsManageSkillsOpen(false);
+                                setSelectedLessonForSkills(null);
+                              }}
+                              data-testid="button-close-skills-dialog"
+                            >
+                              Close
+                            </Button>
+                          </div>
+                        </div>
                       </DialogContent>
                     </Dialog>
 
