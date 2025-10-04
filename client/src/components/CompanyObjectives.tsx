@@ -8,10 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { KeyResultCard } from "@/components/KeyResultCard";
 import { KeyResultProgressDialog } from "@/components/KeyResultProgressDialog";
 import { AuditHistoryTimeline } from "@/components/AuditHistoryTimeline";
 import { EvidenceManager } from "@/components/EvidenceManager";
+import { ObjectiveResourcePlanner } from "@/components/ObjectiveResourcePlanner";
 import { useState, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -95,6 +97,11 @@ export default function CompanyObjectives() {
     queryKey: ["/api/users"],
   });
 
+  // Query for quality policies
+  const { data: qualityPolicies } = useQuery<any[]>({
+    queryKey: ["/api/quality-policies"],
+  });
+
   // Filter users to only leadership and supervisors for owner selection
   const ownerOptions = useMemo(() => {
     if (!users) return [];
@@ -112,6 +119,7 @@ export default function CompanyObjectives() {
       ownerId: "",
       objectiveType: "committed",
       evaluationMethod: "",
+      qualityPolicyLinks: [],
       strategicTheme: undefined,
       riskLevel: undefined,
       riskMitigation: "",
@@ -129,6 +137,7 @@ export default function CompanyObjectives() {
       ownerId: "",
       objectiveType: "committed",
       evaluationMethod: "",
+      qualityPolicyLinks: [],
       strategicTheme: undefined,
       riskLevel: undefined,
       riskMitigation: "",
@@ -282,6 +291,7 @@ export default function CompanyObjectives() {
       ownerId: objective.ownerId ?? "",
       objectiveType: objective.objectiveType ?? "committed",
       evaluationMethod: objective.evaluationMethod ?? "",
+      qualityPolicyLinks: objective.qualityPolicyLinks ?? [],
       strategicTheme: objective.strategicTheme ?? undefined,
       riskLevel: objective.riskLevel ?? undefined,
       riskMitigation: objective.riskMitigation ?? "",
@@ -317,9 +327,12 @@ export default function CompanyObjectives() {
     return (
       <div className="mt-4 pt-4 border-t">
         <Tabs defaultValue="key-results" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="key-results" data-testid="tab-key-results">
               Key Results ({keyResults?.length || 0})
+            </TabsTrigger>
+            <TabsTrigger value="resources" data-testid="tab-resources">
+              Resources
             </TabsTrigger>
             <TabsTrigger value="audit-history" data-testid="tab-audit-history">
               Audit History
@@ -370,6 +383,14 @@ export default function CompanyObjectives() {
                 No key results yet. Add key results to track progress.
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="resources" className="mt-4">
+            <ObjectiveResourcePlanner 
+              objectiveId={objectiveId}
+              objectiveType="company"
+              canManage={user?.role === "leadership"}
+            />
           </TabsContent>
 
           <TabsContent value="audit-history" className="mt-4">
@@ -682,6 +703,68 @@ export default function CompanyObjectives() {
                         )}
                       />
 
+                      {/* Phase 3: Quality Policy Links */}
+                      <FormField
+                        control={objectiveForm.control}
+                        name="qualityPolicyLinks"
+                        render={() => (
+                          <FormItem>
+                            <div className="mb-4">
+                              <FormLabel className="text-base">Quality Policies (Optional)</FormLabel>
+                              <p className="text-sm text-muted-foreground">Link this objective to relevant quality policies</p>
+                            </div>
+                            {qualityPolicies && qualityPolicies.filter((p: any) => p.isActive).length > 0 ? (
+                              <div className="space-y-2" data-testid="quality-policies-list">
+                                {qualityPolicies.filter((p: any) => p.isActive).map((policy: any) => (
+                                  <FormField
+                                    key={policy.id}
+                                    control={objectiveForm.control}
+                                    name="qualityPolicyLinks"
+                                    render={({ field }) => {
+                                      return (
+                                        <FormItem
+                                          key={policy.id}
+                                          className="flex flex-row items-start space-x-3 space-y-0"
+                                        >
+                                          <FormControl>
+                                            <Checkbox
+                                              checked={field.value?.includes(policy.id)}
+                                              onCheckedChange={(checked) => {
+                                                return checked
+                                                  ? field.onChange([...(field.value || []), policy.id])
+                                                  : field.onChange(
+                                                      field.value?.filter(
+                                                        (value: string) => value !== policy.id
+                                                      )
+                                                    )
+                                              }}
+                                              data-testid={`checkbox-policy-${policy.id}`}
+                                            />
+                                          </FormControl>
+                                          <div className="space-y-1 leading-none">
+                                            <FormLabel className="text-sm font-normal">
+                                              {policy.title}
+                                            </FormLabel>
+                                            {policy.description && (
+                                              <p className="text-xs text-muted-foreground">
+                                                {policy.description}
+                                              </p>
+                                            )}
+                                          </div>
+                                        </FormItem>
+                                      )
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No active quality policies available</p>
+                            )}
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
                       {/* Phase 3: Strategic Theme */}
                       <FormField
                         control={objectiveForm.control}
@@ -958,6 +1041,68 @@ export default function CompanyObjectives() {
                         data-testid="textarea-edit-objective-evaluation"
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Phase 3: Quality Policy Links */}
+              <FormField
+                control={editObjectiveForm.control}
+                name="qualityPolicyLinks"
+                render={() => (
+                  <FormItem>
+                    <div className="mb-4">
+                      <FormLabel className="text-base">Quality Policies (Optional)</FormLabel>
+                      <p className="text-sm text-muted-foreground">Link this objective to relevant quality policies</p>
+                    </div>
+                    {qualityPolicies && qualityPolicies.filter((p: any) => p.isActive).length > 0 ? (
+                      <div className="space-y-2" data-testid="edit-quality-policies-list">
+                        {qualityPolicies.filter((p: any) => p.isActive).map((policy: any) => (
+                          <FormField
+                            key={policy.id}
+                            control={editObjectiveForm.control}
+                            name="qualityPolicyLinks"
+                            render={({ field }) => {
+                              return (
+                                <FormItem
+                                  key={policy.id}
+                                  className="flex flex-row items-start space-x-3 space-y-0"
+                                >
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={field.value?.includes(policy.id)}
+                                      onCheckedChange={(checked) => {
+                                        return checked
+                                          ? field.onChange([...(field.value || []), policy.id])
+                                          : field.onChange(
+                                              field.value?.filter(
+                                                (value: string) => value !== policy.id
+                                              )
+                                            )
+                                      }}
+                                      data-testid={`checkbox-edit-policy-${policy.id}`}
+                                    />
+                                  </FormControl>
+                                  <div className="space-y-1 leading-none">
+                                    <FormLabel className="text-sm font-normal">
+                                      {policy.title}
+                                    </FormLabel>
+                                    {policy.description && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {policy.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                </FormItem>
+                              )
+                            }}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No active quality policies available</p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

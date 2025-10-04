@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -14,7 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { insertCompanyObjectiveSchema } from "@shared/schema";
+import { insertCompanyObjectiveSchema, insertQualityPolicySchema } from "@shared/schema";
 import { 
   Settings, 
   Users, 
@@ -25,8 +26,11 @@ import {
   Save,
   Plus,
   Trash2,
-  Edit
+  Edit,
+  FileCheck,
+  CheckCircle2
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Enhanced form schema with date validation
 const objectiveSchema = insertCompanyObjectiveSchema.omit({ createdBy: true }).extend({
@@ -42,14 +46,26 @@ const objectiveSchema = insertCompanyObjectiveSchema.omit({ createdBy: true }).e
 
 type ObjectiveForm = z.infer<typeof objectiveSchema>;
 
+// Quality policy form schema
+const qualityPolicyFormSchema = insertQualityPolicySchema.omit({ createdBy: true });
+type QualityPolicyForm = z.infer<typeof qualityPolicyFormSchema>;
+
 export default function CompanySettings() {
   const { user } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isPolicyDialogOpen, setIsPolicyDialogOpen] = useState(false);
+  const [editingPolicy, setEditingPolicy] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: objectives, isLoading: objectivesLoading } = useQuery({
     queryKey: ["/api/objectives"],
+    retry: false,
+  });
+
+  // Fetch quality policies
+  const { data: qualityPolicies, isLoading: policiesLoading } = useQuery({
+    queryKey: ["/api/quality-policies"],
     retry: false,
   });
 
@@ -61,6 +77,17 @@ export default function CompanySettings() {
       description: "",
       startDate: "",
       endDate: "",
+    },
+  });
+
+  // Quality policy form setup
+  const policyForm = useForm<QualityPolicyForm>({
+    resolver: zodResolver(qualityPolicyFormSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      category: "customer_satisfaction",
+      isActive: true,
     },
   });
 
@@ -112,6 +139,96 @@ export default function CompanySettings() {
       });
     },
   });
+
+  // Quality policy mutations
+  const createPolicyMutation = useMutation({
+    mutationFn: async (data: QualityPolicyForm) => {
+      await apiRequest("POST", "/api/quality-policies", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quality-policies"] });
+      setIsPolicyDialogOpen(false);
+      policyForm.reset();
+      toast({
+        title: "Policy created!",
+        description: "Quality policy has been added successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create quality policy. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePolicyMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<QualityPolicyForm> }) => {
+      await apiRequest("PUT", `/api/quality-policies/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quality-policies"] });
+      setEditingPolicy(null);
+      setIsPolicyDialogOpen(false);
+      policyForm.reset();
+      toast({
+        title: "Policy updated!",
+        description: "Quality policy has been updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update quality policy.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePolicyMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/quality-policies/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quality-policies"] });
+      toast({
+        title: "Policy deleted",
+        description: "Quality policy has been removed.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete quality policy.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Open edit dialog
+  const handleEditPolicy = (policy: any) => {
+    setEditingPolicy(policy);
+    policyForm.reset({
+      title: policy.title,
+      description: policy.description,
+      category: policy.category,
+      isActive: policy.isActive,
+    });
+    setIsPolicyDialogOpen(true);
+  };
+
+  // Open create dialog
+  const handleCreatePolicy = () => {
+    setEditingPolicy(null);
+    policyForm.reset({
+      title: "",
+      description: "",
+      category: "customer_satisfaction",
+      isActive: true,
+    });
+    setIsPolicyDialogOpen(true);
+  };
 
   if (user?.role !== 'leadership') {
     return (
@@ -329,6 +446,200 @@ export default function CompanySettings() {
               <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create-first-objective">
                 <Plus className="w-4 h-4 mr-2" />
                 Create First Objective
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Quality Policies - ISO 9001:2015 Compliance */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <FileCheck className="w-5 h-5" />
+              <span>Quality Policies</span>
+              <Badge variant="outline" className="ml-2">ISO 9001:2015</Badge>
+            </div>
+            <Dialog open={isPolicyDialogOpen} onOpenChange={setIsPolicyDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={handleCreatePolicy} data-testid="button-create-policy">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Policy
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>{editingPolicy ? "Edit Quality Policy" : "Create Quality Policy"}</DialogTitle>
+                </DialogHeader>
+                <Form {...policyForm}>
+                  <form 
+                    onSubmit={policyForm.handleSubmit((data) => 
+                      editingPolicy 
+                        ? updatePolicyMutation.mutate({ id: editingPolicy.id, data })
+                        : createPolicyMutation.mutate(data)
+                    )} 
+                    className="space-y-4"
+                  >
+                    <FormField
+                      control={policyForm.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Policy Title</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., Customer Satisfaction Commitment" {...field} data-testid="input-policy-title" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={policyForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Policy Description</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Describe the quality policy and its requirements..." 
+                              rows={4}
+                              {...field}
+                              data-testid="textarea-policy-description"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={policyForm.control}
+                      name="category"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Category</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-policy-category">
+                                <SelectValue placeholder="Select category" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="customer_satisfaction">Customer Satisfaction</SelectItem>
+                              <SelectItem value="conformity">Product/Service Conformity</SelectItem>
+                              <SelectItem value="continual_improvement">Continual Improvement</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={policyForm.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                          <div className="space-y-0.5">
+                            <FormLabel>Active Status</FormLabel>
+                            <p className="text-sm text-muted-foreground">
+                              Set policy as active and enforceable
+                            </p>
+                          </div>
+                          <FormControl>
+                            <Switch 
+                              checked={field.value ?? true} 
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-policy-active"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex justify-end space-x-2 pt-4">
+                      <Button type="button" variant="outline" onClick={() => setIsPolicyDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button 
+                        type="submit" 
+                        disabled={createPolicyMutation.isPending || updatePolicyMutation.isPending}
+                        data-testid="button-submit-policy"
+                      >
+                        {createPolicyMutation.isPending || updatePolicyMutation.isPending 
+                          ? "Saving..." 
+                          : editingPolicy ? "Update Policy" : "Create Policy"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {policiesLoading ? (
+            <div className="space-y-4">
+              {[...Array(2)].map((_, i) => (
+                <div key={i} className="bg-muted rounded-lg p-4 animate-pulse">
+                  <div className="w-3/4 h-4 bg-muted-foreground/20 rounded mb-2"></div>
+                  <div className="w-1/2 h-3 bg-muted-foreground/20 rounded"></div>
+                </div>
+              ))}
+            </div>
+          ) : (qualityPolicies as any[])?.length > 0 ? (
+            <div className="space-y-4">
+              {(qualityPolicies as any[]).map((policy: any) => (
+                <div key={policy.id} className="border rounded-lg p-4" data-testid={`policy-${policy.id}`}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="font-semibold text-lg" data-testid={`text-policy-title-${policy.id}`}>
+                          {policy.title}
+                        </h4>
+                        <Badge variant={policy.isActive ? "default" : "secondary"} data-testid={`badge-policy-status-${policy.id}`}>
+                          {policy.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                        <Badge variant="outline" data-testid={`badge-policy-category-${policy.id}`}>
+                          {policy.category.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                        </Badge>
+                      </div>
+                      {policy.description && (
+                        <p className="text-muted-foreground text-sm" data-testid={`text-policy-description-${policy.id}`}>
+                          {policy.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditPolicy(policy)}
+                        data-testid={`button-edit-policy-${policy.id}`}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deletePolicyMutation.mutate(policy.id)}
+                        disabled={deletePolicyMutation.isPending}
+                        data-testid={`button-delete-policy-${policy.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <FileCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold">No Quality Policies</h3>
+              <p className="text-muted-foreground mb-4">Create quality policies to meet ISO 9001:2015 requirements.</p>
+              <Button onClick={handleCreatePolicy} data-testid="button-create-first-policy">
+                <Plus className="w-4 h-4 mr-2" />
+                Create First Policy
               </Button>
             </div>
           )}
