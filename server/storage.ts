@@ -19,6 +19,8 @@ import {
   objectiveAuditLog,
   keyResultAuditLog,
   okrEvidence,
+  qualityPolicies,
+  objectiveResources,
   goals,
   weeklyCheckIns,
   competencies,
@@ -99,6 +101,10 @@ import {
   type ObjectiveAuditLog,
   type KeyResultAuditLog,
   type OkrEvidence,
+  type QualityPolicy,
+  type ObjectiveResource,
+  type InsertQualityPolicy,
+  type InsertObjectiveResource,
   type Goal,
   type WeeklyCheckIn,
   type Competency,
@@ -330,6 +336,19 @@ export interface IStorage {
   // Key result progress tracking
   createKrProgressUpdate(update: InsertKrProgressUpdate): Promise<KrProgressUpdate>;
   getKrProgressHistory(keyResultId: string, keyResultType: 'company' | 'team'): Promise<KrProgressUpdate[]>;
+  
+  // Phase 3: Quality policy management
+  getQualityPolicies(category?: string, isActive?: boolean): Promise<QualityPolicy[]>;
+  getQualityPolicy(id: string): Promise<QualityPolicy | null>;
+  createQualityPolicy(policy: InsertQualityPolicy): Promise<QualityPolicy>;
+  updateQualityPolicy(id: string, updates: Partial<InsertQualityPolicy>): Promise<QualityPolicy | null>;
+  deleteQualityPolicy(id: string): Promise<boolean>;
+  
+  // Phase 3: Objective resource planning
+  getObjectiveResources(objectiveId: string, objectiveType: 'company' | 'team'): Promise<ObjectiveResource[]>;
+  createObjectiveResource(resource: InsertObjectiveResource): Promise<ObjectiveResource>;
+  updateObjectiveResource(id: string, updates: Partial<InsertObjectiveResource>): Promise<ObjectiveResource | null>;
+  deleteObjectiveResource(id: string): Promise<boolean>;
   
   // Phase 4: Audit log operations (read-only - logs are system-generated)
   createObjectiveAuditLog(log: InsertObjectiveAuditLog): Promise<ObjectiveAuditLog>;
@@ -1307,6 +1326,94 @@ export class DatabaseStorage implements IStorage {
         eq(krProgressUpdates.keyResultType, keyResultType)
       ))
       .orderBy(desc(krProgressUpdates.timestamp));
+  }
+
+  // Phase 3: Quality policy management
+  async getQualityPolicies(category?: string, isActive?: boolean): Promise<QualityPolicy[]> {
+    const conditions = [];
+    if (category) {
+      conditions.push(eq(qualityPolicies.category, category));
+    }
+    if (isActive !== undefined) {
+      conditions.push(eq(qualityPolicies.isActive, isActive));
+    }
+    
+    return await db
+      .select()
+      .from(qualityPolicies)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(qualityPolicies.createdAt));
+  }
+
+  async getQualityPolicy(id: string): Promise<QualityPolicy | null> {
+    const [policy] = await db
+      .select()
+      .from(qualityPolicies)
+      .where(eq(qualityPolicies.id, id))
+      .limit(1);
+    return policy || null;
+  }
+
+  async createQualityPolicy(policy: InsertQualityPolicy): Promise<QualityPolicy> {
+    const [created] = await db
+      .insert(qualityPolicies)
+      .values(policy)
+      .returning();
+    return created;
+  }
+
+  async updateQualityPolicy(id: string, updates: Partial<InsertQualityPolicy>): Promise<QualityPolicy | null> {
+    const [updated] = await db
+      .update(qualityPolicies)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(qualityPolicies.id, id))
+      .returning();
+    return updated || null;
+  }
+
+  async deleteQualityPolicy(id: string): Promise<boolean> {
+    const result = await db
+      .delete(qualityPolicies)
+      .where(eq(qualityPolicies.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Phase 3: Objective resource planning
+  async getObjectiveResources(objectiveId: string, objectiveType: 'company' | 'team'): Promise<ObjectiveResource[]> {
+    return await db
+      .select()
+      .from(objectiveResources)
+      .where(and(
+        eq(objectiveResources.objectiveId, objectiveId),
+        eq(objectiveResources.objectiveType, objectiveType)
+      ))
+      .orderBy(desc(objectiveResources.createdAt));
+  }
+
+  async createObjectiveResource(resource: InsertObjectiveResource): Promise<ObjectiveResource> {
+    const [created] = await db
+      .insert(objectiveResources)
+      .values(resource)
+      .returning();
+    return created;
+  }
+
+  async updateObjectiveResource(id: string, updates: Partial<InsertObjectiveResource>): Promise<ObjectiveResource | null> {
+    const [updated] = await db
+      .update(objectiveResources)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(objectiveResources.id, id))
+      .returning();
+    return updated || null;
+  }
+
+  async deleteObjectiveResource(id: string): Promise<boolean> {
+    const result = await db
+      .delete(objectiveResources)
+      .where(eq(objectiveResources.id, id))
+      .returning();
+    return result.length > 0;
   }
 
   // Phase 4: Audit log operations

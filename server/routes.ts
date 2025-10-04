@@ -10,6 +10,8 @@ import {
   insertKeyResultSchema,
   insertTeamKeyResultSchema,
   insertKrProgressUpdateSchema,
+  insertQualityPolicySchema,
+  insertObjectiveResourceSchema,
   insertWeeklyCheckInSchema,
   insertUserCompetencySchema,
   insertDevelopmentPlanSchema,
@@ -820,6 +822,199 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching progress history:", error);
       res.status(500).json({ message: "Failed to fetch progress history" });
+    }
+  });
+
+  // Phase 3: Quality Policies (ISO 9001:2015 Compliance)
+  app.get('/api/quality-policies', isAuthenticated, async (req: any, res) => {
+    try {
+      const { category, isActive } = req.query;
+      const policies = await storage.getQualityPolicies(
+        category as string | undefined,
+        isActive === 'true' ? true : isActive === 'false' ? false : undefined
+      );
+      res.json(policies);
+    } catch (error) {
+      console.error("Error fetching quality policies:", error);
+      res.status(500).json({ message: "Failed to fetch quality policies" });
+    }
+  });
+
+  app.get('/api/quality-policies/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const policy = await storage.getQualityPolicy(id);
+      if (!policy) {
+        return res.status(404).json({ message: "Quality policy not found" });
+      }
+      res.json(policy);
+    } catch (error) {
+      console.error("Error fetching quality policy:", error);
+      res.status(500).json({ message: "Failed to fetch quality policy" });
+    }
+  });
+
+  app.post('/api/quality-policies', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const policyData = insertQualityPolicySchema.parse({
+        ...req.body,
+        createdBy: req.user.claims.sub
+      });
+      const policy = await storage.createQualityPolicy(policyData);
+      res.json(policy);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error creating quality policy:", error);
+      res.status(500).json({ message: "Failed to create quality policy" });
+    }
+  });
+
+  app.put('/api/quality-policies/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const updateData = insertQualityPolicySchema.partial().parse(req.body);
+      const policy = await storage.updateQualityPolicy(id, updateData);
+      if (!policy) {
+        return res.status(404).json({ message: "Quality policy not found" });
+      }
+      res.json(policy);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error updating quality policy:", error);
+      res.status(500).json({ message: "Failed to update quality policy" });
+    }
+  });
+
+  app.delete('/api/quality-policies/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const deleted = await storage.deleteQualityPolicy(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Quality policy not found" });
+      }
+      res.json({ message: "Quality policy deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting quality policy:", error);
+      res.status(500).json({ message: "Failed to delete quality policy" });
+    }
+  });
+
+  // Phase 3: Objective Resources (ISO 9001:2015 Clause 6.2)
+  app.get('/api/objectives/:objectiveId/resources', isAuthenticated, async (req: any, res) => {
+    try {
+      const { objectiveId } = req.params;
+      const { type } = req.query;
+      
+      if (type !== 'company' && type !== 'team') {
+        return res.status(400).json({ message: "Invalid objective type. Must be 'company' or 'team'." });
+      }
+
+      const resources = await storage.getObjectiveResources(objectiveId, type as 'company' | 'team');
+      res.json(resources);
+    } catch (error) {
+      console.error("Error fetching objective resources:", error);
+      res.status(500).json({ message: "Failed to fetch objective resources" });
+    }
+  });
+
+  app.post('/api/objectives/:objectiveId/resources', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership or supervisor
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership' && user?.role !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Leadership or supervisor role required." });
+      }
+
+      const { objectiveId } = req.params;
+      const { type } = req.query;
+      
+      if (type !== 'company' && type !== 'team') {
+        return res.status(400).json({ message: "Invalid objective type. Must be 'company' or 'team'." });
+      }
+
+      const resourceData = insertObjectiveResourceSchema.parse({
+        ...req.body,
+        objectiveId,
+        objectiveType: type,
+        requestedBy: req.user.claims.sub
+      });
+      const resource = await storage.createObjectiveResource(resourceData);
+      res.json(resource);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error creating objective resource:", error);
+      res.status(500).json({ message: "Failed to create objective resource" });
+    }
+  });
+
+  app.put('/api/resources/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const updateData = insertObjectiveResourceSchema.partial().parse({
+        ...req.body,
+        approvedBy: req.body.status === 'approved' ? req.user.claims.sub : undefined
+      });
+      const resource = await storage.updateObjectiveResource(id, updateData);
+      if (!resource) {
+        return res.status(404).json({ message: "Objective resource not found" });
+      }
+      res.json(resource);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error updating objective resource:", error);
+      res.status(500).json({ message: "Failed to update objective resource" });
+    }
+  });
+
+  app.delete('/api/resources/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is leadership
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const deleted = await storage.deleteObjectiveResource(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Objective resource not found" });
+      }
+      res.json({ message: "Objective resource deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting objective resource:", error);
+      res.status(500).json({ message: "Failed to delete objective resource" });
     }
   });
 

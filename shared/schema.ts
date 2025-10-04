@@ -66,6 +66,29 @@ export const strategicThemeEnum = pgEnum("strategic_theme", [
 // Risk level enum for Phase 3 risk assessment
 export const riskLevelEnum = pgEnum("risk_level", ["low", "medium", "high", "critical"]);
 
+// Phase 3: Quality Management enums
+export const qualityPolicyCategoryEnum = pgEnum("quality_policy_category", [
+  "customer_satisfaction",
+  "conformity",
+  "continual_improvement",
+  "other"
+]);
+
+export const resourceTypeEnum = pgEnum("resource_type", [
+  "budget",
+  "personnel",
+  "equipment",
+  "training",
+  "other"
+]);
+
+export const resourceStatusEnum = pgEnum("resource_status", [
+  "requested",
+  "approved",
+  "allocated",
+  "consumed"
+]);
+
 // Phase 4: Audit Trail enums
 export const objectiveChangeTypeEnum = pgEnum("objective_change_type", ["created", "updated", "deleted", "status_changed"]);
 export const keyResultChangeTypeEnum = pgEnum("key_result_change_type", ["created", "updated", "progress_updated", "confidence_changed"]);
@@ -472,6 +495,41 @@ export const okrEvidence = pgTable("okr_evidence", {
 }, (table) => [
   index("evidence_linked_idx").on(table.linkedToId, table.linkedToType),
   index("evidence_uploaded_by_idx").on(table.uploadedBy),
+]);
+
+// Phase 3: Quality policies for ISO 9001:2015 compliance
+export const qualityPolicies = pgTable("quality_policies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  category: qualityPolicyCategoryEnum("category").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("quality_policies_category_idx").on(table.category),
+  index("quality_policies_active_idx").on(table.isActive),
+]);
+
+// Phase 3: Resource planning for objectives (ISO 9001:2015 Clause 6.2)
+export const objectiveResources = pgTable("objective_resources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  objectiveId: varchar("objective_id").notNull(),
+  objectiveType: varchar("objective_type").notNull(), // 'company' or 'team'
+  resourceType: resourceTypeEnum("resource_type").notNull(),
+  description: text("description").notNull(),
+  quantity: integer("quantity"),
+  estimatedCost: integer("estimated_cost"), // Stored as pence/cents
+  status: resourceStatusEnum("status").default("requested"),
+  requestedBy: varchar("requested_by").notNull(),
+  approvedBy: varchar("approved_by"),
+  approvalNote: text("approval_note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("objective_resources_objective_idx").on(table.objectiveId, table.objectiveType),
+  index("objective_resources_status_idx").on(table.status),
 ]);
 
 // Individual goals (OKRs)
@@ -2050,6 +2108,20 @@ export const insertKeyResultAuditLogSchema = createInsertSchema(keyResultAuditLo
   changeTimestamp: true,
 });
 
+// Phase 3: Quality policies insert schema
+export const insertQualityPolicySchema = createInsertSchema(qualityPolicies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Phase 3: Objective resources insert schema
+export const insertObjectiveResourceSchema = createInsertSchema(objectiveResources).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Phase 4: Evidence upload schema
 export const insertOkrEvidenceSchema = createInsertSchema(okrEvidence).omit({
   id: true,
@@ -2407,6 +2479,12 @@ export type CompanyObjective = typeof companyObjectives.$inferSelect;
 export type TeamObjective = typeof teamObjectives.$inferSelect;
 export type KeyResult = typeof keyResults.$inferSelect;
 export type TeamKeyResult = typeof teamKeyResults.$inferSelect;
+export type KrProgressUpdate = typeof krProgressUpdates.$inferSelect;
+export type ObjectiveAuditLog = typeof objectiveAuditLog.$inferSelect;
+export type KeyResultAuditLog = typeof keyResultAuditLog.$inferSelect;
+export type OkrEvidence = typeof okrEvidence.$inferSelect;
+export type QualityPolicy = typeof qualityPolicies.$inferSelect;
+export type ObjectiveResource = typeof objectiveResources.$inferSelect;
 export type Goal = typeof goals.$inferSelect;
 export type WeeklyCheckIn = typeof weeklyCheckIns.$inferSelect;
 export type Competency = typeof competencies.$inferSelect;
@@ -2450,6 +2528,12 @@ export type InsertCompanyObjective = z.infer<typeof insertCompanyObjectiveSchema
 export type InsertTeamObjective = z.infer<typeof insertTeamObjectiveSchema>;
 export type InsertKeyResult = z.infer<typeof insertKeyResultSchema>;
 export type InsertTeamKeyResult = z.infer<typeof insertTeamKeyResultSchema>;
+export type InsertKrProgressUpdate = z.infer<typeof insertKrProgressUpdateSchema>;
+export type InsertObjectiveAuditLog = z.infer<typeof insertObjectiveAuditLogSchema>;
+export type InsertKeyResultAuditLog = z.infer<typeof insertKeyResultAuditLogSchema>;
+export type InsertOkrEvidence = z.infer<typeof insertOkrEvidenceSchema>;
+export type InsertQualityPolicy = z.infer<typeof insertQualityPolicySchema>;
+export type InsertObjectiveResource = z.infer<typeof insertObjectiveResourceSchema>;
 export type InsertGoal = z.infer<typeof insertGoalSchema>;
 export type InsertWeeklyCheckIn = z.infer<typeof insertWeeklyCheckInSchema>;
 export type InsertUserCompetency = z.infer<typeof insertUserCompetencySchema>;
