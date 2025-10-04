@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useToast } from "@/hooks/use-toast";
+import WeeklyKRCheckIn from "./WeeklyKRCheckIn";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -202,6 +203,9 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Weekly KR Check-ins */}
+      <WeeklyKRCheckIn />
 
       {/* Recent Activity */}
       <Card>

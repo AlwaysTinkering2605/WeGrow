@@ -66,8 +66,14 @@ export default function WeeklyKRCheckIn() {
   ];
 
   // Get completion stats
+  const weekStart = getWeekStart();
   const { data: completionStats } = useQuery({
-    queryKey: ['/api/kr-check-ins/stats/completion', { weekOf: getWeekStart().toISOString() }],
+    queryKey: ['/api/kr-check-ins/stats/completion', weekStart.toISOString()],
+    queryFn: async () => {
+      const response = await fetch(`/api/kr-check-ins/stats/completion?weekOf=${weekStart.toISOString()}`);
+      if (!response.ok) throw new Error('Failed to fetch stats');
+      return response.json();
+    }
   });
 
   // Individual check-in mutation
