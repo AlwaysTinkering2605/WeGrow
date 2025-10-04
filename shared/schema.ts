@@ -617,6 +617,25 @@ export const weeklyCheckIns = pgTable("weekly_check_ins", {
   submittedAt: timestamp("submitted_at").defaultNow(),
 });
 
+// Phase 7: Weekly check-ins for Key Results (both company and team KRs)
+export const krWeeklyCheckIns = pgTable("kr_weekly_check_ins", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  keyResultId: varchar("key_result_id").notNull(),
+  keyResultType: varchar("key_result_type").notNull(), // 'company' or 'team'
+  updatedBy: varchar("updated_by").notNull(),
+  previousValue: integer("previous_value").notNull(),
+  newValue: integer("new_value").notNull(),
+  confidenceScore: integer("confidence_score"), // 1-10 confidence score
+  achievements: text("achievements"),
+  challenges: text("challenges"),
+  weekOf: timestamp("week_of").notNull(),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+}, (table) => [
+  index("kr_check_ins_key_result_idx").on(table.keyResultId, table.weekOf),
+  index("kr_check_ins_updated_by_idx").on(table.updatedBy),
+  index("kr_check_ins_week_idx").on(table.weekOf),
+]);
+
 // Competencies
 export const competencies = pgTable("competencies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1489,6 +1508,13 @@ export const weeklyCheckInsRelations = relations(weeklyCheckIns, ({ one }) => ({
   }),
 }));
 
+export const krWeeklyCheckInsRelations = relations(krWeeklyCheckIns, ({ one }) => ({
+  updater: one(users, {
+    fields: [krWeeklyCheckIns.updatedBy],
+    references: [users.id],
+  }),
+}));
+
 export const competenciesRelations = relations(competencies, ({ many }) => ({
   userCompetencies: many(userCompetencies),
   developmentPlans: many(developmentPlans),
@@ -2234,6 +2260,20 @@ export const insertWeeklyCheckInSchema = createInsertSchema(weeklyCheckIns).omit
     .max(100, "Progress cannot exceed 100"),
 });
 
+export const insertKrWeeklyCheckInSchema = createInsertSchema(krWeeklyCheckIns).omit({
+  id: true,
+  submittedAt: true,
+}).extend({
+  confidenceScore: z.number().min(1).max(10).optional(),
+  weekOf: z.string()
+    .min(1, "Week date is required")
+    .refine((str) => {
+      const date = new Date(str);
+      return !isNaN(date.getTime());
+    }, "Invalid date format")
+    .transform((str) => new Date(str)),
+});
+
 export const insertUserCompetencySchema = createInsertSchema(userCompetencies).omit({
   id: true,
   lastAssessedAt: true,
@@ -2554,6 +2594,7 @@ export type ManagementReview = typeof managementReviews.$inferSelect;
 export type OkrSnapshot = typeof okrSnapshots.$inferSelect;
 export type Goal = typeof goals.$inferSelect;
 export type WeeklyCheckIn = typeof weeklyCheckIns.$inferSelect;
+export type KrWeeklyCheckIn = typeof krWeeklyCheckIns.$inferSelect;
 export type Competency = typeof competencies.$inferSelect;
 export type UserCompetency = typeof userCompetencies.$inferSelect;
 export type DevelopmentPlan = typeof developmentPlans.$inferSelect;
@@ -2605,6 +2646,7 @@ export type InsertManagementReview = z.infer<typeof insertManagementReviewSchema
 export type InsertOkrSnapshot = z.infer<typeof insertOkrSnapshotSchema>;
 export type InsertGoal = z.infer<typeof insertGoalSchema>;
 export type InsertWeeklyCheckIn = z.infer<typeof insertWeeklyCheckInSchema>;
+export type InsertKrWeeklyCheckIn = z.infer<typeof insertKrWeeklyCheckInSchema>;
 export type InsertUserCompetency = z.infer<typeof insertUserCompetencySchema>;
 export type InsertDevelopmentPlan = z.infer<typeof insertDevelopmentPlanSchema>;
 export type InsertMeeting = z.infer<typeof insertMeetingSchema>;
