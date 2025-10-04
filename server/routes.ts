@@ -17,6 +17,7 @@ import {
   insertRecognitionSchema,
   insertTeamSchema,
   insertDepartmentSchema,
+  insertSkillCategoryTypeSchema,
   insertSkillCategorySchema,
   insertJobRoleSchema,
   updateUserProfileSchema,
@@ -1131,6 +1132,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error deleting department:", error);
       res.status(500).json({ message: "Failed to delete department" });
+    }
+  });
+
+  // Skill Category Types Routes
+  app.get('/api/skill-category-types', isAuthenticated, async (req: any, res) => {
+    try {
+      const types = await storage.getAllSkillCategoryTypes();
+      res.json(types);
+    } catch (error) {
+      console.error("Error fetching skill category types:", error);
+      res.status(500).json({ message: "Failed to fetch skill category types" });
+    }
+  });
+
+  app.get('/api/skill-category-types/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const type = await storage.getSkillCategoryType(id);
+      if (!type) {
+        return res.status(404).json({ message: "Skill category type not found" });
+      }
+      res.json(type);
+    } catch (error) {
+      console.error("Error fetching skill category type:", error);
+      res.status(500).json({ message: "Failed to fetch skill category type" });
+    }
+  });
+
+  app.post('/api/skill-category-types', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const typeData = insertSkillCategoryTypeSchema.parse(req.body);
+      const type = await storage.createSkillCategoryType(typeData);
+      res.json(type);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating skill category type:", error);
+      res.status(500).json({ message: "Failed to create skill category type" });
+    }
+  });
+
+  app.put('/api/skill-category-types/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      const typeData = insertSkillCategoryTypeSchema.partial().parse(req.body);
+      const type = await storage.updateSkillCategoryType(id, typeData);
+      if (!type) {
+        return res.status(404).json({ message: "Skill category type not found" });
+      }
+      res.json(type);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating skill category type:", error);
+      res.status(500).json({ message: "Failed to update skill category type" });
+    }
+  });
+
+  app.delete('/api/skill-category-types/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'leadership') {
+        return res.status(403).json({ message: "Access denied. Leadership role required." });
+      }
+
+      const { id } = req.params;
+      
+      // Check if type is in use by skill categories
+      const categories = await storage.getAllSkillCategories();
+      const categoriesUsingType = categories.filter(cat => cat.typeId === id);
+      
+      if (categoriesUsingType.length > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete skill category type that is in use",
+          usage: {
+            categories: categoriesUsingType.length
+          }
+        });
+      }
+
+      await storage.deleteSkillCategoryType(id);
+      res.json({ message: "Skill category type deleted successfully" });
+    } catch (error: any) {
+      if (error.message === "Skill category type not found") {
+        return res.status(404).json({ message: "Skill category type not found" });
+      }
+      console.error("Error deleting skill category type:", error);
+      res.status(500).json({ message: "Failed to delete skill category type" });
     }
   });
 
