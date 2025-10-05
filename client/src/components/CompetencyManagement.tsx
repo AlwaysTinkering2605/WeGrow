@@ -88,12 +88,13 @@ interface Competency {
   category?: string;
   categoryId?: string;
   categoryName?: string;
-  level: number;
+  proficiencyLevelId?: string;
   parentId?: string;
   children?: Competency[];
-  skillType: "technical" | "behavioral" | "safety" | "compliance";
   assessmentCriteria?: string;
   isActive: boolean;
+  requiredForRoles?: string[];
+  trainingResources?: string[];
 }
 
 interface RoleMapping {
@@ -397,11 +398,12 @@ function CompetencyLibraryView({ competencies, isLoading }: {
       title: competency.title,
       description: competency.description,
       categoryId: competency.categoryId || "",
-      level: competency.level,
+      proficiencyLevelId: competency.proficiencyLevelId || "",
       parentId: competency.parentId,
-      skillType: competency.skillType,
       assessmentCriteria: competency.assessmentCriteria,
       isActive: competency.isActive,
+      requiredForRoles: competency.requiredForRoles || [],
+      trainingResources: competency.trainingResources || [],
     });
     setIsCreateDialogOpen(true);
   };
