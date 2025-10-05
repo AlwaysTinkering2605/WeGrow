@@ -1359,9 +1359,9 @@ export default function CompetencyManagement() {
     queryKey: ["/api/competency-library/hierarchical"]
   });
 
-  // Fetch skill categories for the dropdown
+  // Fetch skill categories with relations (type and defaultProficiency)
   const { data: skillCategories } = useQuery({
-    queryKey: ["/api/skill-categories"]
+    queryKey: ["/api/skill-categories/with-relations"]
   }) as { data: any[] | undefined };
 
   // Fetch proficiency levels for the dropdown
@@ -1549,7 +1549,13 @@ export default function CompetencyManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Skill Category</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={(value) => {
+                        field.onChange(value);
+                        const selectedCategory = skillCategories?.find((cat: any) => cat.id === value);
+                        if (selectedCategory?.defaultProficiencyId) {
+                          form.setValue('proficiencyLevelId', selectedCategory.defaultProficiencyId);
+                        }
+                      }} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-competency-category">
                             <SelectValue placeholder="Select category" />
@@ -1582,6 +1588,15 @@ export default function CompetencyManagement() {
                   </FormItem>
                 )}
               />
+
+              {form.watch('categoryId') && (
+                <div className="bg-muted/50 p-3 rounded-md">
+                  <FormLabel className="text-sm text-muted-foreground">Category Type</FormLabel>
+                  <p className="text-sm font-medium mt-1" data-testid="text-category-type">
+                    {skillCategories?.find((cat: any) => cat.id === form.watch('categoryId'))?.type?.name || 'N/A'}
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
