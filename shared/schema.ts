@@ -2726,6 +2726,12 @@ export type UserBadge = typeof userBadges.$inferSelect;
 export type TrainingRequirement = typeof trainingRequirements.$inferSelect;
 export type PdpCourseLink = typeof pdpCourseLinks.$inferSelect;
 
+// Gamification Types
+export type UserPoints = typeof userPoints.$inferSelect;
+export type PointTransaction = typeof pointTransactions.$inferSelect;
+export type Achievement = typeof achievements.$inferSelect;
+export type UserAchievement = typeof userAchievements.$inferSelect;
+
 export type TeamMember = typeof teamMembers.$inferSelect;
 
 export type InsertTeam = z.infer<typeof insertTeamSchema>;
@@ -2777,6 +2783,12 @@ export type InsertBadge = z.infer<typeof insertBadgeSchema>;
 export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
 export type InsertTrainingRequirement = z.infer<typeof insertTrainingRequirementSchema>;
 export type InsertPdpCourseLink = z.infer<typeof insertPdpCourseLinkSchema>;
+
+// Gamification Insert Types
+export type InsertUserPoints = z.infer<typeof insertUserPointsSchema>;
+export type InsertPointTransaction = z.infer<typeof insertPointTransactionSchema>;
+export type InsertAchievement = z.infer<typeof insertAchievementSchema>;
+export type InsertUserAchievement = z.infer<typeof insertUserAchievementSchema>;
 
 // Learning Paths and Training Matrix Types
 export type LearningPath = typeof learningPaths.$inferSelect;
