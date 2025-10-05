@@ -1364,6 +1364,11 @@ export default function CompetencyManagement() {
     queryKey: ["/api/skill-categories"]
   }) as { data: any[] | undefined };
 
+  // Fetch proficiency levels for the dropdown
+  const { data: proficiencyLevels } = useQuery({
+    queryKey: ["/api/proficiency-levels"]
+  }) as { data: any[] | undefined };
+
   const createCompetencyMutation = useMutation({
     mutationFn: (data: CompetencyFormType) => apiRequest("/api/competency-library", {
       method: "POST",
@@ -1578,40 +1583,27 @@ export default function CompetencyManagement() {
                 )}
               />
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="skillType"
+                  name="proficiencyLevelId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Category Type</FormLabel>
+                      <FormLabel>Proficiency Level</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger data-testid="select-skill-type">
-                            <SelectValue />
+                          <SelectTrigger data-testid="select-proficiency-level-alt">
+                            <SelectValue placeholder="Select proficiency level" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="technical">Technical</SelectItem>
-                          <SelectItem value="behavioral">Behavioral</SelectItem>
-                          <SelectItem value="safety">Safety</SelectItem>
-                          <SelectItem value="compliance">Compliance</SelectItem>
+                          {proficiencyLevels?.map((level: any) => (
+                            <SelectItem key={level.id} value={level.id}>
+                              {level.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="level"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Level (1-5)</FormLabel>
-                      <FormControl>
-                        <Input type="number" min="1" max="5" {...field} data-testid="input-competency-level" />
-                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
