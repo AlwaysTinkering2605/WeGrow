@@ -2260,6 +2260,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/skill-categories/with-relations', isAuthenticated, async (req: any, res) => {
+    try {
+      const categories = await storage.getAllSkillCategoriesWithRelations();
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching skill categories with relations:", error);
+      res.status(500).json({ message: "Failed to fetch skill categories with relations" });
+    }
+  });
+
   app.get('/api/skill-categories/:id', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
@@ -3612,7 +3622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/competency-library', isAuthenticated, requireLeadership(), async (req: any, res) => {
     try {
       // Extract data for base competency creation (if provided)
-      const { title, description, categoryId, skillType, level, ...libraryData } = req.body;
+      const { title, description, categoryId, proficiencyLevelId, ...libraryData } = req.body;
       
       // Auto-populate createdBy from authenticated user
       const userId = req.user.claims.sub;
@@ -3623,6 +3633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: title,
           description,
           categoryId,
+          proficiencyLevelId,
         });
         
         // Now create the competency library item that references it

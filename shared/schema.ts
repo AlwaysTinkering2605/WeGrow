@@ -283,6 +283,7 @@ export const skillCategories = pgTable("skill_categories", {
   name: varchar("name").notNull().unique(),
   description: text("description"),
   typeId: varchar("type_id").notNull(), // FK to skill_category_types.id - normalized type reference
+  defaultProficiencyId: varchar("default_proficiency_id"), // FK to proficiency_levels.id - default proficiency for this category
   sortOrder: integer("sort_order").default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -293,7 +294,13 @@ export const skillCategories = pgTable("skill_categories", {
     foreignColumns: [skillCategoryTypes.id],
     name: "skill_categories_type_fk"
   }).onDelete("set null"),
+  foreignKey({
+    columns: [table.defaultProficiencyId],
+    foreignColumns: [proficiencyLevels.id],
+    name: "skill_categories_default_proficiency_fk"
+  }).onDelete("set null"),
   index("skill_categories_type_idx").on(table.typeId),
+  index("skill_categories_default_proficiency_idx").on(table.defaultProficiencyId),
   index("skill_categories_sort_order_idx").on(table.sortOrder),
 ]);
 
@@ -721,6 +728,7 @@ export const competencies = pgTable("competencies", {
   description: text("description"),
   category: varchar("category"), // DEPRECATED: Keep for migration, use categoryId instead
   categoryId: varchar("category_id"), // FK to skill_categories.id - normalized category reference
+  proficiencyLevelId: varchar("proficiency_level_id"), // FK to proficiency_levels.id - target proficiency for this competency
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
@@ -729,7 +737,13 @@ export const competencies = pgTable("competencies", {
     foreignColumns: [skillCategories.id],
     name: "competencies_category_fk"
   }).onDelete("set null"),
+  foreignKey({
+    columns: [table.proficiencyLevelId],
+    foreignColumns: [proficiencyLevels.id],
+    name: "competencies_proficiency_level_fk"
+  }).onDelete("set null"),
   index("competencies_category_idx").on(table.categoryId),
+  index("competencies_proficiency_level_idx").on(table.proficiencyLevelId),
 ]);
 
 // User competency assessments
@@ -2161,6 +2175,11 @@ export const insertCompetencySkillSchema = createInsertSchema(competencySkills).
   createdAt: true,
 });
 
+export const insertCompetencySchema = createInsertSchema(competencies).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertLearningPathJobRoleSchema = createInsertSchema(learningPathJobRoles).omit({
   id: true,
   createdAt: true,
@@ -2743,6 +2762,7 @@ export type InsertProficiencyLevel = z.infer<typeof insertProficiencyLevelSchema
 export type InsertSkill = z.infer<typeof insertSkillSchema>;
 export type InsertLessonSkill = z.infer<typeof insertLessonSkillSchema>;
 export type InsertCompetencySkill = z.infer<typeof insertCompetencySkillSchema>;
+export type InsertCompetency = z.infer<typeof insertCompetencySchema>;
 export type InsertJobRole = z.infer<typeof insertJobRoleSchema>;
 export type InsertLearningPathJobRole = z.infer<typeof insertLearningPathJobRoleSchema>;
 export type InsertCompanyObjective = z.infer<typeof insertCompanyObjectiveSchema>;

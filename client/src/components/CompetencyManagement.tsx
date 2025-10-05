@@ -49,10 +49,9 @@ const competencySchema = z.object({
   title: z.string().min(1, "Competency title is required"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   categoryId: z.string().min(1, "Category is required"),
-  level: z.coerce.number().min(1).max(5),
+  proficiencyLevelId: z.string().min(1, "Proficiency level is required"),
   parentId: z.string().optional(),
   requiredForRoles: z.array(z.string()).default([]),
-  skillType: z.enum(["technical", "behavioral", "safety", "compliance"]).default("technical"),
   assessmentCriteria: z.string().optional(),
   trainingResources: z.array(z.string()).default([]),
   isActive: z.boolean().default(true),
@@ -314,23 +313,46 @@ function CompetencyLibraryView({ competencies, isLoading }: {
 }) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingCompetency, setEditingCompetency] = useState<Competency | null>(null);
+  const [selectedCategoryType, setSelectedCategoryType] = useState<string>("");
   const { toast } = useToast();
 
-  // Fetch skill categories for the dropdown
+  // Fetch skill categories with relations for auto-fill
   const { data: skillCategories } = useQuery({
-    queryKey: ["/api/skill-categories"]
+    queryKey: ["/api/skill-categories/with-relations"]
+  }) as { data: any[] | undefined };
+
+  // Fetch proficiency levels for the dropdown
+  const { data: proficiencyLevels } = useQuery({
+    queryKey: ["/api/proficiency-levels"]
   }) as { data: any[] | undefined };
 
   const form = useForm<CompetencyFormType>({
     resolver: zodResolver(competencySchema),
     defaultValues: {
-      skillType: "technical",
-      level: 1,
+      proficiencyLevelId: "",
       isActive: true,
       requiredForRoles: [],
       trainingResources: [],
     }
   });
+
+  // Watch categoryId to auto-fill type and proficiency
+  const categoryId = form.watch("categoryId");
+
+  useEffect(() => {
+    if (categoryId && skillCategories) {
+      const category = skillCategories.find((c: any) => c.id === categoryId);
+      if (category) {
+        // Set the category type for display
+        setSelectedCategoryType(category.type?.name || "");
+        
+        // Auto-fill proficiency level if category has a default
+        if (category.defaultProficiencyId && !editingCompetency) {
+          form.setValue("proficiencyLevelId", category.defaultProficiencyId);
+        }
+      }
+    }
+  }, [categoryId, skillCategories, editingCompetency, form]);
 
   // Create competency mutation
   const createCompetencyMutation = useMutation({
@@ -551,50 +573,39 @@ function CompetencyLibraryView({ competencies, isLoading }: {
                 />
 
                 <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="skillType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Category Type</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-skill-type">
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="technical">Technical</SelectItem>
-                            <SelectItem value="safety">Safety</SelectItem>
-                            <SelectItem value="compliance">Compliance</SelectItem>
-                            <SelectItem value="behavioral">Behavioral</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div>
+                    <FormLabel>Category Type</FormLabel>
+                    <div className="mt-2 p-2 bg-muted rounded-md text-sm" data-testid="display-category-type">
+                      {selectedCategoryType || "Select a category first"}
+                    </div>
+                    <FormDescription className="text-xs mt-1">
+                      Auto-filled based on selected category
+                    </FormDescription>
+                  </div>
 
                   <FormField
                     control={form.control}
-                    name="level"
+                    name="proficiencyLevelId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Competency Level</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={String(field.value)}>
+                        <FormLabel>Proficiency Level</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-competency-level">
-                              <SelectValue />
+                            <SelectTrigger data-testid="select-proficiency-level">
+                              <SelectValue placeholder="Select proficiency level" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="1">Level 1 - Awareness</SelectItem>
-                            <SelectItem value="2">Level 2 - Basic</SelectItem>
-                            <SelectItem value="3">Level 3 - Competent</SelectItem>
-                            <SelectItem value="4">Level 4 - Proficient</SelectItem>
-                            <SelectItem value="5">Level 5 - Expert</SelectItem>
+                            {proficiencyLevels?.map((level: any) => (
+                              <SelectItem key={level.id} value={level.id}>
+                                {level.name}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
+                        <FormDescription className="text-xs">
+                          Auto-filled from category default, can be changed
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}

@@ -437,7 +437,7 @@ export interface IStorage {
   
   // Competencies
   getCompetencies(): Promise<Competency[]>;
-  createCompetency(competency: { name: string; description: string; categoryId?: string }): Promise<Competency>;
+  createCompetency(competency: { name: string; description: string; categoryId?: string; proficiencyLevelId?: string }): Promise<Competency>;
   getUserCompetencies(userId: string): Promise<UserCompetencyView[]>;
   createUserCompetency(userCompetency: InsertUserCompetency): Promise<UserCompetency>;
   
@@ -546,6 +546,7 @@ export interface IStorage {
 
   // Skill Categories Management
   getAllSkillCategories(): Promise<SkillCategory[]>;
+  getAllSkillCategoriesWithRelations(): Promise<Array<SkillCategory & { type?: SkillCategoryType; defaultProficiency?: ProficiencyLevel }>>;
   getSkillCategory(categoryId: string): Promise<SkillCategory | undefined>;
   createSkillCategory(category: InsertSkillCategory): Promise<SkillCategory>;
   updateSkillCategory(categoryId: string, updates: Partial<InsertSkillCategory>): Promise<SkillCategory>;
@@ -1987,13 +1988,14 @@ export class DatabaseStorage implements IStorage {
       .orderBy(competencies.name);
   }
 
-  async createCompetency(competency: { name: string; description: string; categoryId?: string }): Promise<Competency> {
+  async createCompetency(competency: { name: string; description: string; categoryId?: string; proficiencyLevelId?: string }): Promise<Competency> {
     const [created] = await db
       .insert(competencies)
       .values({
         name: competency.name,
         description: competency.description,
         categoryId: competency.categoryId,
+        proficiencyLevelId: competency.proficiencyLevelId,
         isActive: true,
       })
       .returning();
@@ -3115,6 +3117,30 @@ export class DatabaseStorage implements IStorage {
       .from(skillCategories)
       .where(eq(skillCategories.isActive, true))
       .orderBy(skillCategories.sortOrder, skillCategories.name);
+  }
+
+  async getAllSkillCategoriesWithRelations(): Promise<Array<SkillCategory & { type?: SkillCategoryType; defaultProficiency?: ProficiencyLevel }>> {
+    const results = await db
+      .select({
+        id: skillCategories.id,
+        name: skillCategories.name,
+        description: skillCategories.description,
+        typeId: skillCategories.typeId,
+        defaultProficiencyId: skillCategories.defaultProficiencyId,
+        sortOrder: skillCategories.sortOrder,
+        isActive: skillCategories.isActive,
+        createdAt: skillCategories.createdAt,
+        updatedAt: skillCategories.updatedAt,
+        type: skillCategoryTypes,
+        defaultProficiency: proficiencyLevels,
+      })
+      .from(skillCategories)
+      .leftJoin(skillCategoryTypes, eq(skillCategories.typeId, skillCategoryTypes.id))
+      .leftJoin(proficiencyLevels, eq(skillCategories.defaultProficiencyId, proficiencyLevels.id))
+      .where(eq(skillCategories.isActive, true))
+      .orderBy(skillCategories.sortOrder, skillCategories.name);
+    
+    return results as any;
   }
 
   async getSkillCategory(categoryId: string): Promise<SkillCategory | undefined> {
