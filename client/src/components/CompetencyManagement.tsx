@@ -1552,8 +1552,8 @@ export default function CompetencyManagement() {
                       <Select onValueChange={(value) => {
                         field.onChange(value);
                         const selectedCategory = skillCategories?.find((cat: any) => cat.id === value);
-                        if (selectedCategory?.defaultProficiencyId) {
-                          form.setValue('proficiencyLevelId', selectedCategory.defaultProficiencyId);
+                        if (selectedCategory) {
+                          form.setValue('proficiencyLevelId', selectedCategory.defaultProficiencyId || '');
                         }
                       }} value={field.value}>
                         <FormControl>
