@@ -146,8 +146,7 @@ function CompetencyManagementDashboard() {
       comp.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = !categoryFilter || categoryFilter === "all" || 
       comp.category === categoryFilter || comp.categoryName === categoryFilter || comp.categoryId === categoryFilter;
-    const matchesSkillType = !skillTypeFilter || skillTypeFilter === "all" || comp.skillType === skillTypeFilter;
-    return matchesSearch && matchesCategory && matchesSkillType;
+    return matchesSearch && matchesCategory;
   });
 
   return (
@@ -192,9 +191,9 @@ function CompetencyManagementDashboard() {
             <div className="flex items-center">
               <Shield className="w-8 h-8 text-green-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Safety Critical</p>
-                <p className="text-2xl font-bold" data-testid="stat-safety-competencies">
-                  {competencies?.filter(c => c.skillType === "safety").length || 0}
+                <p className="text-sm font-medium text-muted-foreground">Active</p>
+                <p className="text-2xl font-bold" data-testid="stat-active-competencies">
+                  {competencies?.filter(c => c.isActive).length || 0}
                 </p>
               </div>
             </div>
@@ -206,9 +205,9 @@ function CompetencyManagementDashboard() {
             <div className="flex items-center">
               <CheckCircle className="w-8 h-8 text-purple-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Compliance</p>
-                <p className="text-2xl font-bold" data-testid="stat-compliance-competencies">
-                  {competencies?.filter(c => c.skillType === "compliance").length || 0}
+                <p className="text-sm font-medium text-muted-foreground">Categories</p>
+                <p className="text-2xl font-bold" data-testid="stat-category-count">
+                  {new Set(competencies?.map(c => c.categoryId).filter(Boolean)).size || 0}
                 </p>
               </div>
             </div>
@@ -442,14 +441,6 @@ function CompetencyLibraryView({ competencies, isLoading }: {
                       <h4 className="font-medium">{competency.title}</h4>
                       <Badge variant={competency.isActive ? "default" : "secondary"}>
                         {competency.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                      <Badge variant="outline">Level {competency.level}</Badge>
-                      <Badge 
-                        variant={competency.skillType === "safety" ? "destructive" : 
-                                competency.skillType === "compliance" ? "secondary" :
-                                competency.skillType === "behavioral" ? "outline" : "default"}
-                      >
-                        {competency.skillType}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">{competency.description}</p>
@@ -842,12 +833,6 @@ function CompetencyTree({ competencies, onEdit, onDelete, onReorder }: {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h4 className="font-medium text-sm">{competency.title}</h4>
-              <Badge variant={competency.skillType === "safety" ? "destructive" : 
-                             competency.skillType === "compliance" ? "secondary" :
-                             competency.skillType === "behavioral" ? "outline" : "default"}>
-                {competency.skillType}
-              </Badge>
-              <Badge variant="outline">L{competency.level}</Badge>
               {!competency.isActive && <Badge variant="destructive">Inactive</Badge>}
             </div>
             <p className="text-xs text-muted-foreground truncate">{competency.description}</p>
@@ -1033,7 +1018,7 @@ function RoleCompetencyMapping() {
                           <SelectContent>
                             {competencies?.map((comp: Competency) => (
                               <SelectItem key={comp.id} value={comp.id}>
-                                {comp.title} (Level {comp.level})
+                                {comp.title}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -1417,8 +1402,7 @@ export default function CompetencyManagement() {
   const form = useForm<CompetencyFormType>({
     resolver: zodResolver(competencySchema),
     defaultValues: {
-      level: 1,
-      skillType: "technical",
+      proficiencyLevelId: "",
       isActive: true,
       requiredForRoles: [],
       trainingResources: []
@@ -1439,13 +1423,12 @@ export default function CompetencyManagement() {
       title: competency.title,
       description: competency.description,
       categoryId: competency.categoryId || "",
-      level: competency.level,
+      proficiencyLevelId: competency.proficiencyLevelId || "",
       parentId: competency.parentId,
-      skillType: competency.skillType,
       assessmentCriteria: competency.assessmentCriteria,
       isActive: competency.isActive,
-      requiredForRoles: [],
-      trainingResources: []
+      requiredForRoles: competency.requiredForRoles || [],
+      trainingResources: competency.trainingResources || []
     });
   };
 
