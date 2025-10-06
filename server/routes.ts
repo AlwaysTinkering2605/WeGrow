@@ -3687,6 +3687,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/competency-library/:id', isAuthenticated, requireLeadership(), async (req, res) => {
+    try {
+      const updates = insertCompetencyLibrarySchema.partial().parse(req.body);
+      const competency = await storage.updateCompetencyLibraryItem(req.params.id, updates);
+      res.json(competency);
+    } catch (error: any) {
+      console.error("Error updating competency:", error);
+      
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid data provided", 
+          errors: error.errors 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to update competency" });
+    }
+  });
+
   app.delete('/api/competency-library/:id', isAuthenticated, requireLeadership(), async (req, res) => {
     try {
       await storage.deleteCompetencyLibraryItem(req.params.id);
