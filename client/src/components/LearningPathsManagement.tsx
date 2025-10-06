@@ -66,6 +66,11 @@ export default function LearningPathsManagement() {
     queryKey: ['/api/lms/courses'],
   });
 
+  // Job roles query for assignment
+  const { data: jobRoles = [] } = useQuery<any[]>({
+    queryKey: ['/api/job-roles'],
+  });
+
   // Forms
   const pathForm = useForm<LearningPathFormData>({
     resolver: zodResolver(learningPathSchema),
@@ -198,10 +203,10 @@ export default function LearningPathsManagement() {
   });
 
   const assignToJobRoleMutation = useMutation({
-    mutationFn: ({ pathId, jobRole }: { pathId: string; jobRole: string }) =>
+    mutationFn: ({ pathId, jobRoleId }: { pathId: string; jobRoleId: string }) =>
       apiRequest(`/api/learning-paths/${pathId}/assign-to-job-role`, {
         method: 'POST',
-        body: JSON.stringify({ jobRole }),
+        body: JSON.stringify({ jobRoleId }),
       }),
     onSuccess: (result) => {
       toast({ 
@@ -898,14 +903,11 @@ export default function LearningPathsManagement() {
                   <SelectValue placeholder="Choose a job role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="cleaner_contract">Cleaner (Contract)</SelectItem>
-                  <SelectItem value="cleaner_specialised">Cleaner (Specialised)</SelectItem>
-                  <SelectItem value="team_leader_contract">Team Leader (Contract)</SelectItem>
-                  <SelectItem value="team_leader_specialised">Team Leader (Specialised)</SelectItem>
-                  <SelectItem value="mobile_cleaner">Mobile Cleaner</SelectItem>
-                  <SelectItem value="supervisor">Supervisor</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
-                  <SelectItem value="director">Director</SelectItem>
+                  {jobRoles.map((role: any) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.name} (Level {role.level})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -925,7 +927,7 @@ export default function LearningPathsManagement() {
                   if (selectedPath && selectedJobRole) {
                     assignToJobRoleMutation.mutate({
                       pathId: selectedPath.id,
-                      jobRole: selectedJobRole
+                      jobRoleId: selectedJobRole
                     });
                   }
                 }}
