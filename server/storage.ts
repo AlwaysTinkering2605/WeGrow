@@ -7339,10 +7339,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Competency Library Management (Vertical Slice 4)
-  async getCompetencyLibrary(): Promise<CompetencyLibraryItem[]> {
-    const results = await db.select()
+  async getCompetencyLibrary(): Promise<any[]> {
+    const results = await db.select({
+      id: competencyLibrary.id,
+      competencyId: competencyLibrary.competencyId,
+      title: competencies.name,
+      description: competencies.description,
+      categoryId: competencies.categoryId,
+      proficiencyLevelId: competencies.proficiencyLevelId,
+      isActive: competencies.isActive,
+      parentId: competencyLibrary.parentCompetencyLibraryId,
+      assessmentCriteria: competencyLibrary.assessmentCriteria,
+      hierarchyLevel: competencyLibrary.hierarchyLevel,
+      sortOrder: competencyLibrary.sortOrder,
+      createdAt: competencyLibrary.createdAt,
+      updatedAt: competencyLibrary.updatedAt,
+    })
       .from(competencyLibrary)
-      .orderBy(competencyLibrary.competencyId);
+      .leftJoin(competencies, eq(competencyLibrary.competencyId, competencies.id))
+      .orderBy(competencyLibrary.sortOrder);
     
     return results;
   }
