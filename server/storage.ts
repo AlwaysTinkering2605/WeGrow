@@ -7433,10 +7433,17 @@ export class DatabaseStorage implements IStorage {
       createdBy: roleCompetencyMappings.createdBy,
       createdAt: roleCompetencyMappings.createdAt,
       updatedAt: roleCompetencyMappings.updatedAt,
-      competency: competencyLibrary
+      competency: {
+        id: competencies.id,
+        title: competencies.name,
+        description: competencies.description,
+        category: competencies.category,
+        isActive: competencies.isActive
+      }
     })
     .from(roleCompetencyMappings)
-    .leftJoin(competencyLibrary, eq(roleCompetencyMappings.competencyLibraryId, competencyLibrary.id));
+    .leftJoin(competencyLibrary, eq(roleCompetencyMappings.competencyLibraryId, competencyLibrary.id))
+    .leftJoin(competencies, eq(competencyLibrary.competencyId, competencies.id));
     
     const conditions = [];
     if (jobRoleId) {
