@@ -885,11 +885,15 @@ function RoleCompetencyMapping() {
   const { data: roleMappings, isLoading: isLoadingMappings } = useQuery({
     queryKey: ["/api/role-competency-mappings", selectedRole],
     enabled: !!selectedRole
-  });
+  }) as { data: RoleMapping[] | undefined; isLoading: boolean };
 
   const { data: competencies } = useQuery({
     queryKey: ["/api/competency-library"]
-  });
+  }) as { data: Competency[] | undefined };
+
+  const { data: jobRoles } = useQuery({
+    queryKey: ["/api/job-roles"]
+  }) as { data: any[] | undefined };
 
   const createMappingMutation = useMutation({
     mutationFn: (data: RoleMappingFormType) => apiRequest("/api/role-competency-mappings", {
@@ -937,15 +941,15 @@ function RoleCompetencyMapping() {
     }
   });
 
+  useEffect(() => {
+    if (selectedRole) {
+      form.setValue("roleId", selectedRole);
+    }
+  }, [selectedRole, form]);
+
   const onSubmit = (data: RoleMappingFormType) => {
     createMappingMutation.mutate(data);
   };
-
-  const roles = [
-    { value: "operative", label: "Cleaning Operative" },
-    { value: "supervisor", label: "Area Supervisor" },
-    { value: "leadership", label: "Senior Leadership" }
-  ];
 
   return (
     <Card>
@@ -965,9 +969,9 @@ function RoleCompetencyMapping() {
               <SelectValue placeholder="Select a role" />
             </SelectTrigger>
             <SelectContent>
-              {roles.map((role) => (
-                <SelectItem key={role.value} value={role.value}>
-                  {role.label}
+              {jobRoles?.filter((role: any) => role.isActive !== false).map((role: any) => (
+                <SelectItem key={role.id} value={role.id}>
+                  {role.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -996,7 +1000,7 @@ function RoleCompetencyMapping() {
                       <FormItem>
                         <FormLabel>Role</FormLabel>
                         <FormControl>
-                          <Input {...field} value={selectedRole} readOnly />
+                          <Input {...field} value={jobRoles?.find((r: any) => r.id === selectedRole)?.name || selectedRole} readOnly />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1155,20 +1159,20 @@ function AuditTrailViewer() {
   const { data: evidenceRecords, isLoading: isLoadingEvidence } = useQuery({
     queryKey: ["/api/competency-evidence", selectedUserId],
     enabled: !!selectedUserId
-  });
+  }) as { data: EvidenceRecord[] | undefined; isLoading: boolean };
 
   const { data: statusHistory, isLoading: isLoadingHistory } = useQuery({
     queryKey: ["/api/competency-status-history", selectedUserId],
     enabled: !!selectedUserId
-  });
+  }) as { data: any[] | undefined; isLoading: boolean };
 
   const { data: users } = useQuery({
     queryKey: ["/api/users"]
-  });
+  }) as { data: any[] | undefined };
 
   const { data: competencies } = useQuery({
     queryKey: ["/api/competency-library"]
-  });
+  }) as { data: Competency[] | undefined };
 
   const verifyEvidenceMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: "verified" | "rejected" }) =>
@@ -1357,7 +1361,7 @@ export default function CompetencyManagement() {
 
   const { data: competencies, isLoading } = useQuery({
     queryKey: ["/api/competency-library/hierarchical"]
-  });
+  }) as { data: Competency[] | undefined; isLoading: boolean };
 
   // Fetch skill categories with relations (type and defaultProficiency)
   const { data: skillCategories } = useQuery({
