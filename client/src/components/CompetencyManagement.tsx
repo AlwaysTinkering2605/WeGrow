@@ -777,6 +777,12 @@ function RoleMappingManager() {
   const { toast } = useToast();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingMapping, setEditingMapping] = useState<any | null>(null);
+  
+  // Filter state
+  const [jobRoleFilter, setJobRoleFilter] = useState<string>('all');
+  const [competencyFilter, setCompetencyFilter] = useState<string>('all');
+  const [mandatoryFilter, setMandatoryFilter] = useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');
 
   const { data: mappings = [], isLoading: isLoadingMappings } = useQuery<any[]>({
     queryKey: ['/api/role-competency-mappings'],
@@ -885,6 +891,34 @@ function RoleMappingManager() {
     });
   };
 
+  // Filter mappings based on selected filters
+  const filteredMappings = mappings.filter((mapping: any) => {
+    // Job Role filter
+    if (jobRoleFilter !== 'all' && mapping.jobRoleId !== jobRoleFilter) {
+      return false;
+    }
+    
+    // Competency filter
+    if (competencyFilter !== 'all' && mapping.competencyLibraryId !== competencyFilter) {
+      return false;
+    }
+    
+    // Mandatory filter
+    if (mandatoryFilter !== 'all') {
+      const isMandatory = mapping.isMandatory ?? true;
+      if (mandatoryFilter === 'true' && !isMandatory) return false;
+      if (mandatoryFilter === 'false' && isMandatory) return false;
+    }
+    
+    // Priority filter
+    if (priorityFilter !== 'all') {
+      const priority = (mapping.priority || 'medium').toLowerCase();
+      if (priority !== priorityFilter.toLowerCase()) return false;
+    }
+    
+    return true;
+  });
+
   return (
     <Card>
       <CardHeader>
@@ -913,29 +947,92 @@ function RoleMappingManager() {
           </div>
         ) : mappings && mappings.length > 0 ? (
           <div className="space-y-4">
+            {/* Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Job Role</label>
+                <Select value={jobRoleFilter} onValueChange={setJobRoleFilter}>
+                  <SelectTrigger data-testid="filter-job-role">
+                    <SelectValue placeholder="All Roles" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    {jobRoles.map((role: any) => (
+                      <SelectItem key={role.id} value={role.id}>
+                        {role.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-2 block">Competency</label>
+                <Select value={competencyFilter} onValueChange={setCompetencyFilter}>
+                  <SelectTrigger data-testid="filter-competency">
+                    <SelectValue placeholder="All Competencies" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Competencies</SelectItem>
+                    {competencies.map((comp: any) => (
+                      <SelectItem key={comp.id} value={comp.id}>
+                        {comp.competency?.name || comp.title || comp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-2 block">Mandatory</label>
+                <Select value={mandatoryFilter} onValueChange={setMandatoryFilter}>
+                  <SelectTrigger data-testid="filter-mandatory">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="true">Mandatory</SelectItem>
+                    <SelectItem value="false">Optional</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-2 block">Priority</label>
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger data-testid="filter-priority">
+                    <SelectValue placeholder="All Priorities" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priorities</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
             <div className="overflow-x-auto">
               <table className="w-full" data-testid="table-role-mappings">
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-3 px-4 font-medium">Job Role</th>
                     <th className="text-left py-3 px-4 font-medium">Competency</th>
-                    <th className="text-left py-3 px-4 font-medium">Required Level</th>
                     <th className="text-left py-3 px-4 font-medium">Mandatory</th>
                     <th className="text-left py-3 px-4 font-medium">Priority</th>
                     <th className="text-left py-3 px-4 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {mappings.map((mapping) => (
+                  {filteredMappings.map((mapping) => (
                     <tr key={mapping.id} className="border-b hover:bg-muted/50" data-testid={`row-mapping-${mapping.id}`}>
                       <td className="py-3 px-4" data-testid={`text-role-${mapping.id}`}>
                         {mapping.roleName || mapping.jobRoleName || mapping.jobRoleId}
                       </td>
                       <td className="py-3 px-4" data-testid={`text-competency-${mapping.id}`}>
                         {mapping.competency?.title || mapping.competencyName || mapping.competencyLibraryId}
-                      </td>
-                      <td className="py-3 px-4" data-testid={`text-level-${mapping.id}`}>
-                        {mapping.proficiencyLevelName || mapping.requiredProficiencyLevel || 'N/A'}
                       </td>
                       <td className="py-3 px-4" data-testid={`text-mandatory-${mapping.id}`}>
                         {mapping.isMandatory ? (
