@@ -58,10 +58,10 @@ const competencySchema = z.object({
 });
 
 const roleMappingSchema = z.object({
-  roleId: z.string().min(1, "Role is required"),
-  competencyId: z.string().min(1, "Competency is required"),
-  priority: z.enum(["critical", "important", "desired"]).default("important"),
-  isRequired: z.boolean().default(true),
+  jobRoleId: z.string().min(1, "Role is required"),
+  competencyLibraryId: z.string().min(1, "Competency is required"),
+  priority: z.string().optional(),
+  isMandatory: z.boolean().default(true),
 });
 
 const evidenceSchema = z.object({
@@ -97,12 +97,12 @@ interface Competency {
 
 interface RoleMapping {
   id: string;
-  roleId: string;
-  competencyId: string;
-  priority: "critical" | "important" | "desired";
-  targetLevel: number;
+  jobRoleId: string;
+  competencyLibraryId: string;
+  priority?: string;
+  targetLevel?: number;
   deadline?: string;
-  isRequired: boolean;
+  isMandatory: boolean;
   competency?: Competency;
 }
 
@@ -879,6 +879,7 @@ function RoleCompetencyMapping() {
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const { data: roleMappings, isLoading: isLoadingMappings } = useQuery({
     queryKey: ["/api/role-competency-mappings", selectedRole],
@@ -933,19 +934,26 @@ function RoleCompetencyMapping() {
   const form = useForm<RoleMappingFormType>({
     resolver: zodResolver(roleMappingSchema),
     defaultValues: {
-      priority: "important",
-      isRequired: true
+      priority: "medium",
+      isMandatory: true
     }
   });
 
   useEffect(() => {
     if (selectedRole) {
-      form.setValue("roleId", selectedRole);
+      form.setValue("jobRoleId", selectedRole);
     }
   }, [selectedRole, form]);
 
   const onSubmit = (data: RoleMappingFormType) => {
-    createMappingMutation.mutate(data);
+    if (!user?.id) {
+      toast({ title: "Error", description: "User not authenticated", variant: "destructive" });
+      return;
+    }
+    createMappingMutation.mutate({
+      ...data,
+      createdBy: user.id
+    });
   };
 
   return (
@@ -992,7 +1000,7 @@ function RoleCompetencyMapping() {
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="roleId"
+                    name="jobRoleId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Role</FormLabel>
@@ -1006,7 +1014,7 @@ function RoleCompetencyMapping() {
 
                   <FormField
                     control={form.control}
-                    name="competencyId"
+                    name="competencyLibraryId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Competency</FormLabel>
@@ -1081,11 +1089,13 @@ function RoleCompetencyMapping() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <h4 className="font-medium">{mapping.competency?.title}</h4>
-                        <Badge variant={mapping.priority === "critical" ? "destructive" : 
-                                       mapping.priority === "important" ? "default" : "secondary"}>
-                          {mapping.priority}
-                        </Badge>
-                        {mapping.isRequired && <Badge variant="outline">Required</Badge>}
+                        {mapping.priority && (
+                          <Badge variant={mapping.priority === "critical" ? "destructive" : 
+                                         mapping.priority === "high" ? "default" : "secondary"}>
+                            {mapping.priority}
+                          </Badge>
+                        )}
+                        {mapping.isMandatory && <Badge variant="outline">Required</Badge>}
                       </div>
                       <p className="text-sm text-muted-foreground">{mapping.competency?.description}</p>
                     </div>
