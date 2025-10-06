@@ -3813,7 +3813,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/role-competency-mappings', isAuthenticated, requireLeadership(), async (req: any, res) => {
     try {
-      const mappingData = insertRoleCompetencyMappingSchema.parse(req.body);
+      const mappingData = insertRoleCompetencyMappingSchema.parse({
+        ...req.body,
+        createdBy: req.user.claims.sub
+      });
       const mapping = await storage.createRoleCompetencyMapping(mappingData);
       res.json(mapping);
     } catch (error: any) {
