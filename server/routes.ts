@@ -6908,19 +6908,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/learning-paths/:pathId/assign-to-job-role', isAuthenticated, requireSupervisorOrLeadership(), async (req: any, res) => {
     try {
       const { pathId } = req.params;
-      const { jobRole } = req.body;
+      const { jobRoleId } = req.body;
       const assignedBy = req.user.claims.sub;
       
-      // Validate job role
-      const validJobRoles = [
-        'cleaner_contract', 'cleaner_specialised', 'team_leader_contract', 
-        'team_leader_specialised', 'mobile_cleaner', 'supervisor', 'manager', 'director'
-      ];
-      
-      if (!jobRole || !validJobRoles.includes(jobRole)) {
+      // Validate job role ID
+      if (!jobRoleId) {
         return res.status(400).json({ 
-          message: "Invalid job role. Must be one of: " + validJobRoles.join(', ') 
+          message: "Job role ID is required" 
         });
+      }
+      
+      // Verify job role exists
+      const jobRole = await storage.getJobRole(jobRoleId);
+      if (!jobRole) {
+        return res.status(404).json({ message: "Job role not found" });
       }
       
       // Check if learning path exists and is published
@@ -6934,10 +6935,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get all users with this job role
-      const usersWithJobRole = await storage.getUsersByJobRole(jobRole);
+      const usersWithJobRole = await storage.getUsersByJobRoleId(jobRoleId);
       
       if (usersWithJobRole.length === 0) {
-        return res.status(404).json({ message: `No users found with job role: ${jobRole}` });
+        return res.status(404).json({ message: `No users found with job role: ${jobRole.name}` });
       }
       
       const enrollments = [];
@@ -6953,7 +6954,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             assignedBy,
             metadata: {
               assignmentType: "job_role",
-              jobRole: jobRole,
+              jobRoleId: jobRoleId,
+              jobRoleName: jobRole.name,
               assignedAt: new Date().toISOString()
             }
           });
@@ -6968,10 +6970,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(201).json({
-        message: `Learning path assigned to ${enrollments.length} users with job role: ${jobRole}`,
+        message: `Learning path assigned to ${enrollments.length} users with ${jobRole.name} role`,
         enrollments: enrollments.length,
         errors: errors.length > 0 ? errors : undefined,
-        jobRole,
+        jobRole: jobRole.name,
+        jobRoleId: jobRoleId,
         pathTitle: learningPath.title
       });
     } catch (error: any) {
