@@ -2487,6 +2487,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updatedUser = await storage.updateUserAssignments(id, updates);
+      
+      // AUTO-ENROLL: If a job role was assigned, enroll user in linked learning paths
+      if (updates.jobRoleId) {
+        try {
+          const linkedPaths = await storage.getJobRoleLearningPaths(updates.jobRoleId);
+          
+          for (const pathMapping of linkedPaths) {
+            try {
+              // Get the learning path to ensure it's published
+              const learningPath = await storage.getLearningPath(pathMapping.learningPathId);
+              
+              if (learningPath && learningPath.isPublished) {
+                // Calculate due date based on relativeDueDays (including 0 for immediate due date)
+                let dueDate = undefined;
+                if (pathMapping.relativeDueDays != null) {
+                  dueDate = new Date();
+                  dueDate.setDate(dueDate.getDate() + pathMapping.relativeDueDays);
+                }
+                
+                await storage.enrollUserInLearningPath({
+                  userId: id,
+                  pathId: pathMapping.learningPathId,
+                  enrollmentSource: "auto_job_role_assignment",
+                  assignedBy: currentUserId,
+                  dueDate,
+                  metadata: {
+                    assignmentType: "auto_job_role",
+                    jobRoleId: updates.jobRoleId,
+                    isMandatory: pathMapping.isMandatory,
+                    assignedAt: new Date().toISOString()
+                  }
+                });
+                
+                console.log(`[AUTO-ENROLL] User ${id} enrolled in learning path ${pathMapping.learningPathId} via job role assignment`);
+              }
+            } catch (enrollError: any) {
+              // Don't fail the whole operation if enrollment fails (e.g., already enrolled)
+              if (!enrollError.message?.includes("already enrolled")) {
+                console.error(`[AUTO-ENROLL] Failed to enroll user ${id} in learning path ${pathMapping.learningPathId}:`, enrollError);
+              }
+            }
+          }
+        } catch (pathError) {
+          console.error(`[AUTO-ENROLL] Error fetching learning paths for job role ${updates.jobRoleId}:`, pathError);
+          // Don't fail the assignment if auto-enrollment fails
+        }
+      }
+      
       res.json(updatedUser);
     } catch (error) {
       console.error("Error updating user assignments:", error);
