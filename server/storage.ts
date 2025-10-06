@@ -7995,14 +7995,40 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getHierarchicalCompetencies(parentId?: string): Promise<CompetencyLibraryItem[]> {
+    const baseQuery = db
+      .select({
+        id: competencyLibrary.id,
+        competencyId: competencyLibrary.competencyId,
+        parentCompetencyLibraryId: competencyLibrary.parentCompetencyLibraryId,
+        hierarchyLevel: competencyLibrary.hierarchyLevel,
+        sortOrder: competencyLibrary.sortOrder,
+        proficiencyLevels: competencyLibrary.proficiencyLevels,
+        assessmentCriteria: competencyLibrary.assessmentCriteria,
+        renewalPeriodDays: competencyLibrary.renewalPeriodDays,
+        isComplianceRequired: competencyLibrary.isComplianceRequired,
+        evidenceRequirements: competencyLibrary.evidenceRequirements,
+        linkedLearningPaths: competencyLibrary.linkedLearningPaths,
+        createdBy: competencyLibrary.createdBy,
+        createdAt: competencyLibrary.createdAt,
+        updatedAt: competencyLibrary.updatedAt,
+        title: competencies.name,
+        description: competencies.description,
+        categoryId: competencies.categoryId,
+        proficiencyLevelId: competencies.proficiencyLevelId,
+        isActive: competencies.isActive,
+        parentId: competencyLibrary.parentCompetencyLibraryId,
+      })
+      .from(competencyLibrary)
+      .leftJoin(competencies, eq(competencyLibrary.competencyId, competencies.id));
+
     if (parentId) {
-      return await db.select().from(competencyLibrary)
+      return await baseQuery
         .where(eq(competencyLibrary.parentCompetencyLibraryId, parentId))
-        .orderBy(asc(competencyLibrary.sortOrder));
+        .orderBy(asc(competencyLibrary.sortOrder)) as any;
     } else {
-      return await db.select().from(competencyLibrary)
+      return await baseQuery
         .where(isNull(competencyLibrary.parentCompetencyLibraryId))
-        .orderBy(asc(competencyLibrary.sortOrder));
+        .orderBy(asc(competencyLibrary.sortOrder)) as any;
     }
   }
 
