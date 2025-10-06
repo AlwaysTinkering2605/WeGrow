@@ -882,7 +882,7 @@ function RoleCompetencyMapping() {
   const { user } = useAuth();
 
   const { data: roleMappings, isLoading: isLoadingMappings } = useQuery({
-    queryKey: ["/api/role-competency-mappings", selectedRole],
+    queryKey: [`/api/role-competency-mappings?jobRoleId=${selectedRole}`, selectedRole],
     enabled: !!selectedRole
   }) as { data: RoleMapping[] | undefined; isLoading: boolean };
 
