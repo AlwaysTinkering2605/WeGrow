@@ -7382,16 +7382,18 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(competencies, eq(competencyLibrary.competencyId, competencies.id))
       .orderBy(competencyLibrary.sortOrder);
     
-    // Fetch all role mappings with job role names
+    // Fetch all role mappings with job role names and proficiency level names
     const allMappings = await db.select({
       id: roleCompetencyMappings.id,
       competencyLibraryId: roleCompetencyMappings.competencyLibraryId,
       jobRoleId: roleCompetencyMappings.jobRoleId,
       requiredProficiencyLevel: roleCompetencyMappings.requiredProficiencyLevel,
       roleName: jobRoles.name,
+      proficiencyLevelName: proficiencyLevels.name,
     })
       .from(roleCompetencyMappings)
-      .leftJoin(jobRoles, eq(roleCompetencyMappings.jobRoleId, jobRoles.id));
+      .leftJoin(jobRoles, eq(roleCompetencyMappings.jobRoleId, jobRoles.id))
+      .leftJoin(proficiencyLevels, eq(roleCompetencyMappings.requiredProficiencyLevel, proficiencyLevels.id));
     
     // Hydrate each competency with its role mappings
     return results.map(competency => {
@@ -7400,7 +7402,7 @@ export class DatabaseStorage implements IStorage {
         jobRoleId: m.jobRoleId,
         proficiencyLevelId: m.requiredProficiencyLevel,
         roleName: m.roleName,
-        proficiencyLevelName: m.requiredProficiencyLevel,
+        proficiencyLevelName: m.proficiencyLevelName,
       }));
       return { ...competency, requiredForRoles };
     });
