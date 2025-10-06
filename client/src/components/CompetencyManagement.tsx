@@ -900,7 +900,10 @@ function RoleCompetencyMapping() {
       body: JSON.stringify(data)
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/role-competency-mappings"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/role-competency-mappings"],
+        refetchType: "all"
+      });
       setIsCreateDialogOpen(false);
       toast({ title: "Role mapping created successfully" });
     },
@@ -916,7 +919,10 @@ function RoleCompetencyMapping() {
         body: JSON.stringify(data)
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/role-competency-mappings"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/role-competency-mappings"],
+        refetchType: "all"
+      });
       toast({ title: "Role mapping updated successfully" });
     }
   });
@@ -926,7 +932,10 @@ function RoleCompetencyMapping() {
       method: "DELETE"
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/role-competency-mappings"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/role-competency-mappings"],
+        refetchType: "all"
+      });
       toast({ title: "Role mapping deleted successfully" });
     }
   });
