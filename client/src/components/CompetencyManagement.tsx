@@ -882,7 +882,7 @@ function RoleCompetencyMapping() {
   const { user } = useAuth();
 
   const { data: roleMappings, isLoading: isLoadingMappings } = useQuery({
-    queryKey: [`/api/role-competency-mappings?jobRoleId=${selectedRole}`, selectedRole],
+    queryKey: ["/api/role-competency-mappings", { jobRoleId: selectedRole }],
     enabled: !!selectedRole
   }) as { data: RoleMapping[] | undefined; isLoading: boolean };
 
@@ -959,10 +959,7 @@ function RoleCompetencyMapping() {
       toast({ title: "Error", description: "User not authenticated", variant: "destructive" });
       return;
     }
-    createMappingMutation.mutate({
-      ...data,
-      createdBy: user.id
-    });
+    createMappingMutation.mutate(data);
   };
 
   return (
@@ -1091,7 +1088,7 @@ function RoleCompetencyMapping() {
                   <Skeleton key={i} className="h-16 w-full" />
                 ))}
               </div>
-            ) : roleMappings?.length > 0 ? (
+            ) : roleMappings && roleMappings.length > 0 ? (
               <div className="space-y-2">
                 {roleMappings.map((mapping: RoleMapping) => (
                   <div key={mapping.id} className="flex items-center justify-between p-4 border rounded-lg">
@@ -1229,7 +1226,7 @@ function AuditTrailViewer() {
                     <Skeleton key={i} className="h-20 w-full" />
                   ))}
                 </div>
-              ) : filteredEvidence?.length > 0 ? (
+              ) : filteredEvidence && filteredEvidence.length > 0 ? (
                 <div className="space-y-4">
                   {filteredEvidence.map((record: EvidenceRecord) => (
                     <div key={record.id} className="border rounded-lg p-4">
@@ -1301,7 +1298,7 @@ function AuditTrailViewer() {
                     <Skeleton key={i} className="h-16 w-full" />
                   ))}
                 </div>
-              ) : statusHistory?.length > 0 ? (
+              ) : statusHistory && statusHistory.length > 0 ? (
                 <div className="space-y-2">
                   {statusHistory.map((entry: any) => (
                     <div key={entry.id} className="flex items-center gap-4 p-3 border rounded-lg">
@@ -1472,9 +1469,9 @@ export default function CompetencyManagement() {
                     <Skeleton key={i} className="h-12 w-full" />
                   ))}
                 </div>
-              ) : competencies?.length > 0 ? (
+              ) : competencies && competencies.length > 0 ? (
                 <CompetencyTree
-                  competencies={competencies}
+                  competencies={competencies || []}
                   onEdit={handleEdit}
                   onDelete={(id) => deleteCompetencyMutation.mutate(id)}
                   onReorder={handleReorder}
