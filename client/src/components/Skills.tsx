@@ -59,6 +59,8 @@ export default function Skills() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedProficiency, setSelectedProficiency] = useState<string>("");
+  const [searchText, setSearchText] = useState<string>("");
   const { toast } = useToast();
 
   const { data: skills, isLoading: skillsLoading } = useQuery({
@@ -167,9 +169,29 @@ export default function Skills() {
     return proficiencyLevels?.find(p => p.id === proficiencyId)?.name;
   };
 
-  const filteredSkills = selectedCategory && selectedCategory !== "all"
-    ? skills?.filter(s => s.categoryId === selectedCategory)
-    : skills;
+  const filteredSkills = skills?.filter(skill => {
+    // Filter by category
+    if (selectedCategory && selectedCategory !== "all" && skill.categoryId !== selectedCategory) {
+      return false;
+    }
+    
+    // Filter by proficiency level
+    if (selectedProficiency && selectedProficiency !== "all") {
+      if (selectedProficiency === "none" && skill.targetProficiencyId) {
+        return false;
+      }
+      if (selectedProficiency !== "none" && skill.targetProficiencyId !== selectedProficiency) {
+        return false;
+      }
+    }
+    
+    // Filter by search text
+    if (searchText && !skill.name.toLowerCase().includes(searchText.toLowerCase())) {
+      return false;
+    }
+    
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -190,7 +212,16 @@ export default function Skills() {
         </Button>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-wrap gap-4">
+        <Input
+          type="text"
+          placeholder="Search by skill name..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          className="w-64"
+          data-testid="input-search-skills"
+        />
+        
         <Select value={selectedCategory || "all"} onValueChange={setSelectedCategory}>
           <SelectTrigger className="w-64" data-testid="select-category-filter">
             <SelectValue placeholder="Filter by category" />
@@ -204,9 +235,29 @@ export default function Skills() {
             ))}
           </SelectContent>
         </Select>
-        {selectedCategory && selectedCategory !== "all" && (
-          <Button variant="outline" onClick={() => setSelectedCategory("all")} data-testid="button-clear-filter">
-            Clear Filter
+
+        <Select value={selectedProficiency || "all"} onValueChange={setSelectedProficiency}>
+          <SelectTrigger className="w-64" data-testid="select-proficiency-filter">
+            <SelectValue placeholder="Filter by proficiency" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" data-testid="option-all-proficiency">All Proficiency Levels</SelectItem>
+            <SelectItem value="none" data-testid="option-no-proficiency">No Target Proficiency</SelectItem>
+            {proficiencyLevels?.map((level) => (
+              <SelectItem key={level.id} value={level.id} data-testid={`option-proficiency-${level.id}`}>
+                {level.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {(searchText || (selectedCategory && selectedCategory !== "all") || (selectedProficiency && selectedProficiency !== "all")) && (
+          <Button variant="outline" onClick={() => {
+            setSearchText("");
+            setSelectedCategory("all");
+            setSelectedProficiency("all");
+          }} data-testid="button-clear-filters">
+            Clear All Filters
           </Button>
         )}
       </div>
@@ -272,12 +323,16 @@ export default function Skills() {
               <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="font-medium mb-2">No skills found</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                {selectedCategory ? "No skills in this category" : "Create your first skill to start building your skills taxonomy"}
+                {searchText || selectedCategory || selectedProficiency 
+                  ? "No skills match your filter criteria. Try adjusting your filters."
+                  : "Create your first skill to start building your skills taxonomy"}
               </p>
-              <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create-first-skill">
-                <Plus className="w-4 h-4 mr-2" />
-                Create First Skill
-              </Button>
+              {!searchText && !selectedCategory && !selectedProficiency && (
+                <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create-first-skill">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create First Skill
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
