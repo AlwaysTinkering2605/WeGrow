@@ -772,8 +772,24 @@ function CompetencyLibraryView({ competencies, isLoading }: {
   );
 }
 
-// Role Mapping Manager Component (placeholder implementation)
+// Role Mapping Manager Component
 function RoleMappingManager() {
+  const { data: mappings = [], isLoading: isLoadingMappings } = useQuery<any[]>({
+    queryKey: ['/api/role-competency-mappings'],
+  });
+
+  const { data: jobRoles = [] } = useQuery<any[]>({
+    queryKey: ['/api/job-roles'],
+  });
+
+  const { data: competencies = [] } = useQuery<any[]>({
+    queryKey: ['/api/competency-library/hierarchical'],
+  });
+
+  const { data: proficiencyLevels = [] } = useQuery<any[]>({
+    queryKey: ['/api/proficiency-levels'],
+  });
+
   return (
     <Card>
       <CardHeader>
@@ -786,13 +802,62 @@ function RoleMappingManager() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="text-center py-8">
-          <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="font-medium mb-2">Role Mapping Interface</h3>
-          <p className="text-sm text-muted-foreground">
-            Configure role-specific competency requirements
-          </p>
-        </div>
+        {isLoadingMappings ? (
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        ) : mappings && mappings.length > 0 ? (
+          <div className="space-y-4">
+            <div className="overflow-x-auto">
+              <table className="w-full" data-testid="table-role-mappings">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-medium">Job Role</th>
+                    <th className="text-left py-3 px-4 font-medium">Competency</th>
+                    <th className="text-left py-3 px-4 font-medium">Required Level</th>
+                    <th className="text-left py-3 px-4 font-medium">Mandatory</th>
+                    <th className="text-left py-3 px-4 font-medium">Priority</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mappings.map((mapping) => (
+                    <tr key={mapping.id} className="border-b hover:bg-muted/50" data-testid={`row-mapping-${mapping.id}`}>
+                      <td className="py-3 px-4" data-testid={`text-role-${mapping.id}`}>
+                        {mapping.roleName || mapping.jobRoleName || mapping.jobRoleId}
+                      </td>
+                      <td className="py-3 px-4" data-testid={`text-competency-${mapping.id}`}>
+                        {mapping.competency?.title || mapping.competencyName || mapping.competencyLibraryId}
+                      </td>
+                      <td className="py-3 px-4" data-testid={`text-level-${mapping.id}`}>
+                        {mapping.proficiencyLevelName || mapping.requiredProficiencyLevel || 'N/A'}
+                      </td>
+                      <td className="py-3 px-4" data-testid={`text-mandatory-${mapping.id}`}>
+                        {mapping.isMandatory ? (
+                          <Badge variant="default" className="bg-red-500">Mandatory</Badge>
+                        ) : (
+                          <Badge variant="outline">Optional</Badge>
+                        )}
+                      </td>
+                      <td className="py-3 px-4" data-testid={`text-priority-${mapping.id}`}>
+                        <Badge variant="secondary">{mapping.priority || 'Medium'}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="font-medium mb-2">No Role Mappings Found</h3>
+            <p className="text-sm text-muted-foreground">
+              Role competency mappings will appear here when configured
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -1332,6 +1397,10 @@ export default function CompetencyManagement() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="mappings" className="space-y-4">
+          <RoleMappingManager />
         </TabsContent>
 
         <TabsContent value="audit">
