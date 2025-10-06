@@ -329,6 +329,29 @@ export interface AggregatedSkill {
   lessons?: Array<{ lessonId: string; lessonName: string }>;
 }
 
+// Competency Library Item with hydrated role mappings
+export interface CompetencyLibraryItemWithRoles {
+  id: string;
+  competencyId: string;
+  title: string | null;
+  description: string | null;
+  categoryId: string | null;
+  proficiencyLevelId: string | null;
+  isActive: boolean | null;
+  parentId: string | null;
+  assessmentCriteria: string | null;
+  hierarchyLevel: number | null;
+  sortOrder: number | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  requiredForRoles: Array<{
+    jobRoleId: string | null;
+    proficiencyLevelId: string | null;
+    roleName: string | null;
+    proficiencyLevelName: string | null;
+  }>;
+}
+
 export interface IStorage {
   // User operations - required for Replit Auth
   getUser(id: string): Promise<User | undefined>;
@@ -878,7 +901,7 @@ export interface IStorage {
   }>;
   
   // Competency Library Management
-  getCompetencyLibrary(): Promise<CompetencyLibraryItem[]>;
+  getCompetencyLibrary(): Promise<CompetencyLibraryItemWithRoles[]>;
   getCompetencyLibraryItem(itemId: string): Promise<CompetencyLibraryItem | undefined>;
   createCompetencyLibraryItem(item: InsertCompetencyLibraryItem): Promise<CompetencyLibraryItem>;
   updateCompetencyLibraryItem(itemId: string, updates: Partial<InsertCompetencyLibraryItem>): Promise<CompetencyLibraryItem>;
@@ -7339,7 +7362,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Competency Library Management (Vertical Slice 4)
-  async getCompetencyLibrary(): Promise<any[]> {
+  async getCompetencyLibrary(): Promise<CompetencyLibraryItemWithRoles[]> {
     const results = await db.select({
       id: competencyLibrary.id,
       competencyId: competencyLibrary.competencyId,
@@ -7359,7 +7382,28 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(competencies, eq(competencyLibrary.competencyId, competencies.id))
       .orderBy(competencyLibrary.sortOrder);
     
-    return results;
+    // Fetch all role mappings with job role names
+    const allMappings = await db.select({
+      id: roleCompetencyMappings.id,
+      competencyLibraryId: roleCompetencyMappings.competencyLibraryId,
+      jobRoleId: roleCompetencyMappings.jobRoleId,
+      requiredProficiencyLevel: roleCompetencyMappings.requiredProficiencyLevel,
+      roleName: jobRoles.name,
+    })
+      .from(roleCompetencyMappings)
+      .leftJoin(jobRoles, eq(roleCompetencyMappings.jobRoleId, jobRoles.id));
+    
+    // Hydrate each competency with its role mappings
+    return results.map(competency => {
+      const mappings = allMappings.filter(m => m.competencyLibraryId === competency.id);
+      const requiredForRoles = mappings.map(m => ({
+        jobRoleId: m.jobRoleId,
+        proficiencyLevelId: m.requiredProficiencyLevel,
+        roleName: m.roleName,
+        proficiencyLevelName: m.requiredProficiencyLevel,
+      }));
+      return { ...competency, requiredForRoles };
+    });
   }
 
   async getCompetencyLibraryItem(itemId: string): Promise<CompetencyLibraryItem | undefined> {
@@ -7433,6 +7477,8 @@ export class DatabaseStorage implements IStorage {
       createdBy: roleCompetencyMappings.createdBy,
       createdAt: roleCompetencyMappings.createdAt,
       updatedAt: roleCompetencyMappings.updatedAt,
+      roleName: jobRoles.name,
+      proficiencyLevelName: roleCompetencyMappings.requiredProficiencyLevel,
       competency: {
         id: competencies.id,
         title: competencies.name,
@@ -7443,7 +7489,8 @@ export class DatabaseStorage implements IStorage {
     })
     .from(roleCompetencyMappings)
     .leftJoin(competencyLibrary, eq(roleCompetencyMappings.competencyLibraryId, competencyLibrary.id))
-    .leftJoin(competencies, eq(competencyLibrary.competencyId, competencies.id));
+    .leftJoin(competencies, eq(competencyLibrary.competencyId, competencies.id))
+    .leftJoin(jobRoles, eq(roleCompetencyMappings.jobRoleId, jobRoles.id));
     
     const conditions = [];
     if (jobRoleId) {

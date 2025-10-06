@@ -51,7 +51,10 @@ const competencySchema = z.object({
   categoryId: z.string().min(1, "Category is required"),
   proficiencyLevelId: z.string().min(1, "Proficiency level is required"),
   parentId: z.string().optional(),
-  requiredForRoles: z.array(z.string()).default([]),
+  requiredForRoles: z.array(z.object({
+    jobRoleId: z.string(),
+    proficiencyLevelId: z.string(),
+  })).default([]),
   assessmentCriteria: z.string().optional(),
   trainingResources: z.array(z.string()).default([]),
   isActive: z.boolean().default(true),
@@ -91,7 +94,12 @@ interface Competency {
   children?: Competency[];
   assessmentCriteria?: string;
   isActive: boolean;
-  requiredForRoles?: string[];
+  requiredForRoles?: Array<{
+    jobRoleId: string;
+    proficiencyLevelId: string;
+    jobRoleName?: string;
+    proficiencyLevelName?: string;
+  }>;
   trainingResources?: string[];
 }
 
@@ -277,19 +285,14 @@ function CompetencyManagementDashboard() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="library" data-testid="tab-competency-library">Competency Library</TabsTrigger>
-          <TabsTrigger value="mappings" data-testid="tab-role-mappings">Role Mappings</TabsTrigger>
           <TabsTrigger value="evidence" data-testid="tab-evidence">Evidence Records</TabsTrigger>
           <TabsTrigger value="analytics" data-testid="tab-competency-analytics">Analytics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="library" className="space-y-6">
           <CompetencyLibraryView competencies={filteredCompetencies} isLoading={isLoading} />
-        </TabsContent>
-
-        <TabsContent value="mappings" className="space-y-6">
-          <RoleCompetencyMapping />
         </TabsContent>
 
         <TabsContent value="evidence" className="space-y-6">
@@ -322,6 +325,11 @@ function CompetencyLibraryView({ competencies, isLoading }: {
   // Fetch proficiency levels for the dropdown
   const { data: proficiencyLevels } = useQuery({
     queryKey: ["/api/proficiency-levels"]
+  }) as { data: any[] | undefined };
+
+  // Fetch job roles for role assignment
+  const { data: jobRoles } = useQuery({
+    queryKey: ["/api/job-roles"]
   }) as { data: any[] | undefined };
 
   const form = useForm<CompetencyFormType>({
@@ -442,12 +450,23 @@ function CompetencyLibraryView({ competencies, isLoading }: {
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">{competency.description}</p>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground mb-2">
                       <span>📂 {competency.categoryName || competency.category || "Uncategorized"}</span>
                       {competency.assessmentCriteria && (
                         <span>📋 Has Assessment Criteria</span>
                       )}
                     </div>
+                    {competency.requiredForRoles && competency.requiredForRoles.length > 0 && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-medium">Required for:</span>
+                        {competency.requiredForRoles.map((roleMapping, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {roleMapping.jobRoleName || roleMapping.jobRoleId}
+                            {roleMapping.proficiencyLevelName && ` (${roleMapping.proficiencyLevelName})`}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -602,6 +621,90 @@ function CompetencyLibraryView({ competencies, isLoading }: {
                     )}
                   />
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="requiredForRoles"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Required for Roles</FormLabel>
+                      <FormDescription className="text-xs mb-2">
+                        Assign this competency to job roles with specific proficiency requirements
+                      </FormDescription>
+                      <div className="space-y-3">
+                        {field.value.map((roleMapping, index) => (
+                          <div key={index} className="flex items-center gap-2 p-3 border rounded-md">
+                            <div className="flex-1 grid grid-cols-2 gap-2">
+                              <Select
+                                value={roleMapping.jobRoleId}
+                                onValueChange={(value) => {
+                                  const updated = [...field.value];
+                                  updated[index] = { ...updated[index], jobRoleId: value };
+                                  field.onChange(updated);
+                                }}
+                              >
+                                <SelectTrigger data-testid={`select-role-${index}`}>
+                                  <SelectValue placeholder="Select role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {jobRoles?.filter((role: any) => role.isActive !== false).map((role: any) => (
+                                    <SelectItem key={role.id} value={role.id}>
+                                      {role.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Select
+                                value={roleMapping.proficiencyLevelId}
+                                onValueChange={(value) => {
+                                  const updated = [...field.value];
+                                  updated[index] = { ...updated[index], proficiencyLevelId: value };
+                                  field.onChange(updated);
+                                }}
+                              >
+                                <SelectTrigger data-testid={`select-role-proficiency-${index}`}>
+                                  <SelectValue placeholder="Required level" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {proficiencyLevels?.map((level: any) => (
+                                    <SelectItem key={level.id} value={level.id}>
+                                      {level.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const updated = field.value.filter((_, i) => i !== index);
+                                field.onChange(updated);
+                              }}
+                              data-testid={`remove-role-${index}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            field.onChange([...field.value, { jobRoleId: "", proficiencyLevelId: "" }]);
+                          }}
+                          data-testid="button-add-role"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Role Requirement
+                        </Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
@@ -871,262 +974,6 @@ function CompetencyTree({ competencies, onEdit, onDelete, onReorder }: {
         .filter(c => !c.parentId) // Only show root-level competencies
         .map(competency => renderCompetency(competency))}
     </div>
-  );
-}
-
-// Role Competency Mapping Interface
-function RoleCompetencyMapping() {
-  const [selectedRole, setSelectedRole] = useState<string>("");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const { toast } = useToast();
-  const { user } = useAuth();
-
-  const { data: roleMappings, isLoading: isLoadingMappings } = useQuery({
-    queryKey: ["/api/role-competency-mappings", { jobRoleId: selectedRole }],
-    enabled: !!selectedRole
-  }) as { data: RoleMapping[] | undefined; isLoading: boolean };
-
-  const { data: competencies } = useQuery({
-    queryKey: ["/api/competency-library"]
-  }) as { data: Competency[] | undefined };
-
-  const { data: jobRoles } = useQuery({
-    queryKey: ["/api/job-roles"]
-  }) as { data: any[] | undefined };
-
-  const createMappingMutation = useMutation({
-    mutationFn: (data: RoleMappingFormType) => apiRequest("/api/role-competency-mappings", {
-      method: "POST",
-      body: JSON.stringify(data)
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/role-competency-mappings"],
-        refetchType: "all"
-      });
-      setIsCreateDialogOpen(false);
-      toast({ title: "Role mapping created successfully" });
-    },
-    onError: (error: any) => {
-      toast({ title: "Failed to create role mapping", description: error.message, variant: "destructive" });
-    }
-  });
-
-  const updateMappingMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<RoleMappingFormType> }) => 
-      apiRequest(`/api/role-competency-mappings/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data)
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/role-competency-mappings"],
-        refetchType: "all"
-      });
-      toast({ title: "Role mapping updated successfully" });
-    }
-  });
-
-  const deleteMappingMutation = useMutation({
-    mutationFn: (id: string) => apiRequest(`/api/role-competency-mappings/${id}`, {
-      method: "DELETE"
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/role-competency-mappings"],
-        refetchType: "all"
-      });
-      toast({ title: "Role mapping deleted successfully" });
-    }
-  });
-
-  const form = useForm<RoleMappingFormType>({
-    resolver: zodResolver(roleMappingSchema),
-    defaultValues: {
-      priority: "medium",
-      isMandatory: true
-    }
-  });
-
-  useEffect(() => {
-    if (selectedRole) {
-      form.setValue("jobRoleId", selectedRole);
-    }
-  }, [selectedRole, form]);
-
-  const onSubmit = (data: RoleMappingFormType) => {
-    if (!user?.id) {
-      toast({ title: "Error", description: "User not authenticated", variant: "destructive" });
-      return;
-    }
-    createMappingMutation.mutate(data);
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Users className="w-5 h-5" />
-          Role Competency Mapping
-        </CardTitle>
-        <CardDescription>
-          Map competencies to roles with priorities and target levels
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center gap-4">
-          <Select value={selectedRole} onValueChange={setSelectedRole}>
-            <SelectTrigger className="w-64" data-testid="select-role">
-              <SelectValue placeholder="Select a role" />
-            </SelectTrigger>
-            <SelectContent>
-              {jobRoles?.filter((role: any) => role.isActive !== false).map((role: any) => (
-                <SelectItem key={role.id} value={role.id}>
-                  {role.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button disabled={!selectedRole} data-testid="button-create-mapping">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Competency
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Competency to Role</DialogTitle>
-                <DialogDescription>
-                  Map a competency to the selected role with target level and priority
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="jobRoleId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Role</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={jobRoles?.find((r: any) => r.id === selectedRole)?.name || selectedRole} readOnly />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="competencyLibraryId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Competency</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-competency">
-                              <SelectValue placeholder="Select competency" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {competencies?.map((comp: Competency) => (
-                              <SelectItem key={comp.id} value={comp.id}>
-                                {comp.title}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Priority</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-priority">
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="critical">Critical</SelectItem>
-                            <SelectItem value="important">Important</SelectItem>
-                            <SelectItem value="desired">Desired</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={createMappingMutation.isPending} data-testid="button-submit-mapping">
-                      {createMappingMutation.isPending ? "Creating..." : "Create Mapping"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        {selectedRole && (
-          <div className="space-y-4">
-            {isLoadingMappings ? (
-              <div className="space-y-2">
-                {[...Array(3)].map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            ) : roleMappings && roleMappings.length > 0 ? (
-              <div className="space-y-2">
-                {roleMappings.map((mapping: RoleMapping) => (
-                  <div key={mapping.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-medium">{mapping.competency?.title}</h4>
-                        {mapping.priority && (
-                          <Badge variant={mapping.priority === "critical" ? "destructive" : 
-                                         mapping.priority === "high" ? "default" : "secondary"}>
-                            {mapping.priority}
-                          </Badge>
-                        )}
-                        {mapping.isMandatory && <Badge variant="outline">Required</Badge>}
-                      </div>
-                      <p className="text-sm text-muted-foreground">{mapping.competency?.description}</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteMappingMutation.mutate(mapping.id)}
-                      data-testid={`delete-mapping-${mapping.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Target className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="font-medium mb-2">No competencies mapped</h3>
-                <p className="text-sm text-muted-foreground">Add competencies to this role to get started</p>
-              </div>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 
@@ -1485,10 +1332,6 @@ export default function CompetencyManagement() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="mappings">
-          <RoleCompetencyMapping />
         </TabsContent>
 
         <TabsContent value="audit">

@@ -3577,6 +3577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Enhanced Competency Library - Hierarchical Competency Management
   app.get('/api/competency-library', isAuthenticated, async (req, res) => {
     try {
+      // Storage layer now returns competencies with hydrated requiredForRoles data
       const competencies = await storage.getCompetencyLibrary();
       res.json(competencies);
     } catch (error) {
@@ -3621,11 +3622,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/competency-library', isAuthenticated, requireLeadership(), async (req: any, res) => {
     try {
-      // Extract data for base competency creation (if provided)
-      const { title, description, categoryId, proficiencyLevelId, ...libraryData } = req.body;
+      // Extract data for base competency creation and role mappings
+      const { title, description, categoryId, proficiencyLevelId, requiredForRoles, ...libraryData } = req.body;
       
       // Auto-populate createdBy from authenticated user
       const userId = req.user.claims.sub;
+      
+      let competency;
       
       // If creating a new competency with title/description, create the base competency first
       if (title && description) {
@@ -3643,17 +3646,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
           createdBy: userId,
         });
         
-        const competency = await storage.createCompetencyLibraryItem(competencyLibraryData);
-        res.json({...competency, categoryId, categoryName: null}); // Include categoryId in response for UI
+        competency = await storage.createCompetencyLibraryItem(competencyLibraryData);
       } else {
         // Otherwise, use the provided competency ID
         const competencyLibraryData = insertCompetencyLibrarySchema.parse({
-          ...req.body,
+          ...libraryData,
           createdBy: userId,
         });
-        const competency = await storage.createCompetencyLibraryItem(competencyLibraryData);
-        res.json(competency);
+        competency = await storage.createCompetencyLibraryItem(competencyLibraryData);
       }
+      
+      // Handle role mappings if provided
+      if (requiredForRoles && Array.isArray(requiredForRoles)) {
+        for (const roleMapping of requiredForRoles) {
+          if (roleMapping.jobRoleId && roleMapping.proficiencyLevelId) {
+            await storage.createRoleCompetencyMapping({
+              jobRoleId: roleMapping.jobRoleId,
+              competencyLibraryId: competency.id,
+              requiredProficiencyLevel: roleMapping.proficiencyLevelId,
+              isMandatory: true,
+              createdBy: userId,
+            });
+          }
+        }
+      }
+      
+      // Fetch created mappings with role and proficiency names for response
+      const mappings = await storage.getRoleCompetencyMappings(undefined, undefined);
+      const competencyMappings = mappings.filter(m => m.competencyLibraryId === competency.id);
+      const requiredForRolesWithNames = competencyMappings.map(m => ({
+        jobRoleId: m.jobRoleId,
+        proficiencyLevelId: m.requiredProficiencyLevel,
+        roleName: m.roleName,
+        proficiencyLevelName: m.proficiencyLevelName,
+      }));
+      
+      res.json({...competency, categoryId, categoryName: null, requiredForRoles: requiredForRolesWithNames});
     } catch (error: any) {
       console.error("Error creating competency:", error);
       
@@ -3687,11 +3715,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/competency-library/:id', isAuthenticated, requireLeadership(), async (req, res) => {
+  app.patch('/api/competency-library/:id', isAuthenticated, requireLeadership(), async (req: any, res) => {
     try {
-      const updates = insertCompetencyLibrarySchema.partial().parse(req.body);
-      const competency = await storage.updateCompetencyLibraryItem(req.params.id, updates);
-      res.json(competency);
+      const { requiredForRoles, ...updates } = req.body;
+      const competencyId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      // Update the competency library item
+      const validatedUpdates = insertCompetencyLibrarySchema.partial().parse(updates);
+      const competency = await storage.updateCompetencyLibraryItem(competencyId, validatedUpdates);
+      
+      // Handle role mappings if provided
+      if (requiredForRoles !== undefined) {
+        // Delete existing role mappings for this competency
+        const existingMappings = await storage.getRoleCompetencyMappings(undefined, undefined);
+        const competencyMappings = existingMappings.filter(m => m.competencyLibraryId === competencyId);
+        for (const mapping of competencyMappings) {
+          await storage.deleteRoleCompetencyMapping(mapping.id);
+        }
+        
+        // Create new role mappings
+        if (Array.isArray(requiredForRoles)) {
+          for (const roleMapping of requiredForRoles) {
+            if (roleMapping.jobRoleId && roleMapping.proficiencyLevelId) {
+              await storage.createRoleCompetencyMapping({
+                jobRoleId: roleMapping.jobRoleId,
+                competencyLibraryId: competencyId,
+                requiredProficiencyLevel: roleMapping.proficiencyLevelId,
+                isMandatory: true,
+                createdBy: userId,
+              });
+            }
+          }
+        }
+      }
+      
+      // Fetch updated mappings with role and proficiency names for response
+      const updatedMappings = await storage.getRoleCompetencyMappings(undefined, undefined);
+      const updatedCompetencyMappings = updatedMappings.filter(m => m.competencyLibraryId === competencyId);
+      const requiredForRolesWithNames = updatedCompetencyMappings.map(m => ({
+        jobRoleId: m.jobRoleId,
+        proficiencyLevelId: m.requiredProficiencyLevel,
+        roleName: m.roleName,
+        proficiencyLevelName: m.proficiencyLevelName,
+      }));
+      
+      res.json({...competency, requiredForRoles: requiredForRolesWithNames});
     } catch (error: any) {
       console.error("Error updating competency:", error);
       

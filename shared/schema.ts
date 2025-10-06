@@ -2529,6 +2529,11 @@ export const insertCompetencyLibrarySchema = createInsertSchema(competencyLibrar
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  requiredForRoles: z.array(z.object({
+    jobRoleId: z.string(),
+    proficiencyLevelId: z.string(),
+  })).optional(),
 });
 
 export const insertRoleCompetencyMappingSchema = createInsertSchema(roleCompetencyMappings).omit({
