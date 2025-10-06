@@ -887,7 +887,7 @@ export interface IStorage {
   unlinkLearningPathFromCompetency(competencyLibraryId: string, learningPathId: string): Promise<void>;
 
   // Role Competency Mappings
-  getRoleCompetencyMappings(role?: string, teamId?: string): Promise<RoleCompetencyMapping[]>;
+  getRoleCompetencyMappings(jobRoleId?: string, teamId?: string): Promise<any[]>;
   getRoleCompetencyMapping(mappingId: string): Promise<RoleCompetencyMapping | undefined>;
   createRoleCompetencyMapping(mapping: InsertRoleCompetencyMapping): Promise<RoleCompetencyMapping>;
   updateRoleCompetencyMapping(mappingId: string, updates: Partial<InsertRoleCompetencyMapping>): Promise<RoleCompetencyMapping>;
@@ -7420,12 +7420,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Role Competency Mappings (Vertical Slice 3)
-  async getRoleCompetencyMappings(role?: string, teamId?: string): Promise<RoleCompetencyMapping[]> {
-    let query = db.select().from(roleCompetencyMappings);
+  async getRoleCompetencyMappings(jobRoleId?: string, teamId?: string): Promise<any[]> {
+    let query = db.select({
+      id: roleCompetencyMappings.id,
+      jobRoleId: roleCompetencyMappings.jobRoleId,
+      competencyLibraryId: roleCompetencyMappings.competencyLibraryId,
+      teamId: roleCompetencyMappings.teamId,
+      requiredProficiencyLevel: roleCompetencyMappings.requiredProficiencyLevel,
+      isMandatory: roleCompetencyMappings.isMandatory,
+      priority: roleCompetencyMappings.priority,
+      gracePeriodDays: roleCompetencyMappings.gracePeriodDays,
+      createdBy: roleCompetencyMappings.createdBy,
+      createdAt: roleCompetencyMappings.createdAt,
+      updatedAt: roleCompetencyMappings.updatedAt,
+      competency: competencyLibrary
+    })
+    .from(roleCompetencyMappings)
+    .leftJoin(competencyLibrary, eq(roleCompetencyMappings.competencyLibraryId, competencyLibrary.id));
     
     const conditions = [];
-    if (role) {
-      conditions.push(eq(roleCompetencyMappings.role, role));
+    if (jobRoleId) {
+      conditions.push(eq(roleCompetencyMappings.jobRoleId, jobRoleId));
     }
     if (teamId) {
       conditions.push(eq(roleCompetencyMappings.teamId, teamId));
