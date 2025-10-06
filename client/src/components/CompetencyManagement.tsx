@@ -61,8 +61,6 @@ const roleMappingSchema = z.object({
   roleId: z.string().min(1, "Role is required"),
   competencyId: z.string().min(1, "Competency is required"),
   priority: z.enum(["critical", "important", "desired"]).default("important"),
-  targetLevel: z.coerce.number().min(1).max(5).default(3),
-  deadline: z.string().optional(),
   isRequired: z.boolean().default(true),
 });
 
@@ -291,7 +289,7 @@ function CompetencyManagementDashboard() {
         </TabsContent>
 
         <TabsContent value="mappings" className="space-y-6">
-          <RoleMappingManager />
+          <RoleCompetencyMapping />
         </TabsContent>
 
         <TabsContent value="evidence" className="space-y-6">
@@ -936,7 +934,6 @@ function RoleCompetencyMapping() {
     resolver: zodResolver(roleMappingSchema),
     defaultValues: {
       priority: "important",
-      targetLevel: 3,
       isRequired: true
     }
   });
@@ -1055,34 +1052,6 @@ function RoleCompetencyMapping() {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="targetLevel"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Target Level (1-5)</FormLabel>
-                        <FormControl>
-                          <Input type="number" min="1" max="5" {...field} data-testid="input-target-level" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="deadline"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Deadline (Optional)</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} data-testid="input-deadline" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                       Cancel
@@ -1116,13 +1085,9 @@ function RoleCompetencyMapping() {
                                        mapping.priority === "important" ? "default" : "secondary"}>
                           {mapping.priority}
                         </Badge>
-                        <Badge variant="outline">Target L{mapping.targetLevel}</Badge>
                         {mapping.isRequired && <Badge variant="outline">Required</Badge>}
                       </div>
                       <p className="text-sm text-muted-foreground">{mapping.competency?.description}</p>
-                      {mapping.deadline && (
-                        <p className="text-xs text-muted-foreground">Deadline: {new Date(mapping.deadline).toLocaleDateString()}</p>
-                      )}
                     </div>
                     <Button
                       variant="ghost"
