@@ -774,6 +774,10 @@ function CompetencyLibraryView({ competencies, isLoading }: {
 
 // Role Mapping Manager Component
 function RoleMappingManager() {
+  const { toast } = useToast();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingMapping, setEditingMapping] = useState<any | null>(null);
+
   const { data: mappings = [], isLoading: isLoadingMappings } = useQuery<any[]>({
     queryKey: ['/api/role-competency-mappings'],
   });
@@ -790,16 +794,115 @@ function RoleMappingManager() {
     queryKey: ['/api/proficiency-levels'],
   });
 
+  const mappingForm = useForm<RoleMappingFormType>({
+    resolver: zodResolver(roleMappingSchema),
+    defaultValues: {
+      jobRoleId: '',
+      competencyLibraryId: '',
+      priority: 'medium',
+      isMandatory: true,
+    },
+  });
+
+  const createMappingMutation = useMutation({
+    mutationFn: async (data: RoleMappingFormType) => {
+      return await apiRequest('/api/role-competency-mappings', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/role-competency-mappings'] });
+      toast({ title: "Success", description: "Role mapping created successfully" });
+      setIsCreateDialogOpen(false);
+      mappingForm.reset();
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to create role mapping",
+        variant: "destructive"
+      });
+    },
+  });
+
+  const updateMappingMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<RoleMappingFormType> }) => {
+      return await apiRequest(`/api/role-competency-mappings/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/role-competency-mappings'] });
+      toast({ title: "Success", description: "Role mapping updated successfully" });
+      setEditingMapping(null);
+      mappingForm.reset();
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to update role mapping",
+        variant: "destructive"
+      });
+    },
+  });
+
+  const deleteMappingMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest(`/api/role-competency-mappings/${id}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/role-competency-mappings'] });
+      toast({ title: "Success", description: "Role mapping deleted successfully" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to delete role mapping",
+        variant: "destructive"
+      });
+    },
+  });
+
+  const onSubmit = (data: RoleMappingFormType) => {
+    if (editingMapping) {
+      updateMappingMutation.mutate({ id: editingMapping.id, data });
+    } else {
+      createMappingMutation.mutate(data);
+    }
+  };
+
+  const handleEdit = (mapping: any) => {
+    setEditingMapping(mapping);
+    mappingForm.reset({
+      jobRoleId: mapping.jobRoleId,
+      competencyLibraryId: mapping.competencyLibraryId,
+      priority: mapping.priority || 'medium',
+      isMandatory: mapping.isMandatory ?? true,
+    });
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Users className="w-5 h-5" />
-          Role Competency Mappings
-        </CardTitle>
-        <CardDescription>
-          Define which competencies are required for each role
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Role Competency Mappings
+            </CardTitle>
+            <CardDescription>
+              Define which competencies are required for each role
+            </CardDescription>
+          </div>
+          <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create-mapping">
+            <Plus className="w-4 h-4 mr-2" />
+            Create Mapping
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {isLoadingMappings ? (
@@ -819,6 +922,7 @@ function RoleMappingManager() {
                     <th className="text-left py-3 px-4 font-medium">Required Level</th>
                     <th className="text-left py-3 px-4 font-medium">Mandatory</th>
                     <th className="text-left py-3 px-4 font-medium">Priority</th>
+                    <th className="text-left py-3 px-4 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -843,6 +947,26 @@ function RoleMappingManager() {
                       <td className="py-3 px-4" data-testid={`text-priority-${mapping.id}`}>
                         <Badge variant="secondary">{mapping.priority || 'Medium'}</Badge>
                       </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(mapping)}
+                            data-testid={`button-edit-mapping-${mapping.id}`}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteMappingMutation.mutate(mapping.id)}
+                            data-testid={`button-delete-mapping-${mapping.id}`}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -859,6 +983,146 @@ function RoleMappingManager() {
           </div>
         )}
       </CardContent>
+
+      <Dialog open={isCreateDialogOpen || !!editingMapping} onOpenChange={(open) => {
+        if (!open) {
+          setIsCreateDialogOpen(false);
+          setEditingMapping(null);
+          mappingForm.reset();
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingMapping ? "Edit Role Mapping" : "Create Role Mapping"}</DialogTitle>
+            <DialogDescription>
+              {editingMapping ? "Update the role competency mapping" : "Assign a competency requirement to a job role"}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...mappingForm}>
+            <form onSubmit={mappingForm.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={mappingForm.control}
+                name="jobRoleId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Job Role</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-mapping-role">
+                          <SelectValue placeholder="Select job role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {jobRoles?.map((role: any) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            {role.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={mappingForm.control}
+                name="competencyLibraryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Competency</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-mapping-competency">
+                          <SelectValue placeholder="Select competency" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {competencies?.map((comp: any) => (
+                          <SelectItem key={comp.id} value={comp.id}>
+                            {comp.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={mappingForm.control}
+                name="priority"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Priority</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-mapping-priority">
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="critical">Critical</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={mappingForm.control}
+                name="isMandatory"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel>Mandatory</FormLabel>
+                      <FormDescription>
+                        Is this competency mandatory for this role?
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <input
+                        type="checkbox"
+                        checked={field.value}
+                        onChange={field.onChange}
+                        className="w-4 h-4"
+                        data-testid="checkbox-mapping-mandatory"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsCreateDialogOpen(false);
+                    setEditingMapping(null);
+                    mappingForm.reset();
+                  }}
+                  data-testid="button-cancel-mapping"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createMappingMutation.isPending || updateMappingMutation.isPending}
+                  data-testid="button-save-mapping"
+                >
+                  {editingMapping ? "Update Mapping" : "Create Mapping"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
