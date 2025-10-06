@@ -3719,9 +3719,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Role Competency Mapping - Team Filtering and Priority Management
   app.get('/api/role-competency-mappings', isAuthenticated, async (req, res) => {
     try {
-      const role = req.query.role as string | undefined;
+      const jobRoleId = req.query.jobRoleId as string | undefined;
       const teamId = req.query.teamId as string | undefined;
-      const mappings = await storage.getRoleCompetencyMappings(role, teamId);
+      const mappings = await storage.getRoleCompetencyMappings(jobRoleId, teamId);
       res.json(mappings);
     } catch (error) {
       console.error("Error fetching role competency mappings:", error);
